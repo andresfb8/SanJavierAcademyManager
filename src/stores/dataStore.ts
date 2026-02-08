@@ -169,23 +169,23 @@ const defaultClub: Club = {
 // ===================
 
 export const useDataStore = create<DataState>((set, get) => ({
-  // --- Initial Data (loaded from demo) ---
+  // --- Initial Data (empty for production) ---
   club: defaultClub,
-  courts: [...demoCourts],
-  tariffs: [...demoTariffs],
-  players: [...demoPlayers],
-  coaches: [...demoCoaches],
-  groups: [...demoGroups],
-  enrollments: [...demoEnrollments],
-  payments: [...demoPayments],
+  courts: [],
+  tariffs: [],
+  players: [],
+  coaches: [],
+  groups: [],
+  enrollments: [],
+  payments: [],
   attendance: [],
-  activities: [...demoActivities],
+  activities: [],
   privateLessons: [],
   invitations: [],
-  events: [...demoEvents],
+  events: [],
   eventPayments: [],
-  evaluations: [...demoEvaluations],
-  coachSalaryConfigs: [...demoCoachSalaryConfigs],
+  evaluations: [],
+  coachSalaryConfigs: [],
 
   // ================================
   // CLUB

@@ -20,6 +20,8 @@ import {
   CalendarDays,
   Activity,
   Settings as SettingsIcon,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import {
   BarChart,
@@ -28,6 +30,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -49,6 +52,10 @@ const defaultKpiConfig: KpiConfig = {
   todayClasses: true,
   totalEnrolled: true,
   waitingList: true,
+  // Chart visibility
+  attendanceChart: true,
+  levelChart: true,
+  financialChart: true,
 }
 
 export default function DashboardPage() {
@@ -68,6 +75,12 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(kpiConfig))
   }, [kpiConfig])
+
+  const [chartCollapsed, setChartCollapsed] = useState<Record<string, boolean>>({})
+
+  const toggleChartCollapsed = (key: string) => {
+    setChartCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
   // KPIs
   const activePlayers = players.filter((p) => p.status === 'activo').length
@@ -126,6 +139,20 @@ export default function DashboardPage() {
     { name: 'Competición', value: players.filter((p) => p.level === 'competicion' && p.status === 'activo').length, color: '#ef4444' },
     { name: 'Menores', value: players.filter((p) => p.level === 'menores' && p.status === 'activo').length, color: '#f59e0b' },
   ].filter((d) => d.value > 0)
+
+  // Financial chart data (last 6 months)
+  const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const financialData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(currentYear, currentMonth - 1 - (5 - i), 1)
+    const m = d.getMonth() + 1
+    const y = d.getFullYear()
+    const monthPayments = payments.filter((p) => p.billingMonth === m && p.billingYear === y)
+    return {
+      month: MONTH_NAMES[d.getMonth()],
+      cobrado: monthPayments.filter((p) => p.status === 'pagado').reduce((sum, p) => sum + p.amount, 0),
+      pendiente: monthPayments.filter((p) => p.status === 'pendiente').reduce((sum, p) => sum + p.amount, 0),
+    }
+  })
 
   // Today's classes
   const today = now.getDay()
@@ -236,71 +263,168 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Charts row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Attendance chart */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base">Asistencia semanal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={attendanceData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="day" fontSize={12} />
-                  <YAxis fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Bar dataKey="asistencia" fill="#2563eb" radius={[4, 4, 0, 0]} name="Asistencia" />
-                  <Bar dataKey="faltas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Faltas" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Level distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Distribución por nivel</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={levelData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {levelData.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} jugadores`, '']} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-2 space-y-1">
-                {levelData.map((entry) => (
-                  <div key={entry.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                      <span className="text-muted-foreground">{entry.name}</span>
-                    </div>
-                    <span className="font-medium">{entry.value}</span>
+        {/* Charts row 1 */}
+        {(kpiConfig.attendanceChart || kpiConfig.levelChart) && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Attendance chart */}
+            {kpiConfig.attendanceChart && (
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base">Asistencia semanal</CardTitle>
+                    {chartCollapsed.attendanceChart && (
+                      <span className="text-xs text-muted-foreground">(Minimizado)</span>
+                    )}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => toggleChartCollapsed('attendanceChart')}
+                    title={chartCollapsed.attendanceChart ? 'Expandir' : 'Minimizar'}
+                  >
+                    {chartCollapsed.attendanceChart ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4" />
+                    )}
+                  </Button>
+                </CardHeader>
+                {!chartCollapsed.attendanceChart && (
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={attendanceData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="day" fontSize={12} />
+                        <YAxis fontSize={12} />
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '12px',
+                          }}
+                        />
+                        <Bar dataKey="asistencia" fill="#2563eb" radius={[4, 4, 0, 0]} name="Asistencia" />
+                        <Bar dataKey="faltas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Faltas" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                )}
+              </Card>
+            )}
+
+            {/* Level distribution */}
+            {kpiConfig.levelChart && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base">Distribución por nivel</CardTitle>
+                    {chartCollapsed.levelChart && (
+                      <span className="text-xs text-muted-foreground">(Minimizado)</span>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => toggleChartCollapsed('levelChart')}
+                    title={chartCollapsed.levelChart ? 'Expandir' : 'Minimizar'}
+                  >
+                    {chartCollapsed.levelChart ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4" />
+                    )}
+                  </Button>
+                </CardHeader>
+                {!chartCollapsed.levelChart && (
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={levelData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={4}
+                          dataKey="value"
+                        >
+                          {levelData.map((entry, index) => (
+                            <Cell key={index} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => [`${value} jugadores`, '']} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="mt-2 space-y-1">
+                      {levelData.map((entry) => (
+                        <div key={entry.name} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                            <span className="text-muted-foreground">{entry.name}</span>
+                          </div>
+                          <span className="font-medium">{entry.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Financial chart row */}
+        {kpiConfig.financialChart && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base">Resumen financiero</CardTitle>
+                  {chartCollapsed.financialChart && (
+                    <span className="text-xs text-muted-foreground">(Minimizado)</span>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => toggleChartCollapsed('financialChart')}
+                  title={chartCollapsed.financialChart ? 'Expandir' : 'Minimizar'}
+                >
+                  {chartCollapsed.financialChart ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4" />
+                  )}
+                </Button>
+              </CardHeader>
+              {!chartCollapsed.financialChart && (
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={financialData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="month" fontSize={12} />
+                      <YAxis fontSize={12} tickFormatter={(v) => `${v}€`} />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '12px',
+                        }}
+                        formatter={(value) => [`${Number(value).toLocaleString('es-ES')}€`, '']}
+                      />
+                      <Legend />
+                      <Bar dataKey="cobrado" fill="#22c55e" radius={[4, 4, 0, 0]} name="Cobrado" />
+                      <Bar dataKey="pendiente" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pendiente" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              )}
+            </Card>
+          </div>
+        )}
 
         {/* Bottom row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -405,6 +529,25 @@ export default function DashboardPage() {
                   <Label className="cursor-pointer">{item.label}</Label>
                 </div>
               ))}
+
+              <div className="border-t pt-3 mt-3">
+                <p className="text-sm font-medium mb-3">Graficos</p>
+                {[
+                  { key: 'attendanceChart', label: 'Grafico de asistencia semanal' },
+                  { key: 'levelChart', label: 'Grafico de distribucion por nivel' },
+                  { key: 'financialChart', label: 'Grafico resumen financiero' },
+                ].map((item) => (
+                  <div key={item.key} className="flex items-center gap-3 mb-3">
+                    <Checkbox
+                      checked={kpiConfig[item.key]}
+                      onCheckedChange={(checked) =>
+                        setKpiConfig((prev) => ({ ...prev, [item.key]: checked }))
+                      }
+                    />
+                    <Label className="cursor-pointer">{item.label}</Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
