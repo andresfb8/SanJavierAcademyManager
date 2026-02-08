@@ -6,6 +6,7 @@
 // asistencia con créditos de recuperación, y operaciones CRUD completas.
 
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type {
   Club,
   Court,
@@ -165,10 +166,26 @@ const defaultClub: Club = {
 }
 
 // ===================
+// DATE REVIVER for localStorage
+// ===================
+// Converts ISO date strings back to Date objects when loading from localStorage
+
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
+
+function dateReviver(_key: string, value: unknown): unknown {
+  if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
+    return new Date(value)
+  }
+  return value
+}
+
+// ===================
 // STORE IMPLEMENTATION
 // ===================
 
-export const useDataStore = create<DataState>((set, get) => ({
+export const useDataStore = create<DataState>()(
+  persist(
+    (set, get) => ({
   // --- Initial Data (empty for production) ---
   club: defaultClub,
   courts: [],
@@ -913,4 +930,41 @@ export const useDataStore = create<DataState>((set, get) => ({
       ),
     }))
   },
-}))
+}),
+    {
+      name: 'sjam-data-store',
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name)
+          if (!str) return null
+          return JSON.parse(str, dateReviver)
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value))
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name)
+        },
+      },
+      // Only persist data, not action functions
+      partialize: (state) => ({
+        club: state.club,
+        courts: state.courts,
+        tariffs: state.tariffs,
+        players: state.players,
+        coaches: state.coaches,
+        groups: state.groups,
+        enrollments: state.enrollments,
+        payments: state.payments,
+        attendance: state.attendance,
+        activities: state.activities,
+        privateLessons: state.privateLessons,
+        invitations: state.invitations,
+        events: state.events,
+        eventPayments: state.eventPayments,
+        evaluations: state.evaluations,
+        coachSalaryConfigs: state.coachSalaryConfigs,
+      }) as DataState,
+    },
+  )
+)
