@@ -14,6 +14,12 @@ import CoachesPage from '@/pages/CoachesPage'
 import AgendaPage from '@/pages/AgendaPage'
 import SettingsPage from '@/pages/SettingsPage'
 import PlanningPage from '@/pages/PlanningPage'
+import UsersPage from '@/pages/UsersPage'
+import ActivateAccountPage from '@/pages/ActivateAccountPage'
+import EventDetailPage from '@/pages/EventDetailPage'
+import ClassDetailPage from '@/pages/ClassDetailPage'
+import CoachProfilePage from '@/pages/CoachProfilePage'
+import EvaluacionesPage from '@/pages/EvaluacionesPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -53,6 +59,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/activar/:token" element={<ActivateAccountPage />} />
       <Route
         element={
           <ProtectedRoute>
@@ -67,8 +74,13 @@ export default function App() {
         <Route path="/grupos/:id" element={<GroupDetailPage />} />
         <Route path="/asistencia" element={<AttendancePage />} />
         <Route path="/agenda" element={<AgendaPage />} />
+        <Route path="/eventos/:id" element={<EventDetailPage />} />
+        <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
         <Route path="/pagos" element={<PaymentsPage />} />
         <Route path="/entrenadores" element={<CoachesPage />} />
+        <Route path="/entrenadores/:id" element={<CoachProfilePage />} />
+        <Route path="/informes" element={<EvaluacionesPage />} />
+        <Route path="/usuarios" element={<UsersPage />} />
         <Route path="/configuracion" element={<SettingsPage />} />
         <Route path="/planificacion" element={<PlanningPage />} />
       </Route>

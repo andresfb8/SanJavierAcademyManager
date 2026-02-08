@@ -124,27 +124,32 @@ export function hasPermission(role: UserRole, module: string, action: string = '
       groups: ['read', 'write', 'delete'], attendance: ['read', 'write'],
       payments: ['read', 'write', 'generate'], coaches: ['read', 'write', 'delete'],
       agenda: ['read', 'write'], settings: ['read', 'write'], users: ['read', 'write', 'delete'],
+      informes: ['read', 'write', 'delete'], events: ['read', 'write', 'delete'],
     },
     coordinador: {
       dashboard: ['read', 'write'], players: ['read', 'write', 'delete', 'import', 'export'],
       groups: ['read', 'write', 'delete'], attendance: ['read', 'write'],
       payments: ['read', 'write', 'generate'], coaches: ['read', 'write', 'delete'],
       agenda: ['read', 'write'], settings: ['read', 'write'], users: [],
+      informes: ['read', 'write', 'delete'], events: ['read', 'write', 'delete'],
     },
     entrenador: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read', 'write'], payments: [], coaches: [],
       agenda: ['read'], settings: [], users: [],
+      informes: ['read', 'write'], events: ['read'],
     },
     jugador: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read'], payments: ['read'], coaches: [],
       agenda: ['read'], settings: [], users: [],
+      informes: ['read'], events: ['read'],
     },
     tutor: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read'], payments: ['read'], coaches: [],
       agenda: ['read'], settings: [], users: [],
+      informes: ['read'], events: ['read'],
     },
   }
   return permissions[role]?.[module]?.includes(action) ?? false

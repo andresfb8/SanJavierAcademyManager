@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,14 @@ import {
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useDataStore } from '@/stores/dataStore'
@@ -28,9 +37,17 @@ import {
   Search,
   Edit2,
   Trash2,
+  LayoutGrid,
+  List,
+  Euro,
+  Eye,
 } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
 import type { Coach } from '@/types'
+
+// ==========================================
+// CoachesPage - Gestion de entrenadores
+// ==========================================
 
 interface CoachForm {
   firstName: string
@@ -43,6 +60,10 @@ interface CoachForm {
   certifications: string
   notes: string
   isActive: boolean
+  ratePerGroup: string
+  ratePerPrivateLesson: string
+  bonuses: string
+  salaryNotes: string
 }
 
 const emptyForm: CoachForm = {
@@ -56,21 +77,34 @@ const emptyForm: CoachForm = {
   certifications: '',
   notes: '',
   isActive: true,
+  ratePerGroup: '',
+  ratePerPrivateLesson: '',
+  bonuses: '',
+  salaryNotes: '',
 }
 
 export default function CoachesPage() {
-  const { coaches, groups, addCoach, updateCoach, deleteCoach } = useDataStore()
+  const {
+    coaches,
+    groups,
+    coachSalaryConfigs,
+    privateLessons,
+    addCoach,
+    updateCoach,
+    deleteCoach,
+    updateCoachSalaryConfig,
+  } = useDataStore()
 
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('active')
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [form, setForm] = useState<CoachForm>({ ...emptyForm })
 
-  const resetForm = () => {
-    setForm({ ...emptyForm })
-  }
+  const resetForm = () => setForm({ ...emptyForm })
 
   const filteredCoaches = useMemo(() => {
     return coaches.filter((c) => {
@@ -85,8 +119,28 @@ export default function CoachesPage() {
     })
   }, [coaches, search, activeFilter])
 
-  const getCoachGroups = (coachId: string) => {
-    return groups.filter((g) => g.coachId === coachId)
+  const getCoachGroups = (coachId: string) =>
+    groups.filter((g) => g.coachId === coachId)
+
+  const getSalaryConfig = (coachId: string) =>
+    coachSalaryConfigs.find((c) => c.coachId === coachId)
+
+  const getEstimatedSalary = (coachId: string) => {
+    const config = getSalaryConfig(coachId)
+    if (!config) return 0
+    const coachGroups = getCoachGroups(coachId)
+    const now = new Date()
+    const monthLessons = privateLessons.filter(
+      (pl) =>
+        pl.coachId === coachId &&
+        new Date(pl.date).getMonth() === now.getMonth() &&
+        new Date(pl.date).getFullYear() === now.getFullYear()
+    )
+    return (
+      coachGroups.length * config.ratePerGroup +
+      monthLessons.length * config.ratePerPrivateLesson +
+      config.bonuses
+    )
   }
 
   const handleSubmit = () => {
@@ -108,6 +162,14 @@ export default function CoachesPage() {
 
     if (editingCoach) {
       updateCoach(editingCoach.id, coachData)
+      // Update salary config
+      updateCoachSalaryConfig(editingCoach.id, {
+        coachId: editingCoach.id,
+        ratePerGroup: parseFloat(form.ratePerGroup) || 0,
+        ratePerPrivateLesson: parseFloat(form.ratePerPrivateLesson) || 0,
+        bonuses: parseFloat(form.bonuses) || 0,
+        notes: form.salaryNotes || undefined,
+      })
       setEditingCoach(null)
     } else {
       addCoach(coachData)
@@ -118,6 +180,7 @@ export default function CoachesPage() {
   }
 
   const openEditDialog = (coach: Coach) => {
+    const config = getSalaryConfig(coach.id)
     setForm({
       firstName: coach.firstName,
       lastName: coach.lastName,
@@ -129,6 +192,10 @@ export default function CoachesPage() {
       certifications: coach.certifications || '',
       notes: coach.notes || '',
       isActive: coach.isActive,
+      ratePerGroup: config ? String(config.ratePerGroup) : '',
+      ratePerPrivateLesson: config ? String(config.ratePerPrivateLesson) : '',
+      bonuses: config ? String(config.bonuses) : '',
+      salaryNotes: config?.notes || '',
     })
     setEditingCoach(coach)
     setShowCreateDialog(true)
@@ -176,9 +243,27 @@ export default function CoachesPage() {
             onChange={(e) => setActiveFilter(e.target.value)}
             className="w-full sm:w-48"
           />
+          <div className="flex gap-1 border rounded-md p-1">
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="h-8 px-2"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="h-8 px-2"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* Grid de entrenadores */}
+        {/* Contenido */}
         {filteredCoaches.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -186,14 +271,16 @@ export default function CoachesPage() {
             description="Anade tu primer entrenador para empezar a gestionar el equipo tecnico"
             action={{ label: 'Anadir entrenador', onClick: openCreateDialog }}
           />
-        ) : (
+        ) : viewMode === 'cards' ? (
+          /* ====== VISTA CARDS ====== */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredCoaches.map((coach) => {
               const coachGroups = getCoachGroups(coach.id)
+              const salary = getEstimatedSalary(coach.id)
+              const config = getSalaryConfig(coach.id)
               return (
                 <Card key={coach.id} className="overflow-hidden">
                   <CardContent className="p-5">
-                    {/* Cabecera: Avatar + Nombre + Badge */}
                     <div className="flex items-start gap-4 mb-4">
                       <Avatar className="h-14 w-14">
                         <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
@@ -221,7 +308,6 @@ export default function CoachesPage() {
                       </div>
                     </div>
 
-                    {/* Informacion de contacto */}
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Mail className="h-3.5 w-3.5 shrink-0" />
@@ -246,12 +332,19 @@ export default function CoachesPage() {
                         <span>
                           {coachGroups.length === 0
                             ? 'Sin grupos asignados'
-                            : `${coachGroups.length} grupo${coachGroups.length > 1 ? 's' : ''} asignado${coachGroups.length > 1 ? 's' : ''}`}
+                            : `${coachGroups.length} grupo${coachGroups.length > 1 ? 's' : ''}`}
                         </span>
                       </div>
+                      {config && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Euro className="h-3.5 w-3.5 shrink-0" />
+                          <span className="font-medium text-foreground">
+                            Salario est.: {formatCurrency(salary)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Grupos asignados */}
                     {coachGroups.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {coachGroups.map((group) => (
@@ -262,8 +355,15 @@ export default function CoachesPage() {
                       </div>
                     )}
 
-                    {/* Acciones */}
                     <div className="flex items-center gap-2 pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/entrenadores/${coach.id}`)}
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        Ver perfil
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -287,6 +387,86 @@ export default function CoachesPage() {
               )
             })}
           </div>
+        ) : (
+          /* ====== VISTA LISTA ====== */
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Especializacion</TableHead>
+                    <TableHead className="text-center">Grupos</TableHead>
+                    <TableHead className="text-right">Salario est.</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCoaches.map((coach) => {
+                    const coachGroups = getCoachGroups(coach.id)
+                    const salary = getEstimatedSalary(coach.id)
+                    return (
+                      <TableRow key={coach.id}>
+                        <TableCell>
+                          <button
+                            className="flex items-center gap-3 text-left hover:underline"
+                            onClick={() => navigate(`/entrenadores/${coach.id}`)}
+                          >
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                {coach.firstName[0]}{coach.lastName[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <span className="font-medium text-sm">
+                                {coach.firstName} {coach.lastName}
+                              </span>
+                            </div>
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-sm">{coach.email}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {coach.specialization || '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">{coachGroups.length}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium">
+                          {formatCurrency(salary)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={coach.isActive ? 'success' : 'secondary'}>
+                            {coach.isActive ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(coach)}
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setShowDeleteConfirm(coach.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -388,9 +568,64 @@ export default function CoachesPage() {
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="Notas adicionales sobre el entrenador..."
-                rows={3}
+                rows={2}
               />
             </div>
+
+            {/* Seccion Salario */}
+            {editingCoach && (
+              <>
+                <div className="col-span-2 border-t pt-4 mt-2">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Euro className="h-4 w-4" />
+                    Configuracion salarial
+                  </h3>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tarifa por grupo (€/mes)</Label>
+                  <Input
+                    type="number"
+                    value={form.ratePerGroup}
+                    onChange={(e) => setForm({ ...form, ratePerGroup: e.target.value })}
+                    placeholder="250"
+                    min="0"
+                    step="10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tarifa clase particular (€)</Label>
+                  <Input
+                    type="number"
+                    value={form.ratePerPrivateLesson}
+                    onChange={(e) =>
+                      setForm({ ...form, ratePerPrivateLesson: e.target.value })
+                    }
+                    placeholder="30"
+                    min="0"
+                    step="5"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Primas / Bonificaciones (€)</Label>
+                  <Input
+                    type="number"
+                    value={form.bonuses}
+                    onChange={(e) => setForm({ ...form, bonuses: e.target.value })}
+                    placeholder="0"
+                    min="0"
+                    step="10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Notas salario</Label>
+                  <Input
+                    value={form.salaryNotes}
+                    onChange={(e) => setForm({ ...form, salaryNotes: e.target.value })}
+                    placeholder="Observaciones..."
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter>

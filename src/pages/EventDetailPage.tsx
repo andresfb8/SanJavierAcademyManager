@@ -1,0 +1,447 @@
+import { useState, useMemo } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Header } from '@/components/layout/Header'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { useDataStore } from '@/stores/dataStore'
+import {
+  ArrowLeft,
+  Users,
+  Clock,
+  MapPin,
+  User,
+  Euro,
+  UserPlus,
+  UserMinus,
+  Calendar,
+  FileText,
+  CheckCircle,
+} from 'lucide-react'
+import { formatDate, formatCurrency } from '@/lib/utils'
+import { EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
+
+// ==========================================
+// EventDetailPage - Detalle de evento
+// ==========================================
+// Ruta: /eventos/:id
+
+export default function EventDetailPage() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const {
+    events,
+    eventPayments,
+    players,
+    updateEvent,
+    addEventPayment,
+    updateEventPayment,
+  } = useDataStore()
+
+  // Estado para anadir asistente
+  const [selectedPlayerId, setSelectedPlayerId] = useState('')
+  // Estado para metodo de pago al marcar pagado
+  const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
+
+  // ===================
+  // DATOS DERIVADOS
+  // ===================
+
+  const event = useMemo(() => events.find((e) => e.id === id), [events, id])
+
+  const thisEventPayments = useMemo(
+    () => eventPayments.filter((ep) => ep.eventId === id),
+    [eventPayments, id]
+  )
+
+  const attendeeIds = useMemo(
+    () => new Set(event?.attendeePlayerIds ?? []),
+    [event?.attendeePlayerIds]
+  )
+
+  const availablePlayers = useMemo(
+    () => players.filter((p) => p.status === 'activo' && !attendeeIds.has(p.id)),
+    [players, attendeeIds]
+  )
+
+  const eventTypeInfo = useMemo(
+    () => EVENT_TYPES.find((t) => t.value === event?.type),
+    [event?.type]
+  )
+
+  const totalCobrado = useMemo(
+    () =>
+      thisEventPayments
+        .filter((ep) => ep.status === 'pagado')
+        .reduce((sum, ep) => sum + ep.amount, 0),
+    [thisEventPayments]
+  )
+
+  const totalPendiente = useMemo(
+    () =>
+      thisEventPayments
+        .filter((ep) => ep.status === 'pendiente')
+        .reduce((sum, ep) => sum + ep.amount, 0),
+    [thisEventPayments]
+  )
+
+  // ===================
+  // HANDLERS
+  // ===================
+
+  const handleAddAttendee = () => {
+    if (!event || !selectedPlayerId) return
+    const player = players.find((p) => p.id === selectedPlayerId)
+    if (!player) return
+
+    const playerName = `${player.firstName} ${player.lastName}`
+
+    updateEvent(event.id, {
+      attendeePlayerIds: [...event.attendeePlayerIds, player.id],
+      attendeePlayerNames: [...event.attendeePlayerNames, playerName],
+    })
+
+    addEventPayment({
+      eventId: event.id,
+      eventName: event.name,
+      playerId: player.id,
+      playerName,
+      amount: event.price,
+      status: 'pendiente',
+    })
+
+    setSelectedPlayerId('')
+  }
+
+  const handleRemoveAttendee = (playerId: string) => {
+    if (!event) return
+    const playerIndex = event.attendeePlayerIds.indexOf(playerId)
+    if (playerIndex === -1) return
+
+    const newPlayerIds = event.attendeePlayerIds.filter((pid) => pid !== playerId)
+    const newPlayerNames = event.attendeePlayerNames.filter((_, i) => i !== playerIndex)
+
+    updateEvent(event.id, {
+      attendeePlayerIds: newPlayerIds,
+      attendeePlayerNames: newPlayerNames,
+    })
+
+    const payment = thisEventPayments.find((ep) => ep.playerId === playerId && ep.status !== 'cancelado')
+    if (payment) {
+      updateEventPayment(payment.id, { status: 'cancelado' })
+    }
+  }
+
+  const handleMarkPaid = (paymentId: string) => {
+    const method = paymentMethods[paymentId] || 'efectivo'
+    updateEventPayment(paymentId, {
+      status: 'pagado',
+      paidDate: new Date(),
+      paymentMethod: method as 'transferencia' | 'efectivo' | 'domiciliacion' | 'tarjeta',
+    })
+  }
+
+  // ===================
+  // GUARDAS
+  // ===================
+
+  if (!event) {
+    return (
+      <div>
+        <Header title="Detalle del evento" />
+        <div className="p-6">
+          <div className="flex flex-col items-center justify-center py-20 space-y-4">
+            <p className="text-lg text-muted-foreground">Evento no encontrado</p>
+            <Button variant="outline" onClick={() => navigate('/agenda')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver a agenda
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ===================
+  // RENDER
+  // ===================
+
+  return (
+    <div>
+      <Header
+        title={event.name}
+        subtitle={`${eventTypeInfo?.label ?? event.type} · ${formatDate(new Date(event.date))}`}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate('/agenda')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Volver
+          </Button>
+        }
+      />
+
+      <div className="p-6 space-y-6">
+        {/* ============================== */}
+        {/* INFORMACION DEL EVENTO         */}
+        {/* ============================== */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Informacion del evento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Tipo</p>
+                <Badge className={eventTypeInfo?.color ?? 'bg-gray-100 text-gray-800'}>
+                  {eventTypeInfo?.label ?? event.type}
+                </Badge>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Fecha y hora</p>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">
+                    {formatDate(new Date(event.date))} · {event.startTime} - {event.endTime}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Pistas</p>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">
+                    {event.courtNames.length > 0 ? event.courtNames.join(', ') : 'Sin pistas'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Entrenadores</p>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">
+                    {event.coachNames.length > 0 ? event.coachNames.join(', ') : 'Sin entrenadores'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Precio por asistente</p>
+                <div className="flex items-center gap-2">
+                  <Euro className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-bold">{formatCurrency(event.price)}</span>
+                </div>
+              </div>
+
+              {event.maxCapacity !== undefined && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Capacidad maxima</p>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{event.maxCapacity} plazas</span>
+                  </div>
+                </div>
+              )}
+
+              {event.description && (
+                <div className="space-y-1 sm:col-span-2 lg:col-span-3">
+                  <p className="text-sm text-muted-foreground">Descripcion</p>
+                  <p className="text-sm">{event.description}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ============================== */}
+        {/* ASISTENTES                     */}
+        {/* ============================== */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Asistentes ({event.attendeePlayerIds.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Anadir asistente */}
+            <div className="flex items-end gap-3 mb-6 pb-4 border-b">
+              <div className="flex-1">
+                <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                  Anadir asistente
+                </label>
+                {availablePlayers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">
+                    No hay jugadores disponibles para anadir.
+                  </p>
+                ) : (
+                  <Select
+                    options={availablePlayers.map((p) => ({
+                      value: p.id,
+                      label: `${p.firstName} ${p.lastName}`,
+                    }))}
+                    placeholder="Seleccionar jugador..."
+                    value={selectedPlayerId}
+                    onChange={(e) => setSelectedPlayerId(e.target.value)}
+                  />
+                )}
+              </div>
+              <Button
+                onClick={handleAddAttendee}
+                disabled={!selectedPlayerId || availablePlayers.length === 0}
+              >
+                <UserPlus className="h-4 w-4 mr-1" />
+                Anadir
+              </Button>
+            </div>
+
+            {/* Tabla de asistentes */}
+            {event.attendeePlayerIds.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                <Users className="h-10 w-10 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">No hay asistentes registrados</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Jugador</TableHead>
+                    <TableHead>Estado pago</TableHead>
+                    <TableHead>Importe</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {event.attendeePlayerIds.map((playerId, index) => {
+                    const playerName = event.attendeePlayerNames[index] || 'Jugador desconocido'
+                    const payment = thisEventPayments.find(
+                      (ep) => ep.playerId === playerId && ep.status !== 'cancelado'
+                    )
+                    const isPaid = payment?.status === 'pagado'
+
+                    return (
+                      <TableRow key={playerId}>
+                        <TableCell>
+                          <button
+                            className="flex items-center gap-3 text-left hover:underline"
+                            onClick={() => navigate(`/jugadores/${playerId}`)}
+                          >
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
+                              {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                            </div>
+                            <span className="font-medium text-sm">{playerName}</span>
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={payment?.status ?? 'pendiente'} />
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">
+                            {formatCurrency(payment?.amount ?? event.price)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {!isPaid && payment && (
+                              <div className="flex items-center gap-1">
+                                <Select
+                                  className="w-36 h-8 text-xs"
+                                  options={PAYMENT_METHODS.map((m) => ({
+                                    value: m.value,
+                                    label: m.label,
+                                  }))}
+                                  value={paymentMethods[payment.id] || 'efectivo'}
+                                  onChange={(e) =>
+                                    setPaymentMethods((prev) => ({
+                                      ...prev,
+                                      [payment.id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleMarkPaid(payment.id)}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Pagado
+                                </Button>
+                              </div>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleRemoveAttendee(playerId)}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ============================== */}
+        {/* RESUMEN ESTADISTICAS           */}
+        {/* ============================== */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Total asistentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {event.attendeePlayerIds.length}
+                {event.maxCapacity !== undefined && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {' '}/ {event.maxCapacity}
+                  </span>
+                )}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Total cobrado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCobrado)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Total pendiente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-yellow-600">{formatCurrency(totalPendiente)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}

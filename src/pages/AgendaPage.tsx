@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,10 +10,10 @@ import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useDataStore } from '@/stores/dataStore'
-import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin } from 'lucide-react'
-import { DAYS_OF_WEEK, PLAYER_LEVELS } from '@/constants'
-import { generateId, formatCurrency } from '@/lib/utils'
-import type { PrivateLesson } from '@/types'
+import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star } from 'lucide-react'
+import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES } from '@/constants'
+import { formatCurrency } from '@/lib/utils'
+import type { PrivateLesson, EventType } from '@/types'
 
 // ==========================================
 // Constantes de la agenda
@@ -20,9 +21,8 @@ import type { PrivateLesson } from '@/types'
 
 const START_HOUR = 8
 const END_HOUR = 22
-const SLOT_HEIGHT = 48 // px por franja de 30 min
+const SLOT_HEIGHT = 48
 
-/** Genera las franjas horarias de 30 min entre START_HOUR y END_HOUR */
 function generateTimeSlots(): string[] {
   const slots: string[] = []
   for (let h = START_HOUR; h < END_HOUR; h++) {
@@ -34,7 +34,6 @@ function generateTimeSlots(): string[] {
 
 const TIME_SLOTS = generateTimeSlots()
 
-/** Colores por nivel para los bloques de grupo */
 const LEVEL_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   iniciacion: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-800' },
   intermedio: { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-800' },
@@ -43,23 +42,17 @@ const LEVEL_COLORS: Record<string, { bg: string; border: string; text: string }>
   menores: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-800' },
 }
 
-/** Convierte "HH:MM" a un indice dentro de TIME_SLOTS (posicion relativa) */
 function timeToSlotIndex(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return (h - START_HOUR) * 2 + (m >= 30 ? 1 : 0)
 }
 
-/** Formatea una fecha como "Lunes, 6 de febrero de 2026" */
 function formatDateLong(date: Date): string {
   return new Intl.DateTimeFormat('es-ES', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   }).format(date)
 }
 
-/** Formatea fecha como YYYY-MM-DD para inputs */
 function toInputDate(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -67,13 +60,8 @@ function toInputDate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-/** Compara dos fechas ignorando la hora */
 function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
 // ==========================================
@@ -81,21 +69,22 @@ function isSameDay(a: Date, b: Date): boolean {
 // ==========================================
 
 interface GridBlock {
-  type: 'group' | 'private'
+  type: 'group' | 'private' | 'event'
   id: string
   startSlot: number
   endSlot: number
-  // Datos grupo
   groupName?: string
   level?: string
   levelLabel?: string
   coachName?: string
   enrollment?: number
   maxCapacity?: number
-  // Datos clase particular
   playerNames?: string[]
   price?: number
   notes?: string
+  eventName?: string
+  eventType?: string
+  eventTypeLabel?: string
 }
 
 // ==========================================
@@ -103,13 +92,13 @@ interface GridBlock {
 // ==========================================
 
 export default function AgendaPage() {
-  const { groups, courts, coaches, players, privateLessons, addPrivateLesson } = useDataStore()
+  const navigate = useNavigate()
+  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, events, addEvent } = useDataStore()
 
-  // --- Estado de navegacion ---
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  // --- Estado del formulario de clase particular ---
+  // Formulario clase particular
   const [formDate, setFormDate] = useState(toInputDate(new Date()))
   const [formCourtId, setFormCourtId] = useState('')
   const [formCoachId, setFormCoachId] = useState('')
@@ -119,158 +108,154 @@ export default function AgendaPage() {
   const [formPrice, setFormPrice] = useState('')
   const [formNotes, setFormNotes] = useState('')
 
-  // --- Pistas activas ---
-  const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
+  // Formulario evento
+  const [eventDialogOpen, setEventDialogOpen] = useState(false)
+  const [evName, setEvName] = useState('')
+  const [evType, setEvType] = useState<EventType>('mini_torneo')
+  const [evDate, setEvDate] = useState(toInputDate(new Date()))
+  const [evStartTime, setEvStartTime] = useState('09:00')
+  const [evEndTime, setEvEndTime] = useState('12:00')
+  const [evCourtIds, setEvCourtIds] = useState<string[]>([])
+  const [evCoachIds, setEvCoachIds] = useState<string[]>([])
+  const [evPlayerIds, setEvPlayerIds] = useState<string[]>([])
+  const [evPrice, setEvPrice] = useState('')
+  const [evDescription, setEvDescription] = useState('')
+  const [evMaxCapacity, setEvMaxCapacity] = useState('')
 
-  // --- Dia de la semana seleccionado (JS getDay: 0=Dom) ---
+  const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
   const selectedDayOfWeek = selectedDate.getDay()
 
-  // --- Bloques por pista ---
   const blocksByCourt = useMemo(() => {
     const map: Record<string, GridBlock[]> = {}
+    for (const court of activeCourts) { map[court.id] = [] }
 
-    for (const court of activeCourts) {
-      map[court.id] = []
-    }
-
-    // 1. Grupos que tienen sesion en el dia seleccionado
+    // 1. Grupos
     for (const group of groups) {
       if (!group.isActive) continue
-
       for (const slot of group.schedule) {
         if (slot.dayOfWeek !== selectedDayOfWeek) continue
         if (!map[group.courtId]) continue
-
         const levelInfo = PLAYER_LEVELS.find((l) => l.value === group.level)
-
         map[group.courtId].push({
-          type: 'group',
-          id: group.id,
-          startSlot: timeToSlotIndex(slot.startTime),
-          endSlot: timeToSlotIndex(slot.endTime),
-          groupName: group.name,
-          level: group.level,
-          levelLabel: levelInfo?.label ?? group.level,
-          coachName: group.coachName,
-          enrollment: group.currentEnrollment,
-          maxCapacity: group.maxCapacity,
+          type: 'group', id: group.id,
+          startSlot: timeToSlotIndex(slot.startTime), endSlot: timeToSlotIndex(slot.endTime),
+          groupName: group.name, level: group.level, levelLabel: levelInfo?.label ?? group.level,
+          coachName: group.coachName, enrollment: group.currentEnrollment, maxCapacity: group.maxCapacity,
         })
       }
     }
 
-    // 2. Clases particulares en la fecha seleccionada
+    // 2. Clases particulares
     for (const lesson of privateLessons) {
       const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
       if (!isSameDay(lessonDate, selectedDate)) continue
       if (!map[lesson.courtId]) continue
-
       map[lesson.courtId].push({
-        type: 'private',
-        id: lesson.id,
-        startSlot: timeToSlotIndex(lesson.startTime),
-        endSlot: timeToSlotIndex(lesson.endTime),
-        coachName: lesson.coachName,
-        playerNames: lesson.playerNames,
-        price: lesson.price,
-        notes: lesson.notes,
+        type: 'private', id: lesson.id,
+        startSlot: timeToSlotIndex(lesson.startTime), endSlot: timeToSlotIndex(lesson.endTime),
+        coachName: lesson.coachName, playerNames: lesson.playerNames, price: lesson.price, notes: lesson.notes,
       })
     }
 
+    // 3. Eventos
+    for (const event of events) {
+      if (!event.isActive) continue
+      const eventDate = event.date instanceof Date ? event.date : new Date(event.date)
+      if (!isSameDay(eventDate, selectedDate)) continue
+      const typeInfo = EVENT_TYPES.find((t) => t.value === event.type)
+      for (const courtId of event.courtIds) {
+        if (!map[courtId]) continue
+        map[courtId].push({
+          type: 'event', id: event.id,
+          startSlot: timeToSlotIndex(event.startTime), endSlot: timeToSlotIndex(event.endTime),
+          eventName: event.name, eventType: event.type, eventTypeLabel: typeInfo?.label ?? event.type,
+          coachName: event.coachNames.join(', '), playerNames: event.attendeePlayerNames, price: event.price,
+        })
+      }
+    }
+
     return map
-  }, [groups, privateLessons, activeCourts, selectedDate, selectedDayOfWeek])
+  }, [groups, privateLessons, events, activeCourts, selectedDate, selectedDayOfWeek])
 
-  // --- Navegacion de dias ---
-  function goToPreviousDay() {
-    setSelectedDate((prev) => {
-      const d = new Date(prev)
-      d.setDate(d.getDate() - 1)
-      return d
-    })
-  }
+  function goToPreviousDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d }) }
+  function goToNextDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d }) }
+  function goToToday() { setSelectedDate(new Date()) }
 
-  function goToNextDay() {
-    setSelectedDate((prev) => {
-      const d = new Date(prev)
-      d.setDate(d.getDate() + 1)
-      return d
-    })
-  }
-
-  function goToToday() {
-    setSelectedDate(new Date())
-  }
-
-  // --- Nombre del dia ---
   const dayLabel = useMemo(() => {
     const info = DAYS_OF_WEEK.find((d) => d.value === selectedDayOfWeek)
     return info?.label ?? ''
   }, [selectedDayOfWeek])
 
-  // --- Abrir dialogo para nueva clase particular ---
   function openNewLessonDialog() {
-    setFormDate(toInputDate(selectedDate))
-    setFormCourtId(activeCourts[0]?.id ?? '')
-    setFormCoachId(coaches.filter((c) => c.isActive)[0]?.id ?? '')
-    setFormPlayerIds([])
-    setFormStartTime('09:00')
-    setFormEndTime('10:00')
-    setFormPrice('')
-    setFormNotes('')
+    setFormDate(toInputDate(selectedDate)); setFormCourtId(activeCourts[0]?.id ?? '')
+    setFormCoachId(coaches.filter((c) => c.isActive)[0]?.id ?? ''); setFormPlayerIds([])
+    setFormStartTime('09:00'); setFormEndTime('10:00'); setFormPrice(''); setFormNotes('')
     setDialogOpen(true)
   }
 
-  // --- Toggle de jugador en multiselect ---
-  function togglePlayer(playerId: string) {
-    setFormPlayerIds((prev) =>
-      prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
-    )
+  function openNewEventDialog() {
+    setEvName(''); setEvType('mini_torneo'); setEvDate(toInputDate(selectedDate))
+    setEvStartTime('09:00'); setEvEndTime('12:00'); setEvCourtIds([]); setEvCoachIds([])
+    setEvPlayerIds([]); setEvPrice(''); setEvDescription(''); setEvMaxCapacity('')
+    setEventDialogOpen(true)
   }
 
-  // --- Guardar clase particular ---
+  function togglePlayer(playerId: string) {
+    setFormPlayerIds((prev) => prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId])
+  }
+  function toggleEvCourt(courtId: string) {
+    setEvCourtIds((prev) => prev.includes(courtId) ? prev.filter((id) => id !== courtId) : [...prev, courtId])
+  }
+  function toggleEvCoach(coachId: string) {
+    setEvCoachIds((prev) => prev.includes(coachId) ? prev.filter((id) => id !== coachId) : [...prev, coachId])
+  }
+  function toggleEvPlayer(playerId: string) {
+    setEvPlayerIds((prev) => prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId])
+  }
+
   function handleSaveLesson() {
     if (!formCourtId || !formCoachId || formPlayerIds.length === 0) return
-
     const coach = coaches.find((c) => c.id === formCoachId)
     const court = activeCourts.find((c) => c.id === formCourtId)
     const selectedPlayers = players.filter((p) => formPlayerIds.includes(p.id))
-
     const lessonData: Omit<PrivateLesson, 'id' | 'createdAt'> = {
       playerIds: formPlayerIds,
       playerNames: selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`),
-      coachId: formCoachId,
-      coachName: coach ? `${coach.firstName} ${coach.lastName}` : '',
-      courtId: formCourtId,
-      courtName: court?.name ?? '',
-      date: new Date(formDate + 'T00:00:00'),
-      startTime: formStartTime,
-      endTime: formEndTime,
-      price: parseFloat(formPrice) || 0,
-      isPaid: false,
-      notes: formNotes || undefined,
+      coachId: formCoachId, coachName: coach ? `${coach.firstName} ${coach.lastName}` : '',
+      courtId: formCourtId, courtName: court?.name ?? '',
+      date: new Date(formDate + 'T00:00:00'), startTime: formStartTime, endTime: formEndTime,
+      price: parseFloat(formPrice) || 0, isPaid: false, notes: formNotes || undefined,
     }
-
     addPrivateLesson(lessonData)
     setDialogOpen(false)
   }
 
-  // --- Jugadores activos para el selector ---
+  function handleSaveEvent() {
+    if (!evName || evCourtIds.length === 0) return
+    const selectedCoaches = coaches.filter((c) => evCoachIds.includes(c.id))
+    const selectedPlayers = players.filter((p) => evPlayerIds.includes(p.id))
+    const selectedCourts = activeCourts.filter((c) => evCourtIds.includes(c.id))
+    addEvent({
+      name: evName, type: evType, date: new Date(evDate + 'T00:00:00'),
+      startTime: evStartTime, endTime: evEndTime,
+      courtIds: evCourtIds, courtNames: selectedCourts.map((c) => c.name),
+      coachIds: evCoachIds, coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
+      attendeePlayerIds: evPlayerIds, attendeePlayerNames: selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`),
+      price: parseFloat(evPrice) || 0, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
+      description: evDescription || undefined, isActive: true,
+    })
+    setEventDialogOpen(false)
+  }
+
   const activePlayers = useMemo(
     () => players.filter((p) => p.status === 'activo').sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [players]
   )
-
-  // --- Entrenadores activos para el selector ---
   const activeCoaches = useMemo(
     () => coaches.filter((c) => c.isActive).sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [coaches]
   )
-
-  // --- Verificar si hoy ---
   const isToday = isSameDay(selectedDate, new Date())
-
-  // ==========================================
-  // Render
-  // ==========================================
 
   return (
     <div>
@@ -278,221 +263,139 @@ export default function AgendaPage() {
         title="Agenda"
         subtitle="Vista diaria de pistas y horarios"
         actions={
-          <Button onClick={openNewLessonDialog} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nueva clase particular
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={openNewEventDialog} className="gap-1">
+              <CalendarPlus className="h-4 w-4" />
+              Nuevo evento
+            </Button>
+            <Button onClick={openNewLessonDialog} className="gap-1">
+              <Plus className="h-4 w-4" />
+              Nueva clase particular
+            </Button>
+          </div>
         }
       />
 
       <div className="p-6 space-y-4">
-        {/* ============================== */}
         {/* Navegacion de fecha */}
-        {/* ============================== */}
         <Card>
           <CardContent className="py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={goToPreviousDay}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={goToNextDay}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                {!isToday && (
-                  <Button variant="outline" size="sm" onClick={goToToday}>
-                    Hoy
-                  </Button>
-                )}
+                <Button variant="outline" size="icon" onClick={goToPreviousDay}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={goToNextDay}><ChevronRight className="h-4 w-4" /></Button>
+                {!isToday && <Button variant="outline" size="sm" onClick={goToToday}>Hoy</Button>}
               </div>
-
               <div className="text-center">
                 <h2 className="text-lg font-semibold capitalize">{formatDateLong(selectedDate)}</h2>
                 <p className="text-sm text-muted-foreground">{dayLabel}</p>
               </div>
-
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-3 w-3 rounded-sm bg-blue-100 border border-blue-300" />
-                  Grupo
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" />
-                  Particular
-                </div>
+                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-sm bg-blue-100 border border-blue-300" />Grupo</div>
+                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" />Particular</div>
+                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-sm bg-teal-100 border border-teal-300" />Evento</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* ============================== */}
         {/* Grilla horaria */}
-        {/* ============================== */}
         {activeCourts.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No hay pistas activas configuradas.</p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="py-12 text-center"><MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-3" /><p className="text-muted-foreground">No hay pistas activas configuradas.</p></CardContent></Card>
         ) : (
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <div
-                  className="grid min-w-[800px]"
-                  style={{
-                    gridTemplateColumns: `80px repeat(${activeCourts.length}, 1fr)`,
-                  }}
-                >
-                  {/* --- Cabecera: columna de hora + columnas de pistas --- */}
+                <div className="grid min-w-[800px]" style={{ gridTemplateColumns: `80px repeat(${activeCourts.length}, 1fr)` }}>
                   <div className="sticky top-0 z-10 border-b border-r bg-muted/50 px-2 py-3 text-xs font-medium text-muted-foreground flex items-center justify-center">
-                    <Clock className="h-3.5 w-3.5 mr-1" />
-                    Hora
+                    <Clock className="h-3.5 w-3.5 mr-1" />Hora
                   </div>
                   {activeCourts.map((court) => (
-                    <div
-                      key={court.id}
-                      className="sticky top-0 z-10 border-b bg-muted/50 px-3 py-3 text-center"
-                    >
+                    <div key={court.id} className="sticky top-0 z-10 border-b bg-muted/50 px-3 py-3 text-center">
                       <p className="text-sm font-semibold truncate">{court.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {court.type === 'indoor' ? 'Cubierta' : 'Exterior'} &middot; {court.surface}
-                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">{court.type === 'indoor' ? 'Cubierta' : 'Exterior'} &middot; {court.surface}</p>
                     </div>
                   ))}
 
-                  {/* --- Filas de franjas horarias --- */}
                   {TIME_SLOTS.map((time, slotIdx) => {
                     const isFullHour = time.endsWith(':00')
                     return (
                       <div key={`row-${time}`} className="contents">
-                        {/* Celda de hora */}
-                        <div
-                          className={`border-r px-2 flex items-start justify-end pt-1 text-xs font-mono text-muted-foreground ${
-                            isFullHour ? 'border-t' : 'border-t border-dashed'
-                          }`}
-                          style={{ height: SLOT_HEIGHT }}
-                        >
+                        <div className={`border-r px-2 flex items-start justify-end pt-1 text-xs font-mono text-muted-foreground ${isFullHour ? 'border-t' : 'border-t border-dashed'}`} style={{ height: SLOT_HEIGHT }}>
                           {isFullHour ? time : ''}
                         </div>
-
-                        {/* Celdas de pistas */}
                         {activeCourts.map((court) => {
                           const blocks = blocksByCourt[court.id] ?? []
-
-                          // Comprobar si un bloque COMIENZA en esta franja
                           const startingBlock = blocks.find((b) => b.startSlot === slotIdx)
+                          const coveredByBlock = blocks.find((b) => b.startSlot < slotIdx && b.endSlot > slotIdx)
 
-                          // Comprobar si esta franja esta ocupada por un bloque que empezo antes
-                          const coveredByBlock = blocks.find(
-                            (b) => b.startSlot < slotIdx && b.endSlot > slotIdx
-                          )
-
-                          // Si esta franja esta cubierta por un bloque que empezo antes, no renderizar nada
                           if (coveredByBlock) {
-                            return (
-                              <div
-                                key={`${court.id}-${time}`}
-                                className={`${isFullHour ? 'border-t' : 'border-t border-dashed'}`}
-                                style={{ height: SLOT_HEIGHT }}
-                              />
-                            )
+                            return <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'}`} style={{ height: SLOT_HEIGHT }} />
                           }
 
-                          // Si un bloque comienza aqui, renderizar el bloque
                           if (startingBlock) {
                             const spanSlots = startingBlock.endSlot - startingBlock.startSlot
                             const blockHeight = spanSlots * SLOT_HEIGHT
 
                             if (startingBlock.type === 'group') {
                               const colors = LEVEL_COLORS[startingBlock.level ?? ''] ?? LEVEL_COLORS.iniciacion
-
                               return (
-                                <div
-                                  key={`${court.id}-${time}`}
-                                  className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`}
-                                  style={{ height: SLOT_HEIGHT }}
-                                >
-                                  <div
-                                    className={`absolute inset-x-1 top-1 rounded-lg border-l-4 ${colors.bg} ${colors.border} p-2 overflow-hidden z-[1] shadow-sm`}
-                                    style={{ height: blockHeight - 8 }}
-                                  >
+                                <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
+                                  <div className={`absolute inset-x-1 top-1 rounded-lg border-l-4 ${colors.bg} ${colors.border} p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow`} style={{ height: blockHeight - 8 }} onClick={() => navigate(`/clases/${startingBlock.id}/${toInputDate(selectedDate)}`)}>
                                     <div className="flex items-start justify-between gap-1">
-                                      <p className={`text-sm font-semibold ${colors.text} truncate`}>
-                                        {startingBlock.groupName}
-                                      </p>
-                                      <Badge className={`text-[10px] shrink-0 ${PLAYER_LEVELS.find((l) => l.value === startingBlock.level)?.color ?? ''}`}>
-                                        {startingBlock.levelLabel}
-                                      </Badge>
+                                      <p className={`text-sm font-semibold ${colors.text} truncate`}>{startingBlock.groupName}</p>
+                                      <Badge className={`text-[10px] shrink-0 ${PLAYER_LEVELS.find((l) => l.value === startingBlock.level)?.color ?? ''}`}>{startingBlock.levelLabel}</Badge>
                                     </div>
                                     <div className="mt-1 space-y-0.5">
-                                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <Users className="h-3 w-3" />
-                                        {startingBlock.coachName}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {startingBlock.enrollment}/{startingBlock.maxCapacity} alumnos
-                                      </p>
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>
+                                      <p className="text-xs text-muted-foreground">{startingBlock.enrollment}/{startingBlock.maxCapacity} alumnos</p>
                                     </div>
                                   </div>
                                 </div>
                               )
                             }
 
-                            // Clase particular
+                            if (startingBlock.type === 'event') {
+                              return (
+                                <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
+                                  <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-teal-50 border-teal-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }} onClick={() => navigate(`/eventos/${startingBlock.id}`)}>
+                                    <div className="flex items-start justify-between gap-1">
+                                      <p className="text-sm font-semibold text-teal-800 truncate">{startingBlock.eventName}</p>
+                                      <Badge className="text-[10px] shrink-0 bg-teal-100 text-teal-800">{startingBlock.eventTypeLabel}</Badge>
+                                    </div>
+                                    <div className="mt-1 space-y-0.5">
+                                      {startingBlock.coachName && <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>}
+                                      {startingBlock.playerNames && startingBlock.playerNames.length > 0 && <p className="text-xs text-muted-foreground">{startingBlock.playerNames.length} asistentes</p>}
+                                      {startingBlock.price !== undefined && startingBlock.price > 0 && <p className="text-xs font-medium text-teal-700">{formatCurrency(startingBlock.price)}</p>}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            }
+
                             return (
-                              <div
-                                key={`${court.id}-${time}`}
-                                className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`}
-                                style={{ height: SLOT_HEIGHT }}
-                              >
-                                <div
-                                  className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm"
-                                  style={{ height: blockHeight - 8 }}
-                                >
-                                  <p className="text-sm font-semibold text-amber-800">
-                                    Clase Particular
-                                  </p>
+                              <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
+                                <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm" style={{ height: blockHeight - 8 }}>
+                                  <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
                                   <div className="mt-1 space-y-0.5">
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {startingBlock.playerNames?.join(', ')}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Users className="h-3 w-3" />
-                                      {startingBlock.coachName}
-                                    </p>
-                                    {startingBlock.price !== undefined && startingBlock.price > 0 && (
-                                      <p className="text-xs font-medium text-amber-700">
-                                        {formatCurrency(startingBlock.price)}
-                                      </p>
-                                    )}
+                                    <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>
+                                    {startingBlock.price !== undefined && startingBlock.price > 0 && <p className="text-xs font-medium text-amber-700">{formatCurrency(startingBlock.price)}</p>}
                                   </div>
                                 </div>
                               </div>
                             )
                           }
 
-                          // Franja vacia
                           return (
-                            <div
-                              key={`${court.id}-${time}`}
-                              className={`${
-                                isFullHour ? 'border-t' : 'border-t border-dashed'
-                              } hover:bg-muted/30 cursor-pointer transition-colors`}
-                              style={{ height: SLOT_HEIGHT }}
+                            <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} hover:bg-muted/30 cursor-pointer transition-colors`} style={{ height: SLOT_HEIGHT }}
                               onClick={() => {
                                 setFormStartTime(time)
-                                // Calcular hora de fin: +1 hora
                                 const [h, m] = time.split(':').map(Number)
                                 const endH = Math.min(h + 1, END_HOUR)
                                 setFormEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
-                                setFormDate(toInputDate(selectedDate))
-                                setFormCourtId(court.id)
-                                setFormCoachId(activeCoaches[0]?.id ?? '')
-                                setFormPlayerIds([])
-                                setFormPrice('')
-                                setFormNotes('')
+                                setFormDate(toInputDate(selectedDate)); setFormCourtId(court.id)
+                                setFormCoachId(activeCoaches[0]?.id ?? ''); setFormPlayerIds([]); setFormPrice(''); setFormNotes('')
                                 setDialogOpen(true)
                               }}
                             />
@@ -507,203 +410,102 @@ export default function AgendaPage() {
           </Card>
         )}
 
-        {/* ============================== */}
         {/* Resumen del dia */}
-        {/* ============================== */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-                  <Users className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {Object.values(blocksByCourt).reduce(
-                      (acc, blocks) => acc + blocks.filter((b) => b.type === 'group').length,
-                      0
-                    )}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Grupos con clase</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-                  <Clock className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {Object.values(blocksByCourt).reduce(
-                      (acc, blocks) => acc + blocks.filter((b) => b.type === 'private').length,
-                      0
-                    )}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Clases particulares</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-                  <MapPin className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{activeCourts.length}</p>
-                  <p className="text-sm text-muted-foreground">Pistas activas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100"><Users className="h-5 w-5 text-blue-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'group').length, 0)}</p><p className="text-sm text-muted-foreground">Grupos con clase</p></div></div></CardContent></Card>
+          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100"><Clock className="h-5 w-5 text-amber-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'private').length, 0)}</p><p className="text-sm text-muted-foreground">Clases particulares</p></div></div></CardContent></Card>
+          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100"><Star className="h-5 w-5 text-teal-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'event').length, 0)}</p><p className="text-sm text-muted-foreground">Eventos</p></div></div></CardContent></Card>
+          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100"><MapPin className="h-5 w-5 text-green-600" /></div><div><p className="text-2xl font-bold">{activeCourts.length}</p><p className="text-sm text-muted-foreground">Pistas activas</p></div></div></CardContent></Card>
         </div>
       </div>
 
-      {/* ============================== */}
       {/* Dialogo: Nueva clase particular */}
-      {/* ============================== */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Nueva clase particular</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>Nueva clase particular</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            {/* Fecha */}
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-date">Fecha</Label>
-              <Input
-                id="lesson-date"
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-              />
-            </div>
-
-            {/* Pista */}
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-court">Pista</Label>
-              <Select
-                id="lesson-court"
-                value={formCourtId}
-                onChange={(e) => setFormCourtId(e.target.value)}
-                options={activeCourts.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="Seleccionar pista"
-              />
-            </div>
-
-            {/* Entrenador */}
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-coach">Entrenador</Label>
-              <Select
-                id="lesson-coach"
-                value={formCoachId}
-                onChange={(e) => setFormCoachId(e.target.value)}
-                options={activeCoaches.map((c) => ({
-                  value: c.id,
-                  label: `${c.firstName} ${c.lastName}`,
-                }))}
-                placeholder="Seleccionar entrenador"
-              />
-            </div>
-
-            {/* Jugadores (multiselect con checkboxes) */}
+            <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Pista</Label><Select value={formCourtId} onChange={(e) => setFormCourtId(e.target.value)} options={activeCourts.map((c) => ({ value: c.id, label: c.name }))} placeholder="Seleccionar pista" /></div>
+            <div className="space-y-1.5"><Label>Entrenador</Label><Select value={formCoachId} onChange={(e) => setFormCoachId(e.target.value)} options={activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Seleccionar entrenador" /></div>
             <div className="space-y-1.5">
               <Label>Jugadores</Label>
               <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
-                {activePlayers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-2">
-                    No hay jugadores activos
-                  </p>
-                ) : (
-                  activePlayers.map((player) => (
-                    <label
-                      key={player.id}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm"
-                    >
-                      <Checkbox
-                        checked={formPlayerIds.includes(player.id)}
-                        onCheckedChange={() => togglePlayer(player.id)}
-                      />
-                      <span>
-                        {player.lastName}, {player.firstName}
-                      </span>
-                      <Badge className={`ml-auto text-[10px] ${PLAYER_LEVELS.find((l) => l.value === player.level)?.color ?? ''}`}>
-                        {PLAYER_LEVELS.find((l) => l.value === player.level)?.label ?? player.level}
-                      </Badge>
-                    </label>
-                  ))
-                )}
+                {activePlayers.length === 0 ? <p className="text-sm text-muted-foreground text-center py-2">No hay jugadores activos</p> : activePlayers.map((player) => (
+                  <label key={player.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={formPlayerIds.includes(player.id)} onCheckedChange={() => togglePlayer(player.id)} />
+                    <span>{player.lastName}, {player.firstName}</span>
+                    <Badge className={`ml-auto text-[10px] ${PLAYER_LEVELS.find((l) => l.value === player.level)?.color ?? ''}`}>{PLAYER_LEVELS.find((l) => l.value === player.level)?.label ?? player.level}</Badge>
+                  </label>
+                ))}
               </div>
-              {formPlayerIds.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {formPlayerIds.length} jugador{formPlayerIds.length !== 1 ? 'es' : ''} seleccionado{formPlayerIds.length !== 1 ? 's' : ''}
-                </p>
-              )}
+              {formPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{formPlayerIds.length} jugador{formPlayerIds.length !== 1 ? 'es' : ''} seleccionado{formPlayerIds.length !== 1 ? 's' : ''}</p>}
             </div>
-
-            {/* Horario */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="lesson-start">Hora inicio</Label>
-                <Input
-                  id="lesson-start"
-                  type="time"
-                  value={formStartTime}
-                  onChange={(e) => setFormStartTime(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="lesson-end">Hora fin</Label>
-                <Input
-                  id="lesson-end"
-                  type="time"
-                  value={formEndTime}
-                  onChange={(e) => setFormEndTime(e.target.value)}
-                />
-              </div>
+              <div className="space-y-1.5"><Label>Hora inicio</Label><Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Hora fin</Label><Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} /></div>
             </div>
-
-            {/* Precio */}
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-price">Precio (&euro;)</Label>
-              <Input
-                id="lesson-price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formPrice}
-                onChange={(e) => setFormPrice(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-
-            {/* Notas */}
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-notes">Notas</Label>
-              <Input
-                id="lesson-notes"
-                value={formNotes}
-                onChange={(e) => setFormNotes(e.target.value)}
-                placeholder="Notas adicionales (opcional)"
-              />
-            </div>
+            <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} placeholder="0.00" /></div>
+            <div className="space-y-1.5"><Label>Notas</Label><Input value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Notas adicionales (opcional)" /></div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveLesson}
-              disabled={!formCourtId || !formCoachId || formPlayerIds.length === 0}
-            >
-              Guardar clase
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveLesson} disabled={!formCourtId || !formCoachId || formPlayerIds.length === 0}>Guardar clase</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogo: Nuevo evento */}
+      <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Nuevo evento</DialogTitle></DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-1.5"><Label>Nombre del evento</Label><Input value={evName} onChange={(e) => setEvName(e.target.value)} placeholder="Ej: Mini Torneo Navidad" /></div>
+            <div className="space-y-1.5"><Label>Tipo</Label><Select value={evType} onChange={(e) => setEvType(e.target.value as EventType)} options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))} /></div>
+            <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={evDate} onChange={(e) => setEvDate(e.target.value)} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label>Hora inicio</Label><Input type="time" value={evStartTime} onChange={(e) => setEvStartTime(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Hora fin</Label><Input type="time" value={evEndTime} onChange={(e) => setEvEndTime(e.target.value)} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Pistas</Label>
+              <div className="max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
+                {activeCourts.map((court) => (
+                  <label key={court.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={evCourtIds.includes(court.id)} onCheckedChange={() => toggleEvCourt(court.id)} /><span>{court.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Entrenadores</Label>
+              <div className="max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
+                {activeCoaches.map((coach) => (
+                  <label key={coach.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={evCoachIds.includes(coach.id)} onCheckedChange={() => toggleEvCoach(coach.id)} /><span>{coach.firstName} {coach.lastName}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Asistentes</Label>
+              <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
+                {activePlayers.map((player) => (
+                  <label key={player.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={evPlayerIds.includes(player.id)} onCheckedChange={() => toggleEvPlayer(player.id)} /><span>{player.lastName}, {player.firstName}</span>
+                  </label>
+                ))}
+              </div>
+              {evPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{evPlayerIds.length} asistente{evPlayerIds.length !== 1 ? 's' : ''}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={evPrice} onChange={(e) => setEvPrice(e.target.value)} placeholder="0.00" /></div>
+              <div className="space-y-1.5"><Label>Capacidad max.</Label><Input type="number" min="1" value={evMaxCapacity} onChange={(e) => setEvMaxCapacity(e.target.value)} placeholder="Sin limite" /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Descripcion</Label><Input value={evDescription} onChange={(e) => setEvDescription(e.target.value)} placeholder="Descripcion del evento (opcional)" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEventDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEvent} disabled={!evName || evCourtIds.length === 0}>Guardar evento</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

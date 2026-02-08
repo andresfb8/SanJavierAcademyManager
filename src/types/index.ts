@@ -247,6 +247,9 @@ export type ActivityType =
   | 'group_created'
   | 'attendance_recorded'
   | 'recovery_used'
+  | 'evaluation_created'
+  | 'event_created'
+  | 'invitation_sent'
 
 export interface Activity {
   id: string
@@ -255,4 +258,95 @@ export interface Activity {
   relatedEntityId?: string
   userId: string
   createdAt: Date
+}
+
+// --- Invitación ---
+export type InvitationStatus = 'pendiente' | 'aceptada' | 'expirada'
+
+export interface Invitation {
+  id: string
+  email: string
+  role: UserRole
+  linkedPlayerId?: string
+  linkedPlayerIds?: string[]
+  clubId: string
+  status: InvitationStatus
+  token: string
+  createdBy: string
+  createdAt: Date
+  expiresAt: Date
+  acceptedAt?: Date
+}
+
+// --- Evento (mini torneos, clinics, etc.) ---
+export type EventType = 'mini_torneo' | 'clinic' | 'exhibicion' | 'social'
+
+export interface AcademyEvent {
+  id: string
+  name: string
+  type: EventType
+  date: Date
+  startTime: string
+  endTime: string
+  courtIds: string[]
+  courtNames: string[]
+  coachIds: string[]
+  coachNames: string[]
+  attendeePlayerIds: string[]
+  attendeePlayerNames: string[]
+  price: number
+  maxCapacity?: number
+  description?: string
+  isActive: boolean
+  createdAt: Date
+}
+
+// --- Pago de Evento ---
+export interface EventPayment {
+  id: string
+  eventId: string
+  eventName: string
+  playerId: string
+  playerName: string
+  amount: number
+  status: PaymentStatus
+  paymentMethod?: PaymentMethod
+  paidDate?: Date
+  createdAt: Date
+}
+
+// --- Evaluación / Informe ---
+export interface EvaluationScore {
+  criterionKey: string
+  score: number
+}
+
+export interface EvaluationBlock {
+  blockKey: string
+  scores: EvaluationScore[]
+  average: number
+  comment?: string
+}
+
+export interface Evaluation {
+  id: string
+  playerId: string
+  playerName: string
+  coachId: string
+  coachName: string
+  date: Date
+  blocks: EvaluationBlock[]
+  overallAverage: number
+  finalComment?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// --- Configuración Salario Entrenador ---
+export interface CoachSalaryConfig {
+  coachId: string
+  ratePerGroup: number
+  ratePerPrivateLesson: number
+  bonuses: number
+  notes?: string
 }

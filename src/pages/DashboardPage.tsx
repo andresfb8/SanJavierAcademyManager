@@ -1,7 +1,12 @@
+import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/Header'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -14,6 +19,7 @@ import {
   TrendingUp,
   CalendarDays,
   Activity,
+  Settings as SettingsIcon,
 } from 'lucide-react'
 import {
   BarChart,
@@ -28,9 +34,40 @@ import {
   Cell,
 } from 'recharts'
 
+const KPI_STORAGE_KEY = 'dashboard-kpi-config'
+
+interface KpiConfig {
+  [key: string]: boolean
+}
+
+const defaultKpiConfig: KpiConfig = {
+  activePlayers: true,
+  revenue: true,
+  pendingPayments: true,
+  activeGroups: true,
+  collectionRate: true,
+  todayClasses: true,
+  totalEnrolled: true,
+  waitingList: true,
+}
+
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const { players, payments, groups, activities, enrollments } = useDataStore()
+
+  const [showKpiDialog, setShowKpiDialog] = useState(false)
+  const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
+    try {
+      const saved = localStorage.getItem(KPI_STORAGE_KEY)
+      return saved ? { ...defaultKpiConfig, ...JSON.parse(saved) } : defaultKpiConfig
+    } catch {
+      return defaultKpiConfig
+    }
+  })
+
+  useEffect(() => {
+    localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(kpiConfig))
+  }, [kpiConfig])
 
   // KPIs
   const activePlayers = players.filter((p) => p.status === 'activo').length
@@ -122,64 +159,81 @@ export default function DashboardPage() {
       <Header
         title={`Hola, ${user?.displayName?.split(' ')[0] || 'Director'}`}
         subtitle="Resumen de tu escuela de pádel"
+        actions={
+          <Button variant="ghost" size="icon" onClick={() => setShowKpiDialog(true)} title="Configurar KPIs">
+            <SettingsIcon className="h-5 w-5" />
+          </Button>
+        }
       />
       <div className="p-6 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="Jugadores activos"
-            value={activePlayers}
-            icon={Users}
-            iconClassName="bg-blue-50 text-blue-600"
-          />
-          <StatCard
-            title="Ingresos este mes"
-            value={formatCurrency(currentRevenue)}
-            icon={DollarSign}
-            trend={{ value: revenueDiff, label: 'vs mes anterior' }}
-            iconClassName="bg-green-50 text-green-600"
-          />
-          <StatCard
-            title="Pagos pendientes"
-            value={formatCurrency(currentPending)}
-            icon={AlertCircle}
-            trend={{ value: pendingDiff, label: 'vs mes anterior' }}
-            iconClassName="bg-yellow-50 text-yellow-600"
-          />
-          <StatCard
-            title="Grupos activos"
-            value={activeGroups}
-            icon={GraduationCap}
-            iconClassName="bg-purple-50 text-purple-600"
-          />
-        </div>
-
-        {/* Second row: Collection rate + Today's classes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="Ratio de cobro"
-            value={`${collectionRate}%`}
-            icon={TrendingUp}
-            iconClassName="bg-emerald-50 text-emerald-600"
-          />
-          <StatCard
-            title="Clases hoy"
-            value={todayGroups.length}
-            icon={CalendarDays}
-            iconClassName="bg-indigo-50 text-indigo-600"
-          />
-          <StatCard
-            title="Total alumnos inscritos"
-            value={enrollments.filter((e) => e.isActive).length}
-            icon={Activity}
-            iconClassName="bg-pink-50 text-pink-600"
-          />
-          <StatCard
-            title="Lista de espera"
-            value={players.filter((p) => p.status === 'lista_espera').length}
-            icon={Clock}
-            iconClassName="bg-orange-50 text-orange-600"
-          />
+          {kpiConfig.activePlayers && (
+            <StatCard
+              title="Jugadores activos"
+              value={activePlayers}
+              icon={Users}
+              iconClassName="bg-blue-50 text-blue-600"
+            />
+          )}
+          {kpiConfig.revenue && (
+            <StatCard
+              title="Ingresos este mes"
+              value={formatCurrency(currentRevenue)}
+              icon={DollarSign}
+              trend={{ value: revenueDiff, label: 'vs mes anterior' }}
+              iconClassName="bg-green-50 text-green-600"
+            />
+          )}
+          {kpiConfig.pendingPayments && (
+            <StatCard
+              title="Pagos pendientes"
+              value={formatCurrency(currentPending)}
+              icon={AlertCircle}
+              trend={{ value: pendingDiff, label: 'vs mes anterior' }}
+              iconClassName="bg-yellow-50 text-yellow-600"
+            />
+          )}
+          {kpiConfig.activeGroups && (
+            <StatCard
+              title="Grupos activos"
+              value={activeGroups}
+              icon={GraduationCap}
+              iconClassName="bg-purple-50 text-purple-600"
+            />
+          )}
+          {kpiConfig.collectionRate && (
+            <StatCard
+              title="Ratio de cobro"
+              value={`${collectionRate}%`}
+              icon={TrendingUp}
+              iconClassName="bg-emerald-50 text-emerald-600"
+            />
+          )}
+          {kpiConfig.todayClasses && (
+            <StatCard
+              title="Clases hoy"
+              value={todayGroups.length}
+              icon={CalendarDays}
+              iconClassName="bg-indigo-50 text-indigo-600"
+            />
+          )}
+          {kpiConfig.totalEnrolled && (
+            <StatCard
+              title="Total alumnos inscritos"
+              value={enrollments.filter((e) => e.isActive).length}
+              icon={Activity}
+              iconClassName="bg-pink-50 text-pink-600"
+            />
+          )}
+          {kpiConfig.waitingList && (
+            <StatCard
+              title="Lista de espera"
+              value={players.filter((p) => p.status === 'lista_espera').length}
+              icon={Clock}
+              iconClassName="bg-orange-50 text-orange-600"
+            />
+          )}
         </div>
 
         {/* Charts row */}
@@ -321,6 +375,48 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* KPI Config Dialog */}
+      <Dialog open={showKpiDialog} onOpenChange={setShowKpiDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configurar indicadores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">Selecciona qué indicadores quieres mostrar en el panel principal.</p>
+            <div className="space-y-3">
+              {[
+                { key: 'activePlayers', label: 'Jugadores activos' },
+                { key: 'revenue', label: 'Ingresos del mes' },
+                { key: 'pendingPayments', label: 'Pagos pendientes' },
+                { key: 'activeGroups', label: 'Grupos activos' },
+                { key: 'collectionRate', label: 'Ratio de cobro' },
+                { key: 'todayClasses', label: 'Clases de hoy' },
+                { key: 'totalEnrolled', label: 'Total alumnos inscritos' },
+                { key: 'waitingList', label: 'Lista de espera' },
+              ].map((item) => (
+                <div key={item.key} className="flex items-center gap-3">
+                  <Checkbox
+                    checked={kpiConfig[item.key]}
+                    onCheckedChange={(checked) =>
+                      setKpiConfig((prev) => ({ ...prev, [item.key]: checked }))
+                    }
+                  />
+                  <Label className="cursor-pointer">{item.label}</Label>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKpiConfig(defaultKpiConfig)}>
+              Restaurar
+            </Button>
+            <Button onClick={() => setShowKpiDialog(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

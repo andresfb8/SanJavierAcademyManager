@@ -64,15 +64,20 @@ service cloud.firestore {
 
     match /users/{userId} {
       // Any authenticated user can read their own document.
-      // Directors can read all users within their club.
-      // Coordinadores can read all users within their club.
+      // Directors/coordinadores can read all users within their club.
       allow read: if isAuthenticated() && (
         request.auth.uid == userId ||
         (isAdmin() && resource.data.clubId == getClubId())
       );
 
-      // Only directors can create or modify user documents, scoped to their club.
-      allow create: if hasRole('director') && request.resource.data.clubId == getClubId();
+      // An authenticated user can create their own document (first login bootstrap).
+      // Directors can also create user documents for others in their club.
+      allow create: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (hasRole('director') && request.resource.data.clubId == getClubId())
+      );
+
+      // Only directors can modify/delete user documents, scoped to their club.
       allow update: if hasRole('director') && resource.data.clubId == getClubId() && incomingBelongsToClub();
       allow delete: if hasRole('director') && resource.data.clubId == getClubId();
     }
@@ -216,6 +221,81 @@ service cloud.firestore {
 
       allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
       allow delete: if isAdmin() && belongsToClub();
+    }
+
+    // ─── Invitations Collection ─────────────────────────────────────────
+    // Solo directores pueden gestionar invitaciones.
+
+    match /invitations/{invitationId} {
+      allow read: if isAuthenticated() && belongsToClub() && isAdmin();
+      allow create: if hasRole('director') && incomingBelongsToClub();
+      allow update: if hasRole('director') && belongsToClub() && incomingBelongsToClub();
+      allow delete: if hasRole('director') && belongsToClub();
+    }
+
+    // ─── Events Collection ──────────────────────────────────────────────
+    // director/coordinador: CRUD completo.
+    // entrenador: lectura dentro de su club.
+    // jugador/tutor: lectura dentro de su club.
+
+    match /events/{eventId} {
+      allow read: if isAuthenticated() && belongsToClub();
+      allow create: if isAdmin() && incomingBelongsToClub();
+      allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
+    // ─── Event Payments Collection ──────────────────────────────────────
+    // director/coordinador: CRUD completo.
+    // jugador: lectura de sus propios pagos de evento.
+    // tutor: lectura de pagos de eventos de sus hijos.
+
+    match /eventPayments/{paymentId} {
+      allow read: if isAuthenticated() && belongsToClub() && (
+        isAdmin() ||
+        (hasRole('jugador') && isOwnPlayer(resource.data.playerId)) ||
+        (hasRole('tutor') && isChildPlayer(resource.data.playerId))
+      );
+      allow create: if isAdmin() && incomingBelongsToClub();
+      allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
+    // ─── Evaluations Collection ─────────────────────────────────────────
+    // director/coordinador: CRUD completo.
+    // entrenador: lectura y escritura (crea evaluaciones).
+    // jugador: lectura de sus propias evaluaciones.
+    // tutor: lectura de evaluaciones de sus hijos.
+
+    match /evaluations/{evaluationId} {
+      allow read: if isAuthenticated() && belongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador') ||
+        (hasRole('jugador') && isOwnPlayer(resource.data.playerId)) ||
+        (hasRole('tutor') && isChildPlayer(resource.data.playerId))
+      );
+
+      allow create: if isAuthenticated() && incomingBelongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador')
+      );
+
+      allow update: if isAuthenticated() && belongsToClub() && incomingBelongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador')
+      );
+
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
+    // ─── Coach Salary Configs Collection ────────────────────────────────
+    // Solo directores pueden gestionar configuraciones de salario.
+
+    match /coachSalaryConfigs/{configId} {
+      allow read: if isAdmin() && belongsToClub();
+      allow create: if hasRole('director') && incomingBelongsToClub();
+      allow update: if hasRole('director') && belongsToClub() && incomingBelongsToClub();
+      allow delete: if hasRole('director') && belongsToClub();
     }
   }
 }

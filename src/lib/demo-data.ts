@@ -11,6 +11,9 @@ import type {
   Enrollment,
   Payment,
   Activity,
+  AcademyEvent,
+  Evaluation,
+  CoachSalaryConfig,
 } from '@/types'
 
 // ===================
@@ -1116,5 +1119,289 @@ export const demoActivities: Activity[] = [
     relatedEntityId: 'group-005',
     userId: 'demo-director-001',
     createdAt: new Date(currentYear, currentMonth - 1, 6),
+  },
+]
+
+// ===================
+// EVENTOS
+// ===================
+export const demoEvents: AcademyEvent[] = [
+  {
+    id: 'event-001',
+    name: 'Mini Torneo de Navidad',
+    type: 'mini_torneo',
+    date: new Date('2026-01-15'),
+    startTime: '10:00',
+    endTime: '14:00',
+    courtIds: ['court-001', 'court-002'],
+    courtNames: ['Pista 1 - Central', 'Pista 2 - Cubierta'],
+    coachIds: ['coach-001', 'coach-002'],
+    coachNames: ['Miguel Fernández López', 'Laura Martínez Ruiz'],
+    attendeePlayerIds: [
+      'player-001', 'player-002', 'player-003', 'player-004',
+      'player-005', 'player-006', 'player-007', 'player-008',
+    ],
+    attendeePlayerNames: [
+      'Antonio García Pérez', 'María López Hernández', 'Francisco Martínez Sánchez', 'Carmen Ruiz Navarro',
+      'Javier Hernández Torres', 'Ana Serrano Díaz', 'Roberto Moreno Castillo', 'Isabel Vega Romero',
+    ],
+    price: 15,
+    maxCapacity: 16,
+    description: 'Torneo navideño para todos los niveles. Formato americano con rotación de parejas.',
+    isActive: true,
+    createdAt: new Date('2025-12-20'),
+  },
+  {
+    id: 'event-002',
+    name: 'Clinic de Bandeja',
+    type: 'clinic',
+    date: new Date('2026-02-20'),
+    startTime: '17:00',
+    endTime: '19:00',
+    courtIds: ['court-001'],
+    courtNames: ['Pista 1 - Central'],
+    coachIds: ['coach-001'],
+    coachNames: ['Miguel Fernández López'],
+    attendeePlayerIds: ['player-001', 'player-002', 'player-003', 'player-004'],
+    attendeePlayerNames: [
+      'Antonio García Pérez', 'María López Hernández', 'Francisco Martínez Sánchez', 'Carmen Ruiz Navarro',
+    ],
+    price: 25,
+    maxCapacity: 8,
+    description: 'Clinic monográfico centrado en la técnica de bandeja y sus variantes.',
+    isActive: true,
+    createdAt: new Date('2026-01-25'),
+  },
+  {
+    id: 'event-003',
+    name: 'Torneo Social de Primavera',
+    type: 'social',
+    date: new Date('2026-03-15'),
+    startTime: '09:00',
+    endTime: '15:00',
+    courtIds: ['court-001', 'court-002', 'court-003'],
+    courtNames: ['Pista 1 - Central', 'Pista 2 - Cubierta', 'Pista 3 - Exterior'],
+    coachIds: ['coach-001', 'coach-002', 'coach-003'],
+    coachNames: ['Miguel Fernández López', 'Laura Martínez Ruiz', 'Alejandro Sánchez Navarro'],
+    attendeePlayerIds: [
+      'player-001', 'player-002', 'player-003', 'player-004', 'player-005',
+      'player-006', 'player-007', 'player-008', 'player-009', 'player-010',
+    ],
+    attendeePlayerNames: [
+      'Antonio García Pérez', 'María López Hernández', 'Francisco Martínez Sánchez', 'Carmen Ruiz Navarro',
+      'Javier Hernández Torres', 'Ana Serrano Díaz', 'Roberto Moreno Castillo', 'Isabel Vega Romero',
+      'Pablo Jiménez Ortega', 'Lucía Navarro Gil',
+    ],
+    price: 20,
+    maxCapacity: 20,
+    description: 'Gran torneo social de primavera abierto a todos los alumnos de la academia. Incluye almuerzo.',
+    isActive: true,
+    createdAt: new Date('2026-02-15'),
+  },
+]
+
+// ===================
+// EVALUACIONES
+// ===================
+export const demoEvaluations: Evaluation[] = [
+  {
+    id: 'eval-001',
+    playerId: 'player-001',
+    playerName: 'Antonio García Pérez',
+    coachId: 'coach-001',
+    coachName: 'Miguel Fernández López',
+    date: new Date('2026-01-20'),
+    blocks: [
+      {
+        blockKey: 'tecnico_fondo',
+        scores: [
+          { criterionKey: 'derecha_plana_cortada', score: 8 },
+          { criterionKey: 'reves_plano_cortado', score: 7 },
+          { criterionKey: 'salida_pared_derecha', score: 7 },
+          { criterionKey: 'salida_pared_reves', score: 6 },
+          { criterionKey: 'pared_lateral_derecha', score: 7 },
+          { criterionKey: 'pared_lateral_reves', score: 6 },
+          { criterionKey: 'doble_pared_abre_derecha', score: 6 },
+          { criterionKey: 'doble_pared_abre_reves', score: 5 },
+          { criterionKey: 'doble_pared_cierra_derecha', score: 6 },
+          { criterionKey: 'doble_pared_cierra_reves', score: 5 },
+          { criterionKey: 'giros_simples', score: 7 },
+          { criterionKey: 'giros_doble_pared', score: 5 },
+          { criterionKey: 'globos', score: 8 },
+        ],
+        average: 6.38,
+        comment: 'Buen golpe de derecha y globo. Necesita mejorar las dobles paredes y los giros complejos.',
+      },
+      {
+        blockKey: 'tecnico_red',
+        scores: [
+          { criterionKey: 'volea_derecha', score: 8 },
+          { criterionKey: 'volea_reves', score: 7 },
+          { criterionKey: 'dejada', score: 6 },
+        ],
+        average: 7.00,
+        comment: 'Buenas voleas, especialmente de derecha. La dejada necesita más trabajo de muñeca.',
+      },
+      {
+        blockKey: 'tecnico_aereo',
+        scores: [
+          { criterionKey: 'bandeja', score: 7 },
+          { criterionKey: 'vibora', score: 6 },
+          { criterionKey: 'remate_potencia', score: 7 },
+          { criterionKey: 'rulo_reja', score: 5 },
+          { criterionKey: 'defensa_remate', score: 6 },
+        ],
+        average: 6.20,
+        comment: 'Bandeja y remate correctos. El rulo a la reja y la defensa de remate requieren más práctica.',
+      },
+      {
+        blockKey: 'tecnico_saque',
+        scores: [
+          { criterionKey: 'saque', score: 7 },
+          { criterionKey: 'resto', score: 7 },
+        ],
+        average: 7.00,
+        comment: 'Saque consistente con buena dirección. Resto seguro.',
+      },
+      {
+        blockKey: 'tactico',
+        scores: [
+          { criterionKey: 'toma_decisiones', score: 7 },
+          { criterionKey: 'transicion', score: 6 },
+          { criterionKey: 'velocidad_golpes', score: 7 },
+          { criterionKey: 'analisis_rival', score: 6 },
+          { criterionKey: 'lectura_juego', score: 7 },
+        ],
+        average: 6.60,
+        comment: 'Buena toma de decisiones general. Debe mejorar la transición defensa-ataque y el análisis del rival.',
+      },
+      {
+        blockKey: 'fisico_mental',
+        scores: [
+          { criterionKey: 'resistencia_cardio', score: 8 },
+          { criterionKey: 'explosividad_agilidad', score: 7 },
+          { criterionKey: 'gestion_errores', score: 6 },
+          { criterionKey: 'concentracion_actitud', score: 7 },
+        ],
+        average: 7.00,
+        comment: 'Buena condición física. La gestión de errores es el punto a mejorar mentalmente.',
+      },
+    ],
+    overallAverage: 6.56,
+    finalComment: 'Antonio muestra buen nivel general. Debe mejorar los golpes de doble pared y la gestión mental.',
+    createdAt: new Date('2026-01-20'),
+    updatedAt: new Date('2026-01-20'),
+  },
+  {
+    id: 'eval-002',
+    playerId: 'player-003',
+    playerName: 'Francisco Martínez Sánchez',
+    coachId: 'coach-001',
+    coachName: 'Miguel Fernández López',
+    date: new Date('2026-02-01'),
+    blocks: [
+      {
+        blockKey: 'tecnico_fondo',
+        scores: [
+          { criterionKey: 'derecha_plana_cortada', score: 9 },
+          { criterionKey: 'reves_plano_cortado', score: 8 },
+          { criterionKey: 'salida_pared_derecha', score: 8 },
+          { criterionKey: 'salida_pared_reves', score: 7 },
+          { criterionKey: 'pared_lateral_derecha', score: 8 },
+          { criterionKey: 'pared_lateral_reves', score: 7 },
+          { criterionKey: 'doble_pared_abre_derecha', score: 7 },
+          { criterionKey: 'doble_pared_abre_reves', score: 6 },
+          { criterionKey: 'doble_pared_cierra_derecha', score: 7 },
+          { criterionKey: 'doble_pared_cierra_reves', score: 6 },
+          { criterionKey: 'giros_simples', score: 8 },
+          { criterionKey: 'giros_doble_pared', score: 6 },
+          { criterionKey: 'globos', score: 9 },
+        ],
+        average: 7.38,
+        comment: 'Excelente derecha y globo. Las dobles paredes van progresando adecuadamente.',
+      },
+      {
+        blockKey: 'tecnico_red',
+        scores: [
+          { criterionKey: 'volea_derecha', score: 9 },
+          { criterionKey: 'volea_reves', score: 8 },
+          { criterionKey: 'dejada', score: 7 },
+        ],
+        average: 8.00,
+        comment: 'Voleas excelentes, muy sólido en la red. Dejada con buen toque.',
+      },
+      {
+        blockKey: 'tecnico_aereo',
+        scores: [
+          { criterionKey: 'bandeja', score: 8 },
+          { criterionKey: 'vibora', score: 7 },
+          { criterionKey: 'remate_potencia', score: 8 },
+          { criterionKey: 'rulo_reja', score: 6 },
+          { criterionKey: 'defensa_remate', score: 7 },
+        ],
+        average: 7.20,
+        comment: 'Buen juego aéreo en general. El rulo a la reja es el golpe con más margen de mejora.',
+      },
+      {
+        blockKey: 'tecnico_saque',
+        scores: [
+          { criterionKey: 'saque', score: 8 },
+          { criterionKey: 'resto', score: 8 },
+        ],
+        average: 8.00,
+        comment: 'Saque potente y variado. Resto agresivo y bien colocado.',
+      },
+      {
+        blockKey: 'tactico',
+        scores: [
+          { criterionKey: 'toma_decisiones', score: 8 },
+          { criterionKey: 'transicion', score: 7 },
+          { criterionKey: 'velocidad_golpes', score: 8 },
+          { criterionKey: 'analisis_rival', score: 7 },
+          { criterionKey: 'lectura_juego', score: 9 },
+        ],
+        average: 7.80,
+        comment: 'Muy buena lectura de juego. La transición y el análisis del rival siguen mejorando.',
+      },
+      {
+        blockKey: 'fisico_mental',
+        scores: [
+          { criterionKey: 'resistencia_cardio', score: 8 },
+          { criterionKey: 'explosividad_agilidad', score: 8 },
+          { criterionKey: 'gestion_errores', score: 7 },
+          { criterionKey: 'concentracion_actitud', score: 8 },
+        ],
+        average: 7.75,
+        comment: 'Buena forma física y mental. Mantiene la concentración durante todo el partido.',
+      },
+    ],
+    overallAverage: 7.56,
+    finalComment: 'Francisco tiene un juego muy completo. Destacan sus voleas y su lectura de juego.',
+    createdAt: new Date('2026-02-01'),
+    updatedAt: new Date('2026-02-01'),
+  },
+]
+
+// ===================
+// CONFIGURACIÓN SALARIOS ENTRENADORES
+// ===================
+export const demoCoachSalaryConfigs: CoachSalaryConfig[] = [
+  {
+    coachId: 'coach-001',
+    ratePerGroup: 250,
+    ratePerPrivateLesson: 30,
+    bonuses: 100,
+  },
+  {
+    coachId: 'coach-002',
+    ratePerGroup: 200,
+    ratePerPrivateLesson: 25,
+    bonuses: 50,
+  },
+  {
+    coachId: 'coach-003',
+    ratePerGroup: 200,
+    ratePerPrivateLesson: 25,
+    bonuses: 0,
   },
 ]

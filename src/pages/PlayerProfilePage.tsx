@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,10 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Progress } from '@/components/ui/progress'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle } from 'lucide-react'
-import { formatDate, formatCurrency, calculateAge } from '@/lib/utils'
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText } from 'lucide-react'
+import { formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
+import { EVALUATION_STRUCTURE } from '@/constants'
 
 // =========================================
 // Helper: InfoRow
@@ -68,7 +71,9 @@ const attendanceStatusLabels: Record<string, string> = {
 export default function PlayerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { players, enrollments, payments, groups, attendance } = useDataStore()
+  const { players, enrollments, payments, groups, attendance, evaluations, updatePlayer } = useDataStore()
+
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
   const player = useMemo(() => players.find((p) => p.id === id), [players, id])
 
@@ -142,6 +147,52 @@ export default function PlayerProfilePage() {
     return '**** **** **** **** **** ' + iban.slice(-4)
   }, [player])
 
+  // Player evaluations
+  const playerEvaluations = useMemo(() => {
+    if (!player) return []
+    return evaluations
+      .filter((e) => e.playerId === player.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [evaluations, player])
+
+  // Handle edit submit
+  const handleEditSubmit = (formData: PlayerFormData) => {
+    if (!player) return
+    const birthDate = new Date(formData.birthDate)
+    const playerIsMinor = checkIsMinor(birthDate)
+
+    updatePlayer(player.id, {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      dni: formData.dni,
+      birthDate,
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address,
+      city: formData.city,
+      postalCode: formData.postalCode,
+      level: formData.level,
+      dominantHand: formData.dominantHand,
+      position: formData.position,
+      previousExperience: formData.previousExperience || undefined,
+      medicalNotes: formData.medicalNotes || undefined,
+      bankAccountHolder: formData.bankAccountHolder,
+      iban: formData.iban,
+      status: formData.status,
+      isMinor: playerIsMinor,
+      guardian: playerIsMinor ? {
+        firstName: formData.guardianFirstName,
+        lastName: formData.guardianLastName,
+        dni: formData.guardianDni,
+        phone: formData.guardianPhone,
+        email: formData.guardianEmail,
+        relationship: formData.guardianRelationship,
+      } : undefined,
+      notes: formData.notes || undefined,
+    })
+    setShowEditDialog(false)
+  }
+
   // =========================================
   // Not found
   // =========================================
@@ -182,6 +233,10 @@ export default function PlayerProfilePage() {
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={player.status} />
+            <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
+              <EditIcon className="h-4 w-4 mr-1" />
+              Editar
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/jugadores')}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Volver
@@ -265,6 +320,7 @@ export default function PlayerProfilePage() {
             <TabsTrigger value="facturacion">Facturaci&oacute;n</TabsTrigger>
             <TabsTrigger value="asistencia">Asistencia</TabsTrigger>
             <TabsTrigger value="grupos">Grupos</TabsTrigger>
+            <TabsTrigger value="informes">Informes</TabsTrigger>
           </TabsList>
 
           {/* ================================ */}
@@ -515,8 +571,86 @@ export default function PlayerProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ================================ */}
+          {/* TAB: Informes                    */}
+          {/* ================================ */}
+          <TabsContent value="informes">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Evaluaciones e informes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {playerEvaluations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <FileText className="h-10 w-10 mb-3" />
+                    <p className="text-sm">No hay evaluaciones registradas</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {playerEvaluations.map((evaluation) => (
+                      <div key={evaluation.id} className="rounded-lg border p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">
+                              Evaluaci&oacute;n del {formatDate(evaluation.date)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Evaluador: {evaluation.coachName}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-primary">
+                              {evaluation.overallAverage.toFixed(1)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Media global</p>
+                          </div>
+                        </div>
+
+                        {/* Block summaries */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {evaluation.blocks.map((block) => {
+                            const blockDef = EVALUATION_STRUCTURE.find((b) => b.key === block.blockKey)
+                            return (
+                              <div key={block.blockKey} className="rounded-lg bg-muted/50 p-3">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">
+                                  {blockDef?.label || block.blockKey}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <Progress value={block.average * 10} className="flex-1 h-2" />
+                                  <span className="text-sm font-bold">{block.average.toFixed(1)}</span>
+                                </div>
+                                {block.comment && (
+                                  <p className="text-xs text-muted-foreground mt-1">{block.comment}</p>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {evaluation.finalComment && (
+                          <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+                            <p className="text-xs font-medium text-blue-800 mb-1">Comentario final</p>
+                            <p className="text-sm text-blue-700">{evaluation.finalComment}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Dialog */}
+      <PlayerFormDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        player={player}
+        onSubmit={handleEditSubmit}
+      />
     </div>
   )
 }

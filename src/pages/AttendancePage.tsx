@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useDataStore } from '@/stores/dataStore'
 import {
   CheckCircle,
@@ -23,8 +24,10 @@ import {
   Users,
   ClipboardList,
   Save,
+  Download,
 } from 'lucide-react'
 import { formatDate, generateId } from '@/lib/utils'
+import * as XLSX from 'xlsx'
 import type { AttendanceEntry, AttendanceStatus } from '@/types'
 
 // ==========================================
@@ -52,6 +55,19 @@ export default function AttendancePage() {
 
   // --- Estado de guardado ---
   const [saved, setSaved] = useState(false)
+
+  // --- Dialog de exportacion ---
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [exportDateFrom, setExportDateFrom] = useState(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 1)
+    return d.toISOString().split('T')[0]
+  })
+  const [exportDateTo, setExportDateTo] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
+  const [exportSelectedGroupIds, setExportSelectedGroupIds] = useState<string[]>([])
+  const [exportPlayerId, setExportPlayerId] = useState('')
 
   // ===================
   // DATOS DERIVADOS
@@ -130,6 +146,17 @@ export default function AttendancePage() {
       )
       .slice(0, 5)
   }, [selectedGroupId, attendance])
+
+  // Opciones de jugadores para el filtro de exportacion
+  const allPlayerOptions = useMemo(() => {
+    return players
+      .filter((p) => p.status === 'activo')
+      .map((p) => ({
+        value: p.id,
+        label: `${p.firstName} ${p.lastName}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [players])
 
   // ===================
   // HANDLERS
@@ -237,6 +264,117 @@ export default function AttendancePage() {
     setSaved(true)
   }
 
+  // --- Exportacion ---
+
+  const handleToggleExportGroup = (groupId: string, checked: boolean) => {
+    setExportSelectedGroupIds((prev) =>
+      checked ? [...prev, groupId] : prev.filter((id) => id !== groupId)
+    )
+  }
+
+  const handleSelectAllGroups = () => {
+    if (exportSelectedGroupIds.length === activeGroups.length) {
+      setExportSelectedGroupIds([])
+    } else {
+      setExportSelectedGroupIds(activeGroups.map((g) => g.id))
+    }
+  }
+
+  const handleExport = () => {
+    // Translate status to display text
+    const statusLabels: Record<string, string> = {
+      presente: 'Presente',
+      ausente: 'Ausente',
+      justificado: 'Justificado',
+    }
+
+    // Filter attendance records by date range
+    const fromDate = new Date(exportDateFrom + 'T00:00:00')
+    const toDate = new Date(exportDateTo + 'T23:59:59')
+
+    const filteredRecords = attendance.filter((record) => {
+      const recordDate =
+        record.date instanceof Date
+          ? record.date
+          : new Date(record.date)
+      if (recordDate < fromDate || recordDate > toDate) return false
+
+      // Filter by groups if any are selected
+      if (exportSelectedGroupIds.length > 0 && !exportSelectedGroupIds.includes(record.groupId)) {
+        return false
+      }
+
+      return true
+    })
+
+    // Flatten records into rows
+    const rows: {
+      Fecha: string
+      Grupo: string
+      Jugador: string
+      Estado: string
+      Recuperacion: string
+      Notas: string
+    }[] = []
+
+    for (const record of filteredRecords) {
+      const recordDate =
+        record.date instanceof Date
+          ? record.date
+          : new Date(record.date)
+      const dateStr = formatDate(recordDate)
+
+      for (const entry of record.records) {
+        // Filter by player if specified
+        if (exportPlayerId && entry.playerId !== exportPlayerId) continue
+
+        rows.push({
+          Fecha: dateStr,
+          Grupo: record.groupName,
+          Jugador: entry.playerName,
+          Estado: statusLabels[entry.status] ?? entry.status,
+          Recuperacion: entry.isRecovery ? 'Si' : 'No',
+          Notas: entry.notes ?? '',
+        })
+      }
+    }
+
+    // Sort by date then group then player
+    rows.sort((a, b) => {
+      if (a.Fecha !== b.Fecha) return a.Fecha.localeCompare(b.Fecha)
+      if (a.Grupo !== b.Grupo) return a.Grupo.localeCompare(b.Grupo)
+      return a.Jugador.localeCompare(b.Jugador)
+    })
+
+    // Generate Excel
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 12 }, // Fecha
+      { wch: 25 }, // Grupo
+      { wch: 25 }, // Jugador
+      { wch: 14 }, // Estado
+      { wch: 14 }, // Recuperacion
+      { wch: 30 }, // Notas
+    ]
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Asistencia')
+
+    const fileName = `asistencia_export_${exportDateFrom}_${exportDateTo}.xlsx`
+    XLSX.writeFile(workbook, fileName)
+
+    setShowExportDialog(false)
+  }
+
+  const handleOpenExportDialog = () => {
+    // Reset export filters when opening
+    setExportSelectedGroupIds([])
+    setExportPlayerId('')
+    setShowExportDialog(true)
+  }
+
   // ===================
   // CONTADORES RESUMEN
   // ===================
@@ -269,6 +407,12 @@ export default function AttendancePage() {
       <Header
         title="Asistencia"
         subtitle="Registro de asistencia de los grupos"
+        actions={
+          <Button variant="outline" size="sm" onClick={handleOpenExportDialog}>
+            <Download className="h-4 w-4 mr-1" />
+            Exportar
+          </Button>
+        }
       />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -639,6 +783,115 @@ export default function AttendancePage() {
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Anadir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============================== */}
+      {/* DIALOG: EXPORTAR ASISTENCIA    */}
+      {/* ============================== */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Exportar asistencia</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            <p className="text-sm text-muted-foreground">
+              Configura los filtros para exportar los registros de asistencia a
+              un archivo Excel.
+            </p>
+
+            {/* Rango de fechas */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Fecha desde</Label>
+                <Input
+                  type="date"
+                  value={exportDateFrom}
+                  onChange={(e) => setExportDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha hasta</Label>
+                <Input
+                  type="date"
+                  value={exportDateTo}
+                  onChange={(e) => setExportDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Grupos - multi-select con checkboxes */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Grupos</Label>
+                <button
+                  type="button"
+                  onClick={handleSelectAllGroups}
+                  className="text-xs text-primary hover:underline"
+                >
+                  {exportSelectedGroupIds.length === activeGroups.length
+                    ? 'Deseleccionar todos'
+                    : 'Seleccionar todos'}
+                </button>
+              </div>
+              <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
+                {activeGroups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    No hay grupos activos.
+                  </p>
+                ) : (
+                  activeGroups.map((group) => (
+                    <label
+                      key={group.id}
+                      className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent/50 cursor-pointer transition-colors"
+                    >
+                      <Checkbox
+                        checked={exportSelectedGroupIds.includes(group.id)}
+                        onCheckedChange={(checked) =>
+                          handleToggleExportGroup(group.id, checked)
+                        }
+                      />
+                      <span className="text-sm">{group.name}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {group.coachName}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+              {exportSelectedGroupIds.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Sin seleccion = todos los grupos
+                </p>
+              )}
+            </div>
+
+            {/* Jugador (filtro opcional) */}
+            <div className="space-y-2">
+              <Label>Jugador (opcional)</Label>
+              <Select
+                options={allPlayerOptions}
+                placeholder="Todos los jugadores"
+                value={exportPlayerId}
+                onChange={(e) => setExportPlayerId(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowExportDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExport}
+              disabled={!exportDateFrom || !exportDateTo}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar Excel
             </Button>
           </DialogFooter>
         </DialogContent>

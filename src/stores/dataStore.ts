@@ -19,6 +19,11 @@ import type {
   AttendanceEntry,
   Activity,
   PrivateLesson,
+  Invitation,
+  AcademyEvent,
+  EventPayment,
+  Evaluation,
+  CoachSalaryConfig,
   PaymentStatus,
   PaymentMethod,
   PlayerStatus,
@@ -33,6 +38,9 @@ import {
   demoEnrollments,
   demoPayments,
   demoActivities,
+  demoEvents,
+  demoEvaluations,
+  demoCoachSalaryConfigs,
 } from '@/lib/demo-data'
 import { generateId } from '@/lib/utils'
 import { CANCELLATION_DEADLINE_DAY } from '@/constants'
@@ -54,6 +62,11 @@ interface DataState {
   attendance: AttendanceRecord[]
   activities: Activity[]
   privateLessons: PrivateLesson[]
+  invitations: Invitation[]
+  events: AcademyEvent[]
+  eventPayments: EventPayment[]
+  evaluations: Evaluation[]
+  coachSalaryConfigs: CoachSalaryConfig[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -110,6 +123,28 @@ interface DataState {
   addPrivateLesson: (lesson: Omit<PrivateLesson, 'id' | 'createdAt'>) => void
   updatePrivateLesson: (id: string, data: Partial<PrivateLesson>) => void
   deletePrivateLesson: (id: string) => void
+
+  // --- Invitations ---
+  addInvitation: (invitation: Omit<Invitation, 'id'>) => void
+  updateInvitation: (id: string, data: Partial<Invitation>) => void
+  deleteInvitation: (id: string) => void
+
+  // --- Events ---
+  addEvent: (event: Omit<AcademyEvent, 'id' | 'createdAt'>) => void
+  updateEvent: (id: string, data: Partial<AcademyEvent>) => void
+  deleteEvent: (id: string) => void
+
+  // --- Event Payments ---
+  addEventPayment: (payment: Omit<EventPayment, 'id' | 'createdAt'>) => void
+  updateEventPayment: (id: string, data: Partial<EventPayment>) => void
+
+  // --- Evaluations ---
+  addEvaluation: (evaluation: Omit<Evaluation, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateEvaluation: (id: string, data: Partial<Evaluation>) => void
+  deleteEvaluation: (id: string) => void
+
+  // --- Coach Salary ---
+  updateCoachSalaryConfig: (coachId: string, config: Partial<CoachSalaryConfig>) => void
 }
 
 // ===================
@@ -146,6 +181,11 @@ export const useDataStore = create<DataState>((set, get) => ({
   attendance: [],
   activities: [...demoActivities],
   privateLessons: [],
+  invitations: [],
+  events: [...demoEvents],
+  eventPayments: [],
+  evaluations: [...demoEvaluations],
+  coachSalaryConfigs: [...demoCoachSalaryConfigs],
 
   // ================================
   // CLUB
@@ -748,6 +788,127 @@ export const useDataStore = create<DataState>((set, get) => ({
   deletePrivateLesson: (id) => {
     set((state) => ({
       privateLessons: state.privateLessons.filter((l) => l.id !== id),
+    }))
+  },
+
+  // ================================
+  // INVITATIONS
+  // ================================
+
+  addInvitation: (invitationData) => {
+    const newInvitation: Invitation = {
+      ...invitationData,
+      id: generateId(),
+    }
+    set((state) => ({
+      invitations: [...state.invitations, newInvitation],
+    }))
+  },
+
+  updateInvitation: (id, data) => {
+    set((state) => ({
+      invitations: state.invitations.map((i) =>
+        i.id === id ? { ...i, ...data } : i
+      ),
+    }))
+  },
+
+  deleteInvitation: (id) => {
+    set((state) => ({
+      invitations: state.invitations.filter((i) => i.id !== id),
+    }))
+  },
+
+  // ================================
+  // EVENTS
+  // ================================
+
+  addEvent: (eventData) => {
+    const newEvent: AcademyEvent = {
+      ...eventData,
+      id: generateId(),
+      createdAt: new Date(),
+    }
+    set((state) => ({
+      events: [...state.events, newEvent],
+    }))
+  },
+
+  updateEvent: (id, data) => {
+    set((state) => ({
+      events: state.events.map((e) => (e.id === id ? { ...e, ...data } : e)),
+    }))
+  },
+
+  deleteEvent: (id) => {
+    set((state) => ({
+      events: state.events.filter((e) => e.id !== id),
+    }))
+  },
+
+  // ================================
+  // EVENT PAYMENTS
+  // ================================
+
+  addEventPayment: (paymentData) => {
+    const newPayment: EventPayment = {
+      ...paymentData,
+      id: generateId(),
+      createdAt: new Date(),
+    }
+    set((state) => ({
+      eventPayments: [...state.eventPayments, newPayment],
+    }))
+  },
+
+  updateEventPayment: (id, data) => {
+    set((state) => ({
+      eventPayments: state.eventPayments.map((p) =>
+        p.id === id ? { ...p, ...data } : p
+      ),
+    }))
+  },
+
+  // ================================
+  // EVALUATIONS
+  // ================================
+
+  addEvaluation: (evaluationData) => {
+    const now = new Date()
+    const newEvaluation: Evaluation = {
+      ...evaluationData,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now,
+    }
+    set((state) => ({
+      evaluations: [...state.evaluations, newEvaluation],
+    }))
+  },
+
+  updateEvaluation: (id, data) => {
+    set((state) => ({
+      evaluations: state.evaluations.map((e) =>
+        e.id === id ? { ...e, ...data, updatedAt: new Date() } : e
+      ),
+    }))
+  },
+
+  deleteEvaluation: (id) => {
+    set((state) => ({
+      evaluations: state.evaluations.filter((e) => e.id !== id),
+    }))
+  },
+
+  // ================================
+  // COACH SALARY CONFIG
+  // ================================
+
+  updateCoachSalaryConfig: (coachId, config) => {
+    set((state) => ({
+      coachSalaryConfigs: state.coachSalaryConfigs.map((c) =>
+        c.coachId === coachId ? { ...c, ...config } : c
+      ),
     }))
   },
 }))

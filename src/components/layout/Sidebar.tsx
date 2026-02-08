@@ -10,15 +10,25 @@ import {
   Calendar,
   Settings,
   BookOpen,
+  ShieldCheck,
+  FileText,
   LogOut,
   Menu,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, hasPermission } from '@/stores/authStore'
 import { useState } from 'react'
+import type { UserRole } from '@/types'
 
-const navigation = [
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  requiredModule?: string
+}
+
+const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Jugadores', href: '/jugadores', icon: Users },
   { name: 'Grupos', href: '/grupos', icon: GraduationCap },
@@ -26,6 +36,8 @@ const navigation = [
   { name: 'Agenda', href: '/agenda', icon: Calendar },
   { name: 'Pagos', href: '/pagos', icon: CreditCard },
   { name: 'Entrenadores', href: '/entrenadores', icon: UserCog },
+  { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
+  { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
   { name: 'Configuración', href: '/configuracion', icon: Settings },
   { name: 'Planificación', href: '/planificacion', icon: BookOpen },
 ]
@@ -50,28 +62,36 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navigation.map((item) => {
-          const isActive = item.href === '/'
-            ? location.pathname === '/'
-            : location.pathname.startsWith(item.href)
+        {navigation
+          .filter((item) => {
+            // If the nav item requires a specific module, check permissions
+            if (item.requiredModule && user?.role) {
+              return hasPermission(user.role as UserRole, item.requiredModule, 'read')
+            }
+            return true
+          })
+          .map((item) => {
+            const isActive = item.href === '/'
+              ? location.pathname === '/'
+              : location.pathname.startsWith(item.href)
 
-          return (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-primary'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-              )}
-            >
-              <item.icon className="h-5 w-5 shrink-0" />
-              {item.name}
-            </NavLink>
-          )
-        })}
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                )}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {item.name}
+              </NavLink>
+            )
+          })}
       </nav>
 
       {/* User */}

@@ -1,4 +1,4 @@
-import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition } from '@/types'
+import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus } from '@/types'
 
 // --- Niveles ---
 export const PLAYER_LEVELS: { value: PlayerLevel; label: string; color: string }[] = [
@@ -110,6 +110,117 @@ export const MONTHS = [
   { value: 10, label: 'Octubre' },
   { value: 11, label: 'Noviembre' },
   { value: 12, label: 'Diciembre' },
+]
+
+// --- Tipos de Evento ---
+export const EVENT_TYPES: { value: EventType; label: string; color: string }[] = [
+  { value: 'mini_torneo', label: 'Mini Torneo', color: 'bg-teal-100 text-teal-800' },
+  { value: 'clinic', label: 'Clinic', color: 'bg-cyan-100 text-cyan-800' },
+  { value: 'exhibicion', label: 'Exhibición', color: 'bg-indigo-100 text-indigo-800' },
+  { value: 'social', label: 'Evento Social', color: 'bg-pink-100 text-pink-800' },
+]
+
+// --- Estados de Invitación ---
+export const INVITATION_STATUSES: { value: InvitationStatus; label: string; color: string }[] = [
+  { value: 'pendiente', label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'aceptada', label: 'Aceptada', color: 'bg-green-100 text-green-800' },
+  { value: 'expirada', label: 'Expirada', color: 'bg-gray-100 text-gray-800' },
+]
+
+// --- Estructura de Evaluación ---
+export interface EvaluationCriterion {
+  key: string
+  label: string
+}
+
+export interface EvaluationSubBlock {
+  key: string
+  label: string
+  criteria: EvaluationCriterion[]
+}
+
+export interface EvaluationBlockDef {
+  key: string
+  label: string
+  subBlocks?: EvaluationSubBlock[]
+  criteria?: EvaluationCriterion[]
+}
+
+export const EVALUATION_STRUCTURE: EvaluationBlockDef[] = [
+  {
+    key: 'tecnico',
+    label: 'Bloque Técnico',
+    subBlocks: [
+      {
+        key: 'fondo',
+        label: 'Golpes de Fondo',
+        criteria: [
+          { key: 'derecha_plana_cortada', label: 'Derecha plana/cortada' },
+          { key: 'reves_plano_cortado', label: 'Revés plano/cortado' },
+          { key: 'salida_pared_derecha', label: 'Salida de pared (Derecha)' },
+          { key: 'salida_pared_reves', label: 'Salida de pared (Revés)' },
+          { key: 'pared_lateral_derecha', label: 'Pared lateral de derecha' },
+          { key: 'pared_lateral_reves', label: 'Pared lateral de revés' },
+          { key: 'doble_pared_abre_derecha', label: 'Doble pared que abre (Derecha)' },
+          { key: 'doble_pared_abre_reves', label: 'Doble pared que abre (Revés)' },
+          { key: 'doble_pared_cierra_derecha', label: 'Doble pared que cierra (Derecha)' },
+          { key: 'doble_pared_cierra_reves', label: 'Doble pared que cierra (Revés)' },
+          { key: 'giros_simples', label: 'Giros simples' },
+          { key: 'giros_doble_pared', label: 'Giros con doble pared' },
+          { key: 'globos', label: 'Globos' },
+        ],
+      },
+      {
+        key: 'red',
+        label: 'Juego de Red',
+        criteria: [
+          { key: 'volea_derecha', label: 'Volea de derecha' },
+          { key: 'volea_reves', label: 'Volea de revés' },
+          { key: 'dejada', label: 'Dejada' },
+        ],
+      },
+      {
+        key: 'aereo',
+        label: 'Juego Aéreo',
+        criteria: [
+          { key: 'bandeja', label: 'Bandeja' },
+          { key: 'vibora', label: 'Víbora' },
+          { key: 'remate_potencia', label: 'Remate de potencia (x3/x4)' },
+          { key: 'rulo_reja', label: 'Rulo a la reja' },
+          { key: 'defensa_remate', label: 'Defensa de remate rival' },
+        ],
+      },
+      {
+        key: 'saque_resto',
+        label: 'Saque/Resto',
+        criteria: [
+          { key: 'saque', label: 'Saque (Dirección y profundidad)' },
+          { key: 'resto', label: 'Resto (Control y variantes)' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'tactico',
+    label: 'Bloque Táctico',
+    criteria: [
+      { key: 'toma_decisiones', label: 'Toma de decisiones' },
+      { key: 'transicion', label: 'Transición (Defensa-Ataque)' },
+      { key: 'velocidad_golpes', label: 'Velocidad de los golpes' },
+      { key: 'analisis_rival', label: 'Análisis del rival' },
+      { key: 'lectura_juego', label: 'Lectura de juego' },
+    ],
+  },
+  {
+    key: 'fisico_mental',
+    label: 'Bloque Físico y Mental',
+    criteria: [
+      { key: 'resistencia_cardio', label: 'Resistencia / Cardio' },
+      { key: 'explosividad_agilidad', label: 'Explosividad / Agilidad' },
+      { key: 'gestion_errores', label: 'Gestión de errores (Mental)' },
+      { key: 'concentracion_actitud', label: 'Concentración / Actitud' },
+    ],
+  },
 ]
 
 // --- Configuración por defecto ---

@@ -4,46 +4,32 @@ import { Header } from '@/components/layout/Header'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
+import { ImportPlayersDialog, type ImportedPlayer } from '@/components/shared/ImportPlayersDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { useDataStore } from '@/stores/dataStore'
-import { isMinor as checkIsMinor } from '@/lib/utils'
-import {
-  PLAYER_LEVELS,
-  PLAYER_STATUSES,
-  DOMINANT_HANDS,
-  PLAYER_POSITIONS,
-  GUARDIAN_RELATIONSHIPS,
-} from '@/constants'
-import {
-  Plus,
-  Search,
-  Upload,
-  Download,
-  Users,
-  Mail,
-  Phone,
-  MoreHorizontal,
-  Eye,
-  Edit,
-  Trash2,
-  UserX,
-  Filter,
-} from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { useDataStore } from '@/stores/dataStore'
+import { cn, isMinor as checkIsMinor } from '@/lib/utils'
+import { PLAYER_LEVELS, PLAYER_STATUSES } from '@/constants'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table'
+import * as XLSX from 'xlsx'
 import type { Player, PlayerLevel, PlayerStatus } from '@/types'
+import {
+  Plus, Search, Upload, Download, Users, Mail, Phone,
+  MoreHorizontal, Eye, Edit, Trash2, UserX,
+  ArrowUpDown, ArrowUp, ArrowDown,
+} from 'lucide-react'
 
 export default function PlayersPage() {
   const navigate = useNavigate()
@@ -56,35 +42,8 @@ export default function PlayersPage() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [showCancelConfirm, setShowCancelConfirm] = useState<string | null>(null)
-
-  // Form state
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', dni: '', birthDate: '',
-    email: '', phone: '', address: '', city: 'San Javier', postalCode: '30730',
-    level: 'iniciacion' as PlayerLevel, dominantHand: 'derecha' as 'derecha' | 'izquierda',
-    position: 'ambos' as 'drive' | 'reves' | 'ambos',
-    previousExperience: '', medicalNotes: '',
-    bankAccountHolder: '', iban: '',
-    status: 'activo' as PlayerStatus, notes: '',
-    // Guardian
-    guardianFirstName: '', guardianLastName: '', guardianDni: '',
-    guardianPhone: '', guardianEmail: '', guardianRelationship: 'padre' as 'padre' | 'madre' | 'tutor',
-  })
-
-  const resetForm = () => {
-    setForm({
-      firstName: '', lastName: '', dni: '', birthDate: '',
-      email: '', phone: '', address: '', city: 'San Javier', postalCode: '30730',
-      level: 'iniciacion', dominantHand: 'derecha', position: 'ambos',
-      previousExperience: '', medicalNotes: '',
-      bankAccountHolder: '', iban: '',
-      status: 'activo', notes: '',
-      guardianFirstName: '', guardianLastName: '', guardianDni: '',
-      guardianPhone: '', guardianEmail: '', guardianRelationship: 'padre',
-    })
-  }
-
-  const isMinorForm = form.birthDate ? checkIsMinor(new Date(form.birthDate)) : false
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [sorting, setSorting] = useState<SortingState>([])
 
   const filteredPlayers = useMemo(() => {
     return players.filter((p) => {
@@ -115,96 +74,214 @@ export default function PlayersPage() {
     }
   }
 
-  const handleSubmit = () => {
-    const birthDate = new Date(form.birthDate)
+  const handleFormSubmit = (formData: PlayerFormData) => {
+    const birthDate = new Date(formData.birthDate)
     const playerIsMinor = checkIsMinor(birthDate)
 
     const playerData = {
-      firstName: form.firstName,
-      lastName: form.lastName,
-      dni: form.dni,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      dni: formData.dni,
       birthDate,
-      email: form.email,
-      phone: form.phone,
-      address: form.address,
-      city: form.city,
-      postalCode: form.postalCode,
-      level: form.level,
-      dominantHand: form.dominantHand,
-      position: form.position,
-      previousExperience: form.previousExperience || undefined,
-      medicalNotes: form.medicalNotes || undefined,
-      bankAccountHolder: form.bankAccountHolder,
-      iban: form.iban,
-      status: form.status,
-      registrationDate: new Date(),
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address,
+      city: formData.city,
+      postalCode: formData.postalCode,
+      level: formData.level,
+      dominantHand: formData.dominantHand,
+      position: formData.position,
+      previousExperience: formData.previousExperience || undefined,
+      medicalNotes: formData.medicalNotes || undefined,
+      bankAccountHolder: formData.bankAccountHolder,
+      iban: formData.iban,
+      status: formData.status,
+      registrationDate: editingPlayer?.registrationDate || new Date(),
       isMinor: playerIsMinor,
       guardian: playerIsMinor ? {
-        firstName: form.guardianFirstName,
-        lastName: form.guardianLastName,
-        dni: form.guardianDni,
-        phone: form.guardianPhone,
-        email: form.guardianEmail,
-        relationship: form.guardianRelationship,
+        firstName: formData.guardianFirstName,
+        lastName: formData.guardianLastName,
+        dni: formData.guardianDni,
+        phone: formData.guardianPhone,
+        email: formData.guardianEmail,
+        relationship: formData.guardianRelationship,
       } : undefined,
-      notes: form.notes || undefined,
+      notes: formData.notes || undefined,
     }
 
     if (editingPlayer) {
       updatePlayer(editingPlayer.id, playerData)
-      setEditingPlayer(null)
     } else {
       addPlayer(playerData)
     }
     setShowCreateDialog(false)
-    resetForm()
+    setEditingPlayer(null)
   }
 
-  const openEditDialog = (player: Player) => {
-    setForm({
-      firstName: player.firstName,
-      lastName: player.lastName,
-      dni: player.dni,
-      birthDate: player.birthDate.toISOString().split('T')[0],
-      email: player.email,
-      phone: player.phone,
-      address: player.address,
-      city: player.city,
-      postalCode: player.postalCode,
-      level: player.level,
-      dominantHand: player.dominantHand,
-      position: player.position,
-      previousExperience: player.previousExperience || '',
-      medicalNotes: player.medicalNotes || '',
-      bankAccountHolder: player.bankAccountHolder,
-      iban: player.iban,
-      status: player.status,
-      notes: player.notes || '',
-      guardianFirstName: player.guardian?.firstName || '',
-      guardianLastName: player.guardian?.lastName || '',
-      guardianDni: player.guardian?.dni || '',
-      guardianPhone: player.guardian?.phone || '',
-      guardianEmail: player.guardian?.email || '',
-      guardianRelationship: player.guardian?.relationship || 'padre',
-    })
-    setEditingPlayer(player)
-    setShowCreateDialog(true)
+  const handleImport = (importedPlayers: ImportedPlayer[]) => {
+    for (const p of importedPlayers) {
+      addPlayer({
+        firstName: p.firstName,
+        lastName: p.lastName,
+        dni: p.dni || '',
+        birthDate: p.birthDate ? new Date(p.birthDate) : new Date('2000-01-01'),
+        email: p.email || '',
+        phone: p.phone || '',
+        address: p.address || '',
+        city: p.city || 'San Javier',
+        postalCode: p.postalCode || '30730',
+        level: (['iniciacion', 'intermedio', 'avanzado', 'competicion', 'menores'].includes(p.level) ? p.level : 'iniciacion') as PlayerLevel,
+        dominantHand: 'derecha',
+        position: 'ambos',
+        bankAccountHolder: '',
+        iban: '',
+        status: (['activo', 'lista_espera', 'baja'].includes(p.status) ? p.status : 'activo') as PlayerStatus,
+        registrationDate: new Date(),
+        isMinor: p.birthDate ? checkIsMinor(new Date(p.birthDate)) : false,
+        notes: undefined,
+      })
+    }
+    setShowImportDialog(false)
   }
 
   const handleExport = () => {
-    const headers = ['Nombre', 'Apellidos', 'DNI', 'Email', 'Teléfono', 'Nivel', 'Estado']
-    const rows = filteredPlayers.map((p) => [
-      p.firstName, p.lastName, p.dni, p.email, p.phone, p.level, p.status,
-    ])
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `jugadores_${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const data = filteredPlayers.map((p) => ({
+      'Nombre': p.firstName,
+      'Apellidos': p.lastName,
+      'DNI': p.dni,
+      'Email': p.email,
+      'Telefono': p.phone,
+      'Nivel': p.level,
+      'Estado': p.status,
+      'Direccion': p.address,
+      'Ciudad': p.city,
+      'CP': p.postalCode,
+      'Mano': p.dominantHand,
+      'Posicion': p.position,
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Jugadores')
+    XLSX.writeFile(wb, `jugadores_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
+
+  const columns = useMemo<ColumnDef<Player>[]>(() => [
+    {
+      id: 'select',
+      header: () => (
+        <Checkbox
+          checked={selectedIds.size === filteredPlayers.length && filteredPlayers.length > 0}
+          onCheckedChange={toggleSelectAll}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={selectedIds.has(row.original.id)}
+          onCheckedChange={() => toggleSelect(row.original.id)}
+        />
+      ),
+      enableSorting: false,
+      size: 40,
+    },
+    {
+      accessorKey: 'firstName',
+      header: 'Jugador',
+      cell: ({ row }) => {
+        const player = row.original
+        return (
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">
+              {player.firstName[0]}{player.lastName[0]}
+            </div>
+            <div>
+              <p className="font-medium text-sm">{player.firstName} {player.lastName}</p>
+              <p className="text-xs text-muted-foreground">
+                {player.isMinor && '👶 Menor · '}{player.dni}
+              </p>
+            </div>
+          </div>
+        )
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = `${rowA.original.firstName} ${rowA.original.lastName}`.toLowerCase()
+        const b = `${rowB.original.firstName} ${rowB.original.lastName}`.toLowerCase()
+        return a.localeCompare(b)
+      },
+    },
+    {
+      id: 'contact',
+      header: 'Contacto',
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Mail className="h-3.5 w-3.5" />
+            {row.original.email}
+          </div>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Phone className="h-3.5 w-3.5" />
+            {row.original.phone}
+          </div>
+        </div>
+      ),
+      enableSorting: false,
+      meta: { className: 'hidden md:table-cell' },
+    },
+    {
+      accessorKey: 'level',
+      header: 'Nivel',
+      cell: ({ row }) => <StatusBadge status={row.original.level} />,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Estado',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const player = row.original
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => navigate(`/jugadores/${player.id}`)}>
+                <Eye className="h-4 w-4 mr-2" /> Ver perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setEditingPlayer(player); setShowCreateDialog(true) }}>
+                <Edit className="h-4 w-4 mr-2" /> Editar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {player.status === 'activo' && (
+                <DropdownMenuItem onClick={() => setShowCancelConfirm(player.id)}>
+                  <UserX className="h-4 w-4 mr-2" /> Dar de baja
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => setShowDeleteConfirm(player.id)}>
+                <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                <span className="text-destructive">Eliminar</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      },
+      enableSorting: false,
+      size: 40,
+    },
+  ], [selectedIds, filteredPlayers.length, navigate])
+
+  const table = useReactTable({
+    data: filteredPlayers,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
 
   return (
     <div>
@@ -213,11 +290,15 @@ export default function PlayersPage() {
         subtitle={`${players.filter((p) => p.status === 'activo').length} activos · ${players.length} total`}
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4 mr-1" />
+              Importar
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" />
               Exportar
             </Button>
-            <Button size="sm" onClick={() => { resetForm(); setEditingPlayer(null); setShowCreateDialog(true) }}>
+            <Button size="sm" onClick={() => { setEditingPlayer(null); setShowCreateDialog(true) }}>
               <Plus className="h-4 w-4 mr-1" />
               Nuevo jugador
             </Button>
@@ -231,7 +312,7 @@ export default function PlayersPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre, email o teléfono..."
+              placeholder="Buscar por nombre, email o telefono..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -273,8 +354,8 @@ export default function PlayersPage() {
           <EmptyState
             icon={Users}
             title="No hay jugadores"
-            description="Añade tu primer jugador para empezar a gestionar tu escuela"
-            action={{ label: 'Añadir jugador', onClick: () => setShowCreateDialog(true) }}
+            description="Anade tu primer jugador para empezar a gestionar tu escuela"
+            action={{ label: 'Anadir jugador', onClick: () => setShowCreateDialog(true) }}
           />
         ) : (
           <Card>
@@ -282,91 +363,52 @@ export default function PlayersPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-3 w-10">
-                        <Checkbox
-                          checked={selectedIds.size === filteredPlayers.length && filteredPlayers.length > 0}
-                          onCheckedChange={toggleSelectAll}
-                        />
-                      </th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground">Jugador</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Contacto</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground">Nivel</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground">Estado</th>
-                      <th className="p-3 text-right text-sm font-medium text-muted-foreground w-10"></th>
-                    </tr>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <tr key={headerGroup.id} className="border-b bg-muted/50">
+                        {headerGroup.headers.map((header) => (
+                          <th
+                            key={header.id}
+                            className={cn(
+                              'p-3 text-left text-sm font-medium text-muted-foreground',
+                              header.column.getCanSort() && 'cursor-pointer select-none hover:text-foreground',
+                              (header.column.columnDef.meta as Record<string, string> | undefined)?.className
+                            )}
+                            onClick={header.column.getToggleSortingHandler()}
+                            style={{ width: header.column.columnDef.size }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                              {header.column.getCanSort() && (
+                                header.column.getIsSorted() === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> :
+                                header.column.getIsSorted() === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> :
+                                <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+                              )}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
                   </thead>
                   <tbody>
-                    {filteredPlayers.map((player) => (
+                    {table.getRowModel().rows.map((row) => (
                       <tr
-                        key={player.id}
+                        key={row.id}
                         className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/jugadores/${player.id}`)}
+                        onClick={() => navigate(`/jugadores/${row.original.id}`)}
                       >
-                        <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(player.id)}
-                            onCheckedChange={() => toggleSelect(player.id)}
-                          />
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">
-                              {player.firstName[0]}{player.lastName[0]}
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{player.firstName} {player.lastName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {player.isMinor && '👶 Menor · '}{player.dni}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3 hidden md:table-cell">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Mail className="h-3.5 w-3.5" />
-                              {player.email}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Phone className="h-3.5 w-3.5" />
-                              {player.phone}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <StatusBadge status={player.level} />
-                        </td>
-                        <td className="p-3">
-                          <StatusBadge status={player.status} />
-                        </td>
-                        <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => navigate(`/jugadores/${player.id}`)}>
-                                <Eye className="h-4 w-4 mr-2" /> Ver perfil
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(player)}>
-                                <Edit className="h-4 w-4 mr-2" /> Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {player.status === 'activo' && (
-                                <DropdownMenuItem onClick={() => setShowCancelConfirm(player.id)}>
-                                  <UserX className="h-4 w-4 mr-2" /> Dar de baja
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={() => setShowDeleteConfirm(player.id)}>
-                                <Trash2 className="h-4 w-4 mr-2 text-destructive" />
-                                <span className="text-destructive">Eliminar</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            className={cn('p-3', (cell.column.columnDef.meta as Record<string, string> | undefined)?.className)}
+                            onClick={(e) => {
+                              if (cell.column.id === 'select' || cell.column.id === 'actions') {
+                                e.stopPropagation()
+                              }
+                            }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -378,183 +420,29 @@ export default function PlayersPage() {
       </div>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingPlayer ? 'Editar jugador' : 'Nuevo jugador'}</DialogTitle>
-          </DialogHeader>
-          <Tabs defaultValue="personal">
-            <TabsList className="w-full">
-              <TabsTrigger value="personal" className="flex-1">Datos personales</TabsTrigger>
-              <TabsTrigger value="deportivos" className="flex-1">Datos deportivos</TabsTrigger>
-              <TabsTrigger value="bancarios" className="flex-1">Datos bancarios</TabsTrigger>
-              {isMinorForm && <TabsTrigger value="tutor" className="flex-1">Tutor</TabsTrigger>}
-            </TabsList>
+      <PlayerFormDialog
+        open={showCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open)
+          if (!open) setEditingPlayer(null)
+        }}
+        player={editingPlayer}
+        onSubmit={handleFormSubmit}
+      />
 
-            <TabsContent value="personal">
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="space-y-2">
-                  <Label>Nombre *</Label>
-                  <Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Apellidos *</Label>
-                  <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>DNI *</Label>
-                  <Input value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Fecha de nacimiento *</Label>
-                  <Input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
-                  {isMinorForm && (
-                    <p className="text-xs text-yellow-600 font-medium">Este jugador es menor de edad. Completa los datos del tutor.</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Email *</Label>
-                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono *</Label>
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Dirección</Label>
-                  <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Ciudad</Label>
-                  <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Código postal</Label>
-                  <Input value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="deportivos">
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="space-y-2">
-                  <Label>Nivel *</Label>
-                  <Select
-                    options={PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label }))}
-                    value={form.level}
-                    onChange={(e) => setForm({ ...form, level: e.target.value as PlayerLevel })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mano dominante</Label>
-                  <Select
-                    options={DOMINANT_HANDS.map((h) => ({ value: h.value, label: h.label }))}
-                    value={form.dominantHand}
-                    onChange={(e) => setForm({ ...form, dominantHand: e.target.value as 'derecha' | 'izquierda' })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Posición</Label>
-                  <Select
-                    options={PLAYER_POSITIONS.map((p) => ({ value: p.value, label: p.label }))}
-                    value={form.position}
-                    onChange={(e) => setForm({ ...form, position: e.target.value as 'drive' | 'reves' | 'ambos' })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Estado</Label>
-                  <Select
-                    options={PLAYER_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value as PlayerStatus })}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Experiencia previa</Label>
-                  <Input value={form.previousExperience} onChange={(e) => setForm({ ...form, previousExperience: e.target.value })} />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Notas médicas</Label>
-                  <Input value={form.medicalNotes} onChange={(e) => setForm({ ...form, medicalNotes: e.target.value })} />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="bancarios">
-              <div className="grid grid-cols-1 gap-4 mt-4">
-                <div className="space-y-2">
-                  <Label>Titular de la cuenta *</Label>
-                  <Input value={form.bankAccountHolder} onChange={(e) => setForm({ ...form, bankAccountHolder: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>IBAN *</Label>
-                  <Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value })} placeholder="ES00 0000 0000 0000 0000 0000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Notas</Label>
-                  <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-                </div>
-              </div>
-            </TabsContent>
-
-            {isMinorForm && (
-              <TabsContent value="tutor">
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 col-span-2">
-                    <p className="text-sm text-yellow-800 font-medium">
-                      Datos del padre, madre o tutor legal del menor
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Parentesco *</Label>
-                    <Select
-                      options={GUARDIAN_RELATIONSHIPS.map((r) => ({ value: r.value, label: r.label }))}
-                      value={form.guardianRelationship}
-                      onChange={(e) => setForm({ ...form, guardianRelationship: e.target.value as 'padre' | 'madre' | 'tutor' })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>DNI *</Label>
-                    <Input value={form.guardianDni} onChange={(e) => setForm({ ...form, guardianDni: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nombre *</Label>
-                    <Input value={form.guardianFirstName} onChange={(e) => setForm({ ...form, guardianFirstName: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Apellidos *</Label>
-                    <Input value={form.guardianLastName} onChange={(e) => setForm({ ...form, guardianLastName: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Teléfono *</Label>
-                    <Input value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email *</Label>
-                    <Input type="email" value={form.guardianEmail} onChange={(e) => setForm({ ...form, guardianEmail: e.target.value })} />
-                  </div>
-                </div>
-              </TabsContent>
-            )}
-          </Tabs>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCreateDialog(false); resetForm(); setEditingPlayer(null) }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={!form.firstName || !form.lastName || !form.birthDate}>
-              {editingPlayer ? 'Guardar cambios' : 'Crear jugador'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Import Dialog */}
+      <ImportPlayersDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onImport={handleImport}
+      />
 
       {/* Delete Confirm */}
       <ConfirmDialog
         open={!!showDeleteConfirm}
         onOpenChange={() => setShowDeleteConfirm(null)}
         title="Eliminar jugador"
-        description="Esta acción eliminará al jugador y todos sus datos asociados. Esta acción no se puede deshacer."
+        description="Esta accion eliminara al jugador y todos sus datos asociados. Esta accion no se puede deshacer."
         variant="destructive"
         confirmLabel="Eliminar"
         onConfirm={() => {
@@ -568,7 +456,7 @@ export default function PlayersPage() {
         open={!!showCancelConfirm}
         onOpenChange={() => setShowCancelConfirm(null)}
         title="Dar de baja"
-        description="El jugador será dado de baja. Se aplicará la lógica de facturación según la fecha actual (antes o después del día 5 del mes)."
+        description="El jugador sera dado de baja. Se aplicara la logica de facturacion segun la fecha actual (antes o despues del dia 5 del mes)."
         confirmLabel="Dar de baja"
         onConfirm={() => {
           if (showCancelConfirm) cancelPlayer(showCancelConfirm)
