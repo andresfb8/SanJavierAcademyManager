@@ -9,23 +9,32 @@ interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ className, onCheckedChange, checked, ...props }, ref) => {
     return (
-      <label className="inline-flex items-center">
+      <span
+        className="inline-flex items-center cursor-pointer"
+        role="checkbox"
+        aria-checked={!!checked}
+        onClick={(e) => {
+          e.stopPropagation()
+          onCheckedChange?.(!checked)
+        }}
+      >
         <input
           type="checkbox"
           ref={ref}
           checked={checked}
           onChange={(e) => onCheckedChange?.(e.target.checked)}
-          className="sr-only peer"
+          className="sr-only"
+          tabIndex={-1}
           {...props}
         />
         <div className={cn(
-          "h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 flex items-center justify-center",
-          "peer-checked:bg-primary peer-checked:text-primary-foreground",
+          "h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex items-center justify-center",
+          checked ? "bg-primary text-primary-foreground" : "",
           className
         )}>
           {checked && <Check className="h-3 w-3" />}
         </div>
-      </label>
+      </span>
     )
   }
 )

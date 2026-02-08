@@ -31,7 +31,7 @@ function DialogContent({ children, className }: { children: React.ReactNode; cla
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
-      <div className={cn("relative z-50 w-full max-w-lg rounded-lg bg-background p-6 shadow-lg border max-h-[85vh] overflow-y-auto", className)}>
+      <div className={cn("relative z-50 w-[calc(100%-2rem)] sm:w-full sm:max-w-lg rounded-lg bg-background p-4 sm:p-6 shadow-lg border max-h-[85vh] overflow-y-auto", className)}>
         <button onClick={() => setOpen(false)} className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100">
           <X className="h-4 w-4" />
         </button>

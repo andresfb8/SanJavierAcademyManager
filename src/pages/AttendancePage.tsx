@@ -410,12 +410,12 @@ export default function AttendancePage() {
         actions={
           <Button variant="outline" size="sm" onClick={handleOpenExportDialog}>
             <Download className="h-4 w-4 mr-1" />
-            Exportar
+            <span className="hidden sm:inline">Exportar</span>
           </Button>
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6">
         {/* ============================== */}
         {/* SELECTOR DE GRUPO Y FECHA      */}
         {/* ============================== */}
@@ -477,20 +477,20 @@ export default function AttendancePage() {
         {entriesInitialized && selectedGroup && (
           <>
             {/* Info del grupo */}
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="secondary" className="text-sm px-3 py-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <Badge variant="secondary" className="text-xs sm:text-sm px-2 sm:px-3 py-1">
                 <Users className="h-4 w-4 mr-1" />
                 {selectedGroup.name}
               </Badge>
-              <Badge variant="outline" className="text-sm px-3 py-1">
+              <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1">
                 <Calendar className="h-4 w-4 mr-1" />
                 {formatDate(new Date(selectedDate + 'T00:00:00'))}
               </Badge>
-              <Badge variant="outline" className="text-sm px-3 py-1">
+              <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1 hidden sm:inline-flex">
                 Entrenador: {selectedGroup.coachName}
               </Badge>
               {entries.length > 0 && (
-                <div className="ml-auto flex gap-2">
+                <div className="w-full sm:w-auto sm:ml-auto flex gap-2 mt-1 sm:mt-0">
                   <Badge variant="success">{presentCount} Presentes</Badge>
                   <Badge variant="destructive">{absentCount} Ausentes</Badge>
                   <Badge variant="warning">{justifiedCount} Justificados</Badge>
@@ -509,8 +509,8 @@ export default function AttendancePage() {
                     size="sm"
                     onClick={() => setShowRecoveryDialog(true)}
                   >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Anadir recuperacion
+                    <UserPlus className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Anadir recuperacion</span>
                   </Button>
                 </div>
               </CardHeader>
@@ -547,48 +547,48 @@ export default function AttendancePage() {
                         </div>
 
                         {/* Botones de estado */}
-                        <div className="col-span-5 flex gap-2">
+                        <div className="col-span-5 flex gap-1.5 sm:gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() =>
                               handleStatusChange(entry.playerId, 'presente')
                             }
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
+                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
                               entry.status === 'presente'
                                 ? 'bg-green-100 text-green-700 border-green-300 shadow-sm'
                                 : 'bg-background text-muted-foreground border-border hover:bg-green-50 hover:text-green-600'
                             }`}
                           >
                             <CheckCircle className="h-3.5 w-3.5" />
-                            Presente
+                            <span className="hidden sm:inline">Presente</span>
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               handleStatusChange(entry.playerId, 'ausente')
                             }
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
+                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
                               entry.status === 'ausente'
                                 ? 'bg-red-100 text-red-700 border-red-300 shadow-sm'
                                 : 'bg-background text-muted-foreground border-border hover:bg-red-50 hover:text-red-600'
                             }`}
                           >
                             <XCircle className="h-3.5 w-3.5" />
-                            Ausente
+                            <span className="hidden sm:inline">Ausente</span>
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               handleStatusChange(entry.playerId, 'justificado')
                             }
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
+                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
                               entry.status === 'justificado'
                                 ? 'bg-yellow-100 text-yellow-700 border-yellow-300 shadow-sm'
                                 : 'bg-background text-muted-foreground border-border hover:bg-yellow-50 hover:text-yellow-600'
                             }`}
                           >
                             <AlertCircle className="h-3.5 w-3.5" />
-                            Justificado
+                            <span className="hidden sm:inline">Justificado</span>
                           </button>
                         </div>
 
@@ -620,7 +620,7 @@ export default function AttendancePage() {
 
                 {/* Boton guardar */}
                 {entries.length > 0 && (
-                  <div className="mt-6 flex items-center justify-between border-t pt-4">
+                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t pt-4">
                     <div className="text-sm text-muted-foreground">
                       {presentCount} presentes, {absentCount} ausentes,{' '}
                       {justifiedCount} justificados
@@ -661,7 +661,8 @@ export default function AttendancePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="overflow-x-auto">
+                  <div className="space-y-2 min-w-[400px]">
                     {/* Cabecera */}
                     <div className="grid grid-cols-5 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
                       <div>Fecha</div>
@@ -706,6 +707,7 @@ export default function AttendancePage() {
                         </div>
                       )
                     })}
+                  </div>
                   </div>
                 </CardContent>
               </Card>

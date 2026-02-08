@@ -117,25 +117,25 @@ export default function CoachProfilePage() {
         subtitle={coach.specialization || 'Entrenador'}
         actions={
           <Button variant="outline" size="sm" onClick={() => navigate('/entrenadores')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver
+            <ArrowLeft className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Volver</span>
           </Button>
         }
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         {/* Info personal */}
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-start gap-6">
-              <Avatar className="h-20 w-20">
-                <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+              <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
+                <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl font-semibold">
                   {coach.firstName[0]}{coach.lastName[0]}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <h2 className="text-xl font-bold">{coach.firstName} {coach.lastName}</h2>
+              <div className="flex-1 w-full text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold">{coach.firstName} {coach.lastName}</h2>
                   <Badge variant={coach.isActive ? 'success' : 'secondary'}>
                     {coach.isActive ? 'Activo' : 'Inactivo'}
                   </Badge>
@@ -182,16 +182,19 @@ export default function CoachProfilePage() {
         <Tabs defaultValue="grupos">
           <TabsList>
             <TabsTrigger value="grupos">
-              <Users className="h-4 w-4 mr-1.5" />
-              Grupos ({coachGroups.length})
+              <Users className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Grupos ({coachGroups.length})</span>
+              <span className="sm:hidden text-xs">Grupos</span>
             </TabsTrigger>
             <TabsTrigger value="evaluaciones">
-              <FileText className="h-4 w-4 mr-1.5" />
-              Evaluaciones ({coachEvaluations.length})
+              <FileText className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Evaluaciones ({coachEvaluations.length})</span>
+              <span className="sm:hidden text-xs">Eval.</span>
             </TabsTrigger>
             <TabsTrigger value="salario">
-              <CreditCard className="h-4 w-4 mr-1.5" />
-              Salario
+              <CreditCard className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Salario</span>
+              <span className="sm:hidden text-xs">Salario</span>
             </TabsTrigger>
           </TabsList>
 
@@ -210,6 +213,7 @@ export default function CoachProfilePage() {
                     Este entrenador no tiene grupos asignados.
                   </p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -254,6 +258,7 @@ export default function CoachProfilePage() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -274,6 +279,7 @@ export default function CoachProfilePage() {
                     Este entrenador no ha realizado evaluaciones.
                   </p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -314,6 +320,7 @@ export default function CoachProfilePage() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -331,7 +338,7 @@ export default function CoachProfilePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-4">
-                    <p className="text-4xl font-bold text-primary">
+                    <p className="text-3xl sm:text-4xl font-bold text-primary">
                       {formatCurrency(estimatedSalary)}
                     </p>
                     <p className="text-sm text-muted-foreground mt-2">

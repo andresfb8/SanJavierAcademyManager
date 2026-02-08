@@ -276,36 +276,36 @@ export default function AgendaPage() {
         subtitle="Vista diaria de pistas y horarios"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={openNewEventDialog} className="gap-1">
+            <Button variant="outline" onClick={openNewEventDialog} className="gap-1" size="sm">
               <CalendarPlus className="h-4 w-4" />
-              Nuevo evento
+              <span className="hidden sm:inline">Nuevo evento</span>
             </Button>
-            <Button onClick={openNewLessonDialog} className="gap-1">
+            <Button onClick={openNewLessonDialog} className="gap-1" size="sm">
               <Plus className="h-4 w-4" />
-              Nueva clase particular
+              <span className="hidden sm:inline">Nueva clase particular</span>
             </Button>
           </div>
         }
       />
 
-      <div className="p-6 space-y-4">
+      <div className="p-3 sm:p-6 space-y-4">
         {/* Navegacion de fecha */}
         <Card>
           <CardContent className="py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="icon" onClick={goToPreviousDay}><ChevronLeft className="h-4 w-4" /></Button>
                 <Button variant="outline" size="icon" onClick={goToNextDay}><ChevronRight className="h-4 w-4" /></Button>
                 {!isToday && <Button variant="outline" size="sm" onClick={goToToday}>Hoy</Button>}
               </div>
               <div className="text-center">
-                <h2 className="text-lg font-semibold capitalize">{formatDateLong(selectedDate)}</h2>
+                <h2 className="text-base sm:text-lg font-semibold capitalize">{formatDateLong(selectedDate)}</h2>
                 <p className="text-sm text-muted-foreground">{dayLabel}</p>
               </div>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-sm bg-blue-100 border border-blue-300" />Grupo</div>
-                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" />Particular</div>
-                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-sm bg-teal-100 border border-teal-300" />Evento</div>
+              <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-blue-100 border border-blue-300" />Grupo</div>
+                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" />Particular</div>
+                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-teal-100 border border-teal-300" />Evento</div>
               </div>
             </div>
           </CardContent>
@@ -423,7 +423,7 @@ export default function AgendaPage() {
         )}
 
         {/* Resumen del dia */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100"><Users className="h-5 w-5 text-blue-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'group').length, 0)}</p><p className="text-sm text-muted-foreground">Grupos con clase</p></div></div></CardContent></Card>
           <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100"><Clock className="h-5 w-5 text-amber-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'private').length, 0)}</p><p className="text-sm text-muted-foreground">Clases particulares</p></div></div></CardContent></Card>
           <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100"><Star className="h-5 w-5 text-teal-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'event').length, 0)}</p><p className="text-sm text-muted-foreground">Eventos</p></div></div></CardContent></Card>
@@ -433,7 +433,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Nueva clase particular */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nueva clase particular</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
@@ -468,7 +468,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Nuevo evento */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuevo evento</DialogTitle></DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div className="space-y-1.5"><Label>Nombre del evento</Label><Input value={evName} onChange={(e) => setEvName(e.target.value)} placeholder="Ej: Mini Torneo Navidad" /></div>

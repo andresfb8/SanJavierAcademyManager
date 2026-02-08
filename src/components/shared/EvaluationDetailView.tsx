@@ -25,15 +25,15 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
         : 'bg-red-500'
 
   return (
-    <div className="flex items-center gap-3 py-1">
-      <span className="text-sm w-56 shrink-0 truncate">{label}</span>
-      <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+    <div className="flex items-center gap-2 sm:gap-3 py-1">
+      <span className="text-xs sm:text-sm w-32 sm:w-56 shrink-0 truncate">{label}</span>
+      <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${color}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-sm font-semibold w-8 text-right">{score}</span>
+      <span className="text-xs sm:text-sm font-semibold w-8 text-right">{score}</span>
     </div>
   )
 }
@@ -75,14 +75,14 @@ export function EvaluationDetailView({
   return (
     <div className="space-y-6">
       {/* Cabecera */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+        <div className="min-w-0">
           <Button variant="ghost" size="sm" onClick={onClose} className="mb-3">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Volver a evaluaciones
           </Button>
-          <h2 className="text-xl font-bold mb-1">Evaluacion de {evaluation.playerName}</h2>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <h2 className="text-lg sm:text-xl font-bold mb-1">Evaluacion de {evaluation.playerName}</h2>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <User className="h-4 w-4" />
               Evaluador: {evaluation.coachName}
@@ -94,18 +94,18 @@ export function EvaluationDetailView({
           </div>
         </div>
         <div
-          className={`flex items-center gap-2 rounded-lg border px-4 py-3 ${avgColor}`}
+          className={`flex items-center gap-2 rounded-lg border px-3 sm:px-4 py-2 sm:py-3 shrink-0 ${avgColor}`}
         >
           <Star className="h-5 w-5" />
           <div>
-            <p className="text-2xl font-bold">{evaluation.overallAverage.toFixed(1)}</p>
+            <p className="text-xl sm:text-2xl font-bold">{evaluation.overallAverage.toFixed(1)}</p>
             <p className="text-xs">Media global</p>
           </div>
         </div>
       </div>
 
       {/* Resumen de bloques */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
         {blockSummaries.map((bs) => {
           const c =
             bs.average >= 7
@@ -114,9 +114,9 @@ export function EvaluationDetailView({
                 ? 'border-yellow-200 bg-yellow-50'
                 : 'border-red-200 bg-red-50'
           return (
-            <div key={bs.label} className={`rounded-lg border p-3 ${c}`}>
-              <p className="text-xs text-muted-foreground truncate">{bs.label}</p>
-              <p className="text-lg font-bold mt-0.5">{bs.average.toFixed(1)}</p>
+            <div key={bs.label} className={`rounded-lg border p-2 sm:p-3 ${c}`}>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{bs.label}</p>
+              <p className="text-base sm:text-lg font-bold mt-0.5">{bs.average.toFixed(1)}</p>
             </div>
           )
         })}

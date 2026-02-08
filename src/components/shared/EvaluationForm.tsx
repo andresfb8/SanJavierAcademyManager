@@ -207,9 +207,9 @@ export function EvaluationForm({
           {criteria.map((criterion) => (
             <div
               key={criterion.key}
-              className="flex items-center gap-3 py-1"
+              className="flex items-center gap-2 sm:gap-3 py-1"
             >
-              <span className="text-sm flex-1 min-w-0 truncate">
+              <span className="text-xs sm:text-sm flex-1 min-w-0 truncate">
                 {criterion.label}
               </span>
               <Input
@@ -221,7 +221,7 @@ export function EvaluationForm({
                 onChange={(e) =>
                   setScore(criterion.key, parseFloat(e.target.value) || 0)
                 }
-                className="w-16 h-8 text-center text-sm"
+                className="w-14 sm:w-16 h-8 text-center text-sm"
                 placeholder="-"
               />
             </div>
@@ -252,20 +252,20 @@ export function EvaluationForm({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start sm:items-center justify-between gap-3">
+        <div className="min-w-0">
           <Button variant="ghost" size="sm" onClick={onClose} className="mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Volver
           </Button>
-          <h2 className="text-xl font-bold">
+          <h2 className="text-lg sm:text-xl font-bold">
             {editEvaluation ? 'Editar evaluacion' : 'Nueva evaluacion'}
           </h2>
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <div className="flex items-center gap-2">
             <Star className={`h-5 w-5 ${avgColor}`} />
-            <span className={`text-2xl font-bold ${avgColor}`}>
+            <span className={`text-xl sm:text-2xl font-bold ${avgColor}`}>
               {overallAverage > 0 ? overallAverage.toFixed(1) : '-'}
             </span>
           </div>
@@ -397,7 +397,7 @@ export function EvaluationForm({
       </Card>
 
       {/* Acciones */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t">
         <Button variant="outline" onClick={onClose}>
           Cancelar
         </Button>

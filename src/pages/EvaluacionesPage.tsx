@@ -81,7 +81,7 @@ export default function EvaluacionesPage() {
     return (
       <div>
         <Header title="Detalle de evaluacion" />
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           <EvaluationDetailView
             evaluation={viewingEvaluation}
             onClose={() => setViewingEvaluation(null)}
@@ -96,7 +96,7 @@ export default function EvaluacionesPage() {
     return (
       <div>
         <Header title="Nueva evaluacion" />
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           <EvaluationForm
             onClose={() => setShowForm(false)}
             onSave={handleSaveEvaluation}
@@ -114,13 +114,13 @@ export default function EvaluacionesPage() {
         subtitle={`${evaluations.length} evaluacion${evaluations.length !== 1 ? 'es' : ''}`}
         actions={
           <Button size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nueva evaluacion
+            <Plus className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Nueva evaluacion</span>
           </Button>
         }
       />
 
-      <div className="p-6 space-y-4">
+      <div className="p-3 sm:p-6 space-y-4">
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -160,6 +160,7 @@ export default function EvaluacionesPage() {
         ) : (
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -226,6 +227,7 @@ export default function EvaluacionesPage() {
                   })}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         )}

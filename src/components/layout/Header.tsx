@@ -1,5 +1,4 @@
-import { Bell, Search } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 
 interface HeaderProps {
   title: string
@@ -8,24 +7,19 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, actions }: HeaderProps) {
-  const { user } = useAuthStore()
-
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur px-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        )}
-      </div>
-      <div className="flex items-center gap-3">
-        {actions}
-        <button className="relative rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
-          <Bell className="h-5 w-5" />
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-            3
-          </span>
-        </button>
+    <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+      <div className="flex min-h-[4rem] items-center justify-between gap-3 pl-14 pr-4 lg:pl-6 lg:pr-6 py-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg lg:text-xl font-semibold text-foreground truncate">{title}</h1>
+          {subtitle && (
+            <p className="text-xs lg:text-sm text-muted-foreground hidden sm:block">{subtitle}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {actions}
+          <NotificationBell />
+        </div>
       </div>
     </header>
   )
