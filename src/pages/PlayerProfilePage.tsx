@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw } from 'lucide-react'
 import { formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
@@ -140,6 +140,53 @@ export default function PlayerProfilePage() {
     const present = playerAttendance.filter((a) => a.status === 'presente').length
     return Math.round((present / playerAttendance.length) * 100)
   }, [playerAttendance])
+
+  // Recovery credit history (derived from attendance records)
+  const recoveryCreditHistory = useMemo(() => {
+    if (!player) return []
+    const movements: {
+      date: Date
+      groupName: string
+      type: 'earned' | 'used'
+      balance: number
+    }[] = []
+
+    // Collect all credit movements from attendance sorted by date ASC
+    const allMovements: { date: Date; groupName: string; type: 'earned' | 'used' }[] = []
+
+    for (const record of attendance) {
+      for (const entry of record.records) {
+        if (entry.playerId !== player.id) continue
+        if (entry.status === 'justificado') {
+          allMovements.push({
+            date: record.date instanceof Date ? record.date : new Date(record.date),
+            groupName: record.groupName,
+            type: 'earned',
+          })
+        }
+        if (entry.isRecovery) {
+          allMovements.push({
+            date: record.date instanceof Date ? record.date : new Date(record.date),
+            groupName: record.groupName,
+            type: 'used',
+          })
+        }
+      }
+    }
+
+    // Sort by date ascending to calculate running balance
+    allMovements.sort((a, b) => a.date.getTime() - b.date.getTime())
+
+    let balance = 0
+    for (const m of allMovements) {
+      balance += m.type === 'earned' ? 1 : -1
+      balance = Math.max(0, balance)
+      movements.push({ ...m, balance })
+    }
+
+    // Return in reverse chronological order (newest first)
+    return movements.reverse()
+  }, [attendance, player])
 
   // Mask IBAN: show only last 4 digits
   const maskedIban = useMemo(() => {
@@ -460,56 +507,133 @@ export default function PlayerProfilePage() {
           {/* TAB: Asistencia                  */}
           {/* ================================ */}
           <TabsContent value="asistencia">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Registro de asistencia</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {playerAttendance.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <Activity className="h-10 w-10 mb-3" />
-                    <p className="text-sm">No hay registros de asistencia</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="p-3 text-left text-sm font-medium text-muted-foreground">Fecha</th>
-                          <th className="p-3 text-left text-sm font-medium text-muted-foreground">Grupo</th>
-                          <th className="p-3 text-left text-sm font-medium text-muted-foreground">Estado</th>
-                          <th className="p-3 text-left text-sm font-medium text-muted-foreground">Recuperaci&oacute;n</th>
-                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Notas</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {playerAttendance.map((record, index) => (
-                          <tr key={index} className="border-b hover:bg-muted/30 transition-colors">
-                            <td className="p-3 text-sm">{formatDate(record.date)}</td>
-                            <td className="p-3 text-sm text-muted-foreground">{record.groupName}</td>
-                            <td className="p-3">
-                              <StatusBadge status={record.status} />
-                            </td>
-                            <td className="p-3 text-sm">
-                              {record.isRecovery ? (
-                                <Badge variant="outline" className="text-xs">
-                                  Recuperaci&oacute;n
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="p-3 text-sm text-muted-foreground hidden md:table-cell">
-                              {record.notes || '—'}
-                            </td>
+            <div className="space-y-6">
+              {/* Registro de asistencia */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Registro de asistencia</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {playerAttendance.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <Activity className="h-10 w-10 mb-3" />
+                      <p className="text-sm">No hay registros de asistencia</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Fecha</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Grupo</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Estado</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Recuperación</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Notas</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {playerAttendance.map((record, index) => (
+                            <tr key={index} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="p-3 text-sm">{formatDate(record.date)}</td>
+                              <td className="p-3 text-sm text-muted-foreground">{record.groupName}</td>
+                              <td className="p-3">
+                                <StatusBadge status={record.status} />
+                              </td>
+                              <td className="p-3 text-sm">
+                                {record.isRecovery ? (
+                                  <Badge variant="outline" className="text-xs">
+                                    Recuperación
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-sm text-muted-foreground hidden md:table-cell">
+                                {record.notes || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Historial de créditos de recuperación */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Historial de créditos de recuperación
+                    </CardTitle>
+                    <Badge variant="outline" className="text-xs font-semibold">
+                      Saldo actual: {player.recoveryCredits}
+                    </Badge>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {recoveryCreditHistory.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <RotateCcw className="h-10 w-10 mb-3 opacity-40" />
+                      <p className="text-sm">No hay movimientos de créditos</p>
+                      <p className="text-xs mt-1">Los créditos se generan con faltas justificadas y se gastan en clases de recuperación</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Fecha</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Grupo</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Movimiento</th>
+                            <th className="p-3 text-center text-sm font-medium text-muted-foreground">Saldo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recoveryCreditHistory.map((movement, index) => (
+                            <tr key={index} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="p-3 text-sm">{formatDate(movement.date)}</td>
+                              <td className="p-3 text-sm text-muted-foreground">{movement.groupName}</td>
+                              <td className="p-3">
+                                {movement.type === 'earned' ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100">
+                                      <Plus className="h-3 w-3 text-green-600" />
+                                    </div>
+                                    <span className="text-sm text-green-700 font-medium">+1 Falta justificada</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100">
+                                      <Minus className="h-3 w-3 text-blue-600" />
+                                    </div>
+                                    <span className="text-sm text-blue-700 font-medium">−1 Clase de recuperación</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs font-bold ${
+                                    movement.balance > 0
+                                      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                      : 'bg-gray-50 text-gray-500 border-gray-200'
+                                  }`}
+                                >
+                                  {movement.balance}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* ================================ */}
