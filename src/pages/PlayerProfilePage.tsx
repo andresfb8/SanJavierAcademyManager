@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
+
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye } from 'lucide-react'
 import { formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
-import { EVALUATION_STRUCTURE } from '@/constants'
+import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
+import type { Evaluation } from '@/types'
 
 // =========================================
 // Helper: InfoRow
@@ -74,6 +75,7 @@ export default function PlayerProfilePage() {
   const { players, enrollments, payments, groups, attendance, evaluations, updatePlayer } = useDataStore()
 
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [viewingEvaluation, setViewingEvaluation] = useState<Evaluation | null>(null)
 
   const player = useMemo(() => players.find((p) => p.id === id), [players, id])
 
@@ -576,70 +578,75 @@ export default function PlayerProfilePage() {
           {/* TAB: Informes                    */}
           {/* ================================ */}
           <TabsContent value="informes">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Evaluaciones e informes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {playerEvaluations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <FileText className="h-10 w-10 mb-3" />
-                    <p className="text-sm">No hay evaluaciones registradas</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {playerEvaluations.map((evaluation) => (
-                      <div key={evaluation.id} className="rounded-lg border p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">
-                              Evaluaci&oacute;n del {formatDate(evaluation.date)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Evaluador: {evaluation.coachName}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-primary">
-                              {evaluation.overallAverage.toFixed(1)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Media global</p>
-                          </div>
-                        </div>
-
-                        {/* Block summaries */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {evaluation.blocks.map((block) => {
-                            const blockDef = EVALUATION_STRUCTURE.find((b) => b.key === block.blockKey)
+            {viewingEvaluation ? (
+              <EvaluationDetailView
+                evaluation={viewingEvaluation}
+                onClose={() => setViewingEvaluation(null)}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Evaluaciones e informes</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {playerEvaluations.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <FileText className="h-10 w-10 mb-3" />
+                      <p className="text-sm">No hay evaluaciones registradas</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Fecha</th>
+                            <th className="p-3 text-left text-sm font-medium text-muted-foreground">Evaluador</th>
+                            <th className="p-3 text-center text-sm font-medium text-muted-foreground">Media global</th>
+                            <th className="p-3 text-right text-sm font-medium text-muted-foreground">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {playerEvaluations.map((evaluation) => {
+                            const avgColor =
+                              evaluation.overallAverage >= 7
+                                ? 'text-green-600'
+                                : evaluation.overallAverage >= 5
+                                  ? 'text-yellow-600'
+                                  : 'text-red-600'
                             return (
-                              <div key={block.blockKey} className="rounded-lg bg-muted/50 p-3">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">
-                                  {blockDef?.label || block.blockKey}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <Progress value={block.average * 10} className="flex-1 h-2" />
-                                  <span className="text-sm font-bold">{block.average.toFixed(1)}</span>
-                                </div>
-                                {block.comment && (
-                                  <p className="text-xs text-muted-foreground mt-1">{block.comment}</p>
-                                )}
-                              </div>
+                              <tr key={evaluation.id} className="border-b hover:bg-muted/30 transition-colors">
+                                <td className="p-3 text-sm font-medium">
+                                  {formatDate(new Date(evaluation.date))}
+                                </td>
+                                <td className="p-3 text-sm text-muted-foreground">
+                                  {evaluation.coachName}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className={`text-sm font-bold ${avgColor}`}>
+                                    <Star className="h-3.5 w-3.5 inline mr-1" />
+                                    {evaluation.overallAverage.toFixed(1)}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setViewingEvaluation(evaluation)}
+                                  >
+                                    <Eye className="h-3.5 w-3.5 mr-1" />
+                                    Ver informe
+                                  </Button>
+                                </td>
+                              </tr>
                             )
                           })}
-                        </div>
-
-                        {evaluation.finalComment && (
-                          <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
-                            <p className="text-xs font-medium text-blue-800 mb-1">Comentario final</p>
-                            <p className="text-sm text-blue-700">{evaluation.finalComment}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

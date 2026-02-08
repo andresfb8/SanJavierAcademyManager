@@ -130,7 +130,7 @@ interface DataState {
   deleteInvitation: (id: string) => void
 
   // --- Events ---
-  addEvent: (event: Omit<AcademyEvent, 'id' | 'createdAt'>) => void
+  addEvent: (event: Omit<AcademyEvent, 'id' | 'createdAt'>) => string
   updateEvent: (id: string, data: Partial<AcademyEvent>) => void
   deleteEvent: (id: string) => void
 
@@ -824,14 +824,16 @@ export const useDataStore = create<DataState>((set, get) => ({
   // ================================
 
   addEvent: (eventData) => {
+    const newId = generateId()
     const newEvent: AcademyEvent = {
       ...eventData,
-      id: generateId(),
+      id: newId,
       createdAt: new Date(),
     }
     set((state) => ({
       events: [...state.events, newEvent],
     }))
+    return newId
   },
 
   updateEvent: (id, data) => {

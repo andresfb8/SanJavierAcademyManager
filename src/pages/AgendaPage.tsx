@@ -93,7 +93,7 @@ interface GridBlock {
 
 export default function AgendaPage() {
   const navigate = useNavigate()
-  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, events, addEvent } = useDataStore()
+  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, events, addEvent, addEventPayment } = useDataStore()
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -235,15 +235,27 @@ export default function AgendaPage() {
     const selectedCoaches = coaches.filter((c) => evCoachIds.includes(c.id))
     const selectedPlayers = players.filter((p) => evPlayerIds.includes(p.id))
     const selectedCourts = activeCourts.filter((c) => evCourtIds.includes(c.id))
-    addEvent({
+    const eventPrice = parseFloat(evPrice) || 0
+    const eventId = addEvent({
       name: evName, type: evType, date: new Date(evDate + 'T00:00:00'),
       startTime: evStartTime, endTime: evEndTime,
       courtIds: evCourtIds, courtNames: selectedCourts.map((c) => c.name),
       coachIds: evCoachIds, coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
       attendeePlayerIds: evPlayerIds, attendeePlayerNames: selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`),
-      price: parseFloat(evPrice) || 0, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
+      price: eventPrice, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined, isActive: true,
     })
+    // Crear pagos para los asistentes iniciales
+    for (const p of selectedPlayers) {
+      addEventPayment({
+        eventId,
+        eventName: evName,
+        playerId: p.id,
+        playerName: `${p.firstName} ${p.lastName}`,
+        amount: eventPrice,
+        status: 'pendiente',
+      })
+    }
     setEventDialogOpen(false)
   }
 

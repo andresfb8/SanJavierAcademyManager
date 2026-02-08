@@ -81,7 +81,11 @@ export function EvaluationForm({
   )
 
   const setScore = (key: string, value: number) => {
-    setScores((prev) => ({ ...prev, [key]: Math.min(10, Math.max(1, value)) }))
+    if (isNaN(value) || value === 0) {
+      setScores((prev) => { const next = { ...prev }; delete next[key]; return next })
+      return
+    }
+    setScores((prev) => ({ ...prev, [key]: Math.min(10, Math.max(0.5, value)) }))
   }
 
   const setComment = (blockKey: string, value: string) => {
@@ -210,12 +214,12 @@ export function EvaluationForm({
               </span>
               <Input
                 type="number"
-                min={1}
+                min={0.5}
                 max={10}
-                step={1}
-                value={scores[criterion.key] || ''}
+                step={0.5}
+                value={scores[criterion.key] ?? ''}
                 onChange={(e) =>
-                  setScore(criterion.key, parseInt(e.target.value) || 0)
+                  setScore(criterion.key, parseFloat(e.target.value) || 0)
                 }
                 className="w-16 h-8 text-center text-sm"
                 placeholder="-"

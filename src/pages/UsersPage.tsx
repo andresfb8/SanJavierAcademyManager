@@ -224,9 +224,9 @@ export default function UsersPage() {
 
   // --- Render ---
   return (
-    <div className="space-y-6">
+    <div>
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-6 pt-6 pb-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <ShieldCheck className="h-7 w-7" />
@@ -241,6 +241,8 @@ export default function UsersPage() {
           Invitar usuario
         </Button>
       </div>
+
+      <div className="p-6 space-y-4">
 
       {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -330,6 +332,7 @@ export default function UsersPage() {
             )}
           </TableBody>
         </Table>
+      </div>
       </div>
 
       {/* Invite Dialog */}
