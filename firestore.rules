@@ -224,12 +224,17 @@ service cloud.firestore {
     }
 
     // ─── Invitations Collection ─────────────────────────────────────────
-    // Solo directores pueden gestionar invitaciones.
+    // Directores gestionan invitaciones.
+    // Lectura pública por token (documento) para la página de activación.
+    // Usuarios recién creados pueden marcar su propia invitación como aceptada.
 
     match /invitations/{invitationId} {
-      allow read: if isAuthenticated() && belongsToClub() && isAdmin();
+      allow read: if true;
       allow create: if hasRole('director') && incomingBelongsToClub();
-      allow update: if hasRole('director') && belongsToClub() && incomingBelongsToClub();
+      allow update: if (
+        (hasRole('director') && belongsToClub() && incomingBelongsToClub()) ||
+        (isAuthenticated() && resource.data.email == request.auth.token.email && request.resource.data.status == 'aceptada')
+      );
       allow delete: if hasRole('director') && belongsToClub();
     }
 

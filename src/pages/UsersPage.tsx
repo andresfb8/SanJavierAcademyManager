@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { doc, setDoc, deleteDoc, collection, getDocs, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
@@ -8,10 +10,11 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
 import { formatDate, generateId } from '@/lib/utils'
-import type { UserRole, InvitationStatus } from '@/types'
-import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search } from 'lucide-react'
+import type { UserRole, InvitationStatus, AppUser } from '@/types'
+import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, UserX, Users, Mail } from 'lucide-react'
 
 export default function UsersPage() {
   // --- Dialog state ---
