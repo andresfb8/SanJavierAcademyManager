@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useDataStore } from '@/stores/dataStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ShieldCheck, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
+import { ShieldCheck, AlertCircle, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
+import type { Invitation } from '@/types'
 
 const roleLabels: Record<string, string> = {
   director: 'Director',
@@ -20,7 +21,7 @@ const roleLabels: Record<string, string> = {
 
 export default function ActivateAccountPage() {
   const { token } = useParams<{ token: string }>()
-  const { invitations, updateInvitation } = useDataStore()
+  const { updateInvitation } = useDataStore()
 
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -30,9 +31,45 @@ export default function ActivateAccountPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [invitation, setInvitation] = useState<Invitation | null>(null)
 
-  // Find invitation by token
-  const invitation = invitations.find((i) => i.token === token)
+  // Load invitation from Firestore
+  useEffect(() => {
+    async function loadInvitation() {
+      if (!token) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const invitationDoc = await getDoc(doc(db, 'invitations', token))
+        if (invitationDoc.exists()) {
+          const data = invitationDoc.data()
+          setInvitation({
+            id: invitationDoc.id,
+            email: data.email,
+            role: data.role,
+            clubId: data.clubId,
+            status: data.status,
+            token: data.token,
+            createdBy: data.createdBy,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt,
+            expiresAt: data.expiresAt?.toDate?.() || data.expiresAt,
+            linkedPlayerId: data.linkedPlayerId,
+            linkedPlayerIds: data.linkedPlayerIds,
+            acceptedAt: data.acceptedAt?.toDate?.() || data.acceptedAt,
+          } as Invitation)
+        }
+      } catch (err) {
+        console.error('Error loading invitation:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadInvitation()
+  }, [token])
 
   // Determine status
   const isExpired = invitation && invitation.status === 'expirada'
@@ -118,13 +155,23 @@ export default function ActivateAccountPage() {
         }
       }
 
-      // 5. Mark invitation as accepted
+      // 5. Mark invitation as accepted in Firestore
+      try {
+        await updateDoc(doc(db, 'invitations', token!), {
+          status: 'aceptada',
+          acceptedAt: new Date(),
+        })
+      } catch (err) {
+        console.error('Error updating invitation in Firestore:', err)
+      }
+
+      // 6. Also update in local store as fallback/sync
       updateInvitation(invitation.id, {
         status: 'aceptada',
         acceptedAt: new Date(),
       })
 
-      // 6. Sign out so the new user can log in fresh
+      // 7. Sign out so the new user can log in fresh
       await auth.signOut()
 
       setSuccess(true)
@@ -366,7 +413,18 @@ export default function ActivateAccountPage() {
 
   let content: React.ReactNode
 
-  if (success) {
+  if (isLoading) {
+    content = (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Cargando invitacion...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  } else if (success) {
     content = renderSuccess()
   } else if (!invitation) {
     content = renderInvalidToken()

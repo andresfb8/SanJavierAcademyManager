@@ -13,10 +13,12 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { Plus, Search, Users, Clock, MapPin, User, Trash2, Edit2, LayoutGrid, List } from 'lucide-react'
+import { Plus, Search, Users, Clock, MapPin, User, Trash2, Edit2, LayoutGrid, List, FileDown } from 'lucide-react'
 import { generateId } from '@/lib/utils'
 import { PLAYER_LEVELS, DAYS_OF_WEEK, BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import type { Group, PlayerLevel, BillingFrequency, ScheduleSlot } from '@/types'
+import { generateGroupsListReport } from '@/lib/pdf-reports'
+import { useAuthStore } from '@/stores/authStore'
 
 type ViewMode = 'grid' | 'list'
 
@@ -69,7 +71,8 @@ function formatSchedule(schedule: ScheduleSlot[]): string {
 
 export default function GroupsPage() {
   const navigate = useNavigate()
-  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup } = useDataStore()
+  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments } = useDataStore()
+  const { user } = useAuthStore()
 
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
@@ -97,6 +100,30 @@ export default function GroupsPage() {
   }, [groups, search, levelFilter])
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
+
+  const handleExportPDF = () => {
+    const clubName = user?.clubId || 'San Javier Academy'
+
+    const groupsData = filteredGroups.map((group) => {
+      const coach = coaches.find((c) => c.id === group.coachId)
+      const court = courts.find((c) => c.id === group.courtId)
+      const levelInfo = PLAYER_LEVELS.find((l) => l.value === group.level)
+
+      return {
+        name: group.name,
+        level: levelInfo?.label || group.level,
+        coach: coach ? `${coach.firstName} ${coach.lastName}` : 'Sin asignar',
+        court: court?.name || 'Sin asignar',
+        schedule: formatSchedule(group.schedule),
+        enrollment: `${group.currentEnrollment}/${group.maxCapacity}`,
+      }
+    })
+
+    generateGroupsListReport({
+      clubName,
+      groups: groupsData,
+    })
+  }
 
   const resetForm = () => {
     setForm({ ...emptyForm })
@@ -218,10 +245,16 @@ export default function GroupsPage() {
         title="Grupos"
         subtitle={`${activeGroupsCount} activos · ${groups.length} total`}
         actions={
-          <Button size="sm" onClick={openCreateDialog}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nuevo grupo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={filteredGroups.length === 0}>
+              <FileDown className="h-4 w-4 mr-1" />
+              Exportar PDF
+            </Button>
+            <Button size="sm" onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nuevo grupo
+            </Button>
+          </div>
         }
       />
 

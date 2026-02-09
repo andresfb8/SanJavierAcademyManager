@@ -224,12 +224,25 @@ service cloud.firestore {
     }
 
     // ─── Invitations Collection ─────────────────────────────────────────
-    // Solo directores pueden gestionar invitaciones.
+    // Directors can manage invitations.
+    // Unauthenticated users can read invitations (needed for activation page).
+    // Users can update their own invitation when accepting (status = 'aceptada').
 
     match /invitations/{invitationId} {
-      allow read: if isAuthenticated() && belongsToClub() && isAdmin();
+      // Allow unauthenticated read for activation page
+      // Allow authenticated admin read within their club
+      allow read: if true || (isAuthenticated() && belongsToClub() && isAdmin());
+
       allow create: if hasRole('director') && incomingBelongsToClub();
-      allow update: if hasRole('director') && belongsToClub() && incomingBelongsToClub();
+
+      // Allow directors to update invitations in their club
+      // Allow users to update their own invitation when accepting
+      allow update: if (
+        (hasRole('director') && belongsToClub() && incomingBelongsToClub()) ||
+        (request.resource.data.status == 'aceptada' &&
+         request.resource.data.email == request.auth.token.email)
+      );
+
       allow delete: if hasRole('director') && belongsToClub();
     }
 
