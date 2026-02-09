@@ -97,6 +97,8 @@ export default function AgendaPage() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [privateLessonDetailOpen, setPrivateLessonDetailOpen] = useState(false)
+  const [selectedPrivateLesson, setSelectedPrivateLesson] = useState<PrivateLesson | null>(null)
 
   // Formulario clase particular
   const [formDate, setFormDate] = useState(toInputDate(new Date()))
@@ -377,7 +379,7 @@ export default function AgendaPage() {
                           const coveredByBlock = blocks.find((b) => b.startSlot < slotIdx && b.endSlot > slotIdx)
 
                           if (coveredByBlock) {
-                            return <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'}`} style={{ height: SLOT_HEIGHT }} />
+                            return <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} pointer-events-none`} style={{ height: SLOT_HEIGHT }} />
                           }
 
                           if (startingBlock) {
@@ -422,7 +424,14 @@ export default function AgendaPage() {
 
                             return (
                               <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
-                                <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm" style={{ height: blockHeight - 8 }}>
+                                <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }}
+                                  onClick={() => {
+                                    const lesson = privateLessons.find((l) => l.id === startingBlock.id)
+                                    if (lesson) {
+                                      setSelectedPrivateLesson(lesson)
+                                      setPrivateLessonDetailOpen(true)
+                                    }
+                                  }}>
                                   <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
                                   <div className="mt-1 space-y-0.5">
                                     <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
@@ -592,6 +601,62 @@ export default function AgendaPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEventDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveEvent} disabled={!evName || evCourtIds.length === 0}>Guardar evento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogo: Detalle de clase particular */}
+      <Dialog open={privateLessonDetailOpen} onOpenChange={setPrivateLessonDetailOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalle de clase particular</DialogTitle>
+          </DialogHeader>
+          {selectedPrivateLesson && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-muted-foreground">Fecha</Label>
+                <p className="text-sm font-medium">{formatDateLong(selectedPrivateLesson.date instanceof Date ? selectedPrivateLesson.date : new Date(selectedPrivateLesson.date))}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Horario</Label>
+                <p className="text-sm font-medium">{selectedPrivateLesson.startTime} - {selectedPrivateLesson.endTime}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Pista</Label>
+                <p className="text-sm font-medium">{selectedPrivateLesson.courtName}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Entrenador</Label>
+                <p className="text-sm font-medium">{selectedPrivateLesson.coachName}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Jugadores</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {selectedPrivateLesson.playerNames.map((name, i) => (
+                    <Badge key={i} variant="secondary">{name}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Precio</Label>
+                <p className="text-sm font-medium">{formatCurrency(selectedPrivateLesson.price)}</p>
+              </div>
+              {selectedPrivateLesson.notes && (
+                <div>
+                  <Label className="text-muted-foreground">Notas</Label>
+                  <p className="text-sm">{selectedPrivateLesson.notes}</p>
+                </div>
+              )}
+              <div>
+                <Label className="text-muted-foreground">Estado de pago</Label>
+                <Badge variant={selectedPrivateLesson.isPaid ? 'success' : 'warning'}>
+                  {selectedPrivateLesson.isPaid ? 'Pagado' : 'Pendiente'}
+                </Badge>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setPrivateLessonDetailOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
