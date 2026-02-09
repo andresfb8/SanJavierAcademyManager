@@ -342,6 +342,24 @@ export interface Evaluation {
   updatedAt: Date
 }
 
+// --- Informe de Partido ---
+export interface MatchReport {
+  id: string
+  title: string
+  date: Date
+  playerIds: string[]
+  playerNames: string[]
+  coachId: string
+  coachName: string
+  // Sections
+  tacticsComment: string       // Táctica
+  decisionMakingComment: string // Toma de decisiones
+  mentalComment: string         // Aspecto mental
+  generalComment?: string       // Comentario general
+  createdAt: Date
+  updatedAt: Date
+}
+
 // --- Configuración Salario Entrenador ---
 export interface CoachSalaryConfig {
   coachId: string

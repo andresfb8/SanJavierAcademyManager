@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase'
 import { useDataStore } from '@/stores/dataStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -67,14 +70,73 @@ export default function ActivateAccountPage() {
     if (!validate() || !invitation) return
 
     setIsSubmitting(true)
+    setErrors({})
 
     try {
-      // In demo mode, just mark the invitation as accepted
+      // 1. Create Firebase Auth user
+      const credential = await createUserWithEmailAndPassword(auth, invitation.email, password)
+
+      // 2. Update display name
+      await updateProfile(credential.user, { displayName: name.trim() })
+
+      // 3. Create Firestore user document with correct role
+      const userDoc: Record<string, unknown> = {
+        email: invitation.email,
+        displayName: name.trim(),
+        role: invitation.role,
+        clubId: invitation.clubId,
+        isActive: true,
+        createdAt: new Date(),
+      }
+      if (invitation.linkedPlayerId) {
+        userDoc.linkedPlayerId = invitation.linkedPlayerId
+      }
+      if (invitation.linkedPlayerIds && invitation.linkedPlayerIds.length > 0) {
+        userDoc.linkedPlayerIds = invitation.linkedPlayerIds
+      }
+      await setDoc(doc(db, 'users', credential.user.uid), userDoc)
+
+      // 4. Also add as coach in the local store if role is entrenador or coordinador
+      const { addCoach, coaches } = useDataStore.getState()
+      if (invitation.role === 'entrenador' || invitation.role === 'coordinador') {
+        const alreadyExists = coaches.some((c) => c.email.toLowerCase() === invitation.email.toLowerCase())
+        if (!alreadyExists) {
+          const nameParts = name.trim().split(' ')
+          const firstName = nameParts[0] || ''
+          const lastName = nameParts.slice(1).join(' ') || ''
+          addCoach({
+            firstName,
+            lastName,
+            dni: '',
+            email: invitation.email,
+            phone: '',
+            hireDate: new Date(),
+            isActive: true,
+            specialization: invitation.role === 'coordinador' ? 'Coordinador' : undefined,
+            userId: credential.user.uid,
+          })
+        }
+      }
+
+      // 5. Mark invitation as accepted
       updateInvitation(invitation.id, {
         status: 'aceptada',
         acceptedAt: new Date(),
       })
+
+      // 6. Sign out so the new user can log in fresh
+      await auth.signOut()
+
       setSuccess(true)
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code
+      if (code === 'auth/email-already-in-use') {
+        setErrors({ password: 'Ya existe una cuenta con este email. Intenta iniciar sesion directamente.' })
+      } else if (code === 'auth/weak-password') {
+        setErrors({ password: 'La contrasena es demasiado debil. Usa al menos 6 caracteres.' })
+      } else {
+        setErrors({ password: 'Error al crear la cuenta. Intentalo de nuevo.' })
+      }
     } finally {
       setIsSubmitting(false)
     }

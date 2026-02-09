@@ -96,14 +96,14 @@ export default function CoachProfilePage() {
   if (!coach) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Entrenador no encontrado" />
+        <Header title="Miembro no encontrado" />
         <div className="flex-1 flex flex-col items-center justify-center p-6">
           <p className="text-muted-foreground mb-4">
-            No se ha encontrado el entrenador solicitado.
+            No se ha encontrado el miembro solicitado.
           </p>
           <Button variant="outline" onClick={() => navigate('/entrenadores')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Entrenadores
+            Volver a Personal
           </Button>
         </div>
       </div>
@@ -399,8 +399,7 @@ export default function CoachProfilePage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-6">
-                      No se ha configurado el salario para este entrenador. Edita el
-                      entrenador desde la pagina de Entrenadores para configurar las tarifas.
+                      No se ha configurado el salario. Edita el perfil desde la pagina de Personal para configurar las tarifas.
                     </p>
                   )}
                 </CardContent>

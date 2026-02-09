@@ -24,6 +24,7 @@ import type {
   AcademyEvent,
   EventPayment,
   Evaluation,
+  MatchReport,
   CoachSalaryConfig,
   PaymentStatus,
   PaymentMethod,
@@ -67,6 +68,7 @@ interface DataState {
   events: AcademyEvent[]
   eventPayments: EventPayment[]
   evaluations: Evaluation[]
+  matchReports: MatchReport[]
   coachSalaryConfigs: CoachSalaryConfig[]
 
   // --- Club ---
@@ -144,6 +146,11 @@ interface DataState {
   updateEvaluation: (id: string, data: Partial<Evaluation>) => void
   deleteEvaluation: (id: string) => void
 
+  // --- Match Reports ---
+  addMatchReport: (report: Omit<MatchReport, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateMatchReport: (id: string, data: Partial<MatchReport>) => void
+  deleteMatchReport: (id: string) => void
+
   // --- Coach Salary ---
   updateCoachSalaryConfig: (coachId: string, config: Partial<CoachSalaryConfig>) => void
 }
@@ -202,6 +209,7 @@ export const useDataStore = create<DataState>()(
   events: [],
   eventPayments: [],
   evaluations: [],
+  matchReports: [],
   coachSalaryConfigs: [],
 
   // ================================
@@ -920,6 +928,37 @@ export const useDataStore = create<DataState>()(
   },
 
   // ================================
+  // MATCH REPORTS
+  // ================================
+
+  addMatchReport: (reportData) => {
+    const now = new Date()
+    const newReport: MatchReport = {
+      ...reportData,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now,
+    }
+    set((state) => ({
+      matchReports: [...state.matchReports, newReport],
+    }))
+  },
+
+  updateMatchReport: (id, data) => {
+    set((state) => ({
+      matchReports: state.matchReports.map((r) =>
+        r.id === id ? { ...r, ...data, updatedAt: new Date() } : r
+      ),
+    }))
+  },
+
+  deleteMatchReport: (id) => {
+    set((state) => ({
+      matchReports: state.matchReports.filter((r) => r.id !== id),
+    }))
+  },
+
+  // ================================
   // COACH SALARY CONFIG
   // ================================
 
@@ -963,6 +1002,7 @@ export const useDataStore = create<DataState>()(
         events: state.events,
         eventPayments: state.eventPayments,
         evaluations: state.evaluations,
+        matchReports: state.matchReports,
         coachSalaryConfigs: state.coachSalaryConfigs,
       }) as DataState,
     },

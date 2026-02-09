@@ -35,7 +35,7 @@ const navigation: NavItem[] = [
   { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
   { name: 'Agenda', href: '/agenda', icon: Calendar },
   { name: 'Pagos', href: '/pagos', icon: CreditCard },
-  { name: 'Entrenadores', href: '/entrenadores', icon: UserCog },
+  { name: 'Personal', href: '/entrenadores', icon: UserCog },
   { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
   { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
   { name: 'Configuración', href: '/configuracion', icon: Settings },

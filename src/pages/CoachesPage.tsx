@@ -46,7 +46,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import type { Coach } from '@/types'
 
 // ==========================================
-// CoachesPage - Gestion de entrenadores
+// CoachesPage - Gestion de personal (entrenadores y coordinadores)
 // ==========================================
 
 interface CoachForm {
@@ -212,12 +212,12 @@ export default function CoachesPage() {
   return (
     <div>
       <Header
-        title="Entrenadores"
+        title="Personal"
         subtitle={`${activeCount} activos · ${coaches.length} total`}
         actions={
           <Button size="sm" onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-1" />
-            Nuevo entrenador
+            Nuevo miembro
           </Button>
         }
       />
@@ -267,9 +267,9 @@ export default function CoachesPage() {
         {filteredCoaches.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="No hay entrenadores"
-            description="Anade tu primer entrenador para empezar a gestionar el equipo tecnico"
-            action={{ label: 'Anadir entrenador', onClick: openCreateDialog }}
+            title="No hay personal"
+            description="Anade tu primer miembro del equipo para empezar a gestionar el personal"
+            action={{ label: 'Anadir miembro', onClick: openCreateDialog }}
           />
         ) : viewMode === 'cards' ? (
           /* ====== VISTA CARDS ====== */
@@ -475,7 +475,7 @@ export default function CoachesPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingCoach ? 'Editar entrenador' : 'Nuevo entrenador'}
+              {editingCoach ? 'Editar miembro' : 'Nuevo miembro'}
             </DialogTitle>
           </DialogHeader>
 
@@ -643,7 +643,7 @@ export default function CoachesPage() {
               onClick={handleSubmit}
               disabled={!form.firstName || !form.lastName || !form.email || !form.phone}
             >
-              {editingCoach ? 'Guardar cambios' : 'Crear entrenador'}
+              {editingCoach ? 'Guardar cambios' : 'Crear miembro'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -653,8 +653,8 @@ export default function CoachesPage() {
       <ConfirmDialog
         open={!!showDeleteConfirm}
         onOpenChange={() => setShowDeleteConfirm(null)}
-        title="Eliminar entrenador"
-        description="Esta accion eliminara al entrenador y todos sus datos asociados. Esta accion no se puede deshacer."
+        title="Eliminar miembro"
+        description="Esta accion eliminara al miembro del equipo y todos sus datos asociados. Esta accion no se puede deshacer."
         variant="destructive"
         confirmLabel="Eliminar"
         onConfirm={() => {

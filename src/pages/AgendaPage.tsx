@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useDataStore } from '@/stores/dataStore'
-import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import type { PrivateLesson, EventType } from '@/types'
@@ -108,6 +108,10 @@ export default function AgendaPage() {
   const [formPrice, setFormPrice] = useState('')
   const [formNotes, setFormNotes] = useState('')
 
+  // Invitados clase particular
+  const [formGuestNames, setFormGuestNames] = useState<string[]>([])
+  const [formGuestInput, setFormGuestInput] = useState('')
+
   // Formulario evento
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
   const [evName, setEvName] = useState('')
@@ -121,6 +125,10 @@ export default function AgendaPage() {
   const [evPrice, setEvPrice] = useState('')
   const [evDescription, setEvDescription] = useState('')
   const [evMaxCapacity, setEvMaxCapacity] = useState('')
+
+  // Invitados evento
+  const [evGuestNames, setEvGuestNames] = useState<string[]>([])
+  const [evGuestInput, setEvGuestInput] = useState('')
 
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
   const selectedDayOfWeek = selectedDate.getDay()
@@ -190,6 +198,7 @@ export default function AgendaPage() {
     setFormDate(toInputDate(selectedDate)); setFormCourtId(activeCourts[0]?.id ?? '')
     setFormCoachId(coaches.filter((c) => c.isActive)[0]?.id ?? ''); setFormPlayerIds([])
     setFormStartTime('09:00'); setFormEndTime('10:00'); setFormPrice(''); setFormNotes('')
+    setFormGuestNames([]); setFormGuestInput('')
     setDialogOpen(true)
   }
 
@@ -197,6 +206,7 @@ export default function AgendaPage() {
     setEvName(''); setEvType('mini_torneo'); setEvDate(toInputDate(selectedDate))
     setEvStartTime('09:00'); setEvEndTime('12:00'); setEvCourtIds([]); setEvCoachIds([])
     setEvPlayerIds([]); setEvPrice(''); setEvDescription(''); setEvMaxCapacity('')
+    setEvGuestNames([]); setEvGuestInput('')
     setEventDialogOpen(true)
   }
 
@@ -213,14 +223,37 @@ export default function AgendaPage() {
     setEvPlayerIds((prev) => prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId])
   }
 
+  // Helpers invitados clase particular
+  function addFormGuest() {
+    const name = formGuestInput.trim()
+    if (!name) return
+    setFormGuestNames((prev) => [...prev, name])
+    setFormGuestInput('')
+  }
+  function removeFormGuest(index: number) {
+    setFormGuestNames((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Helpers invitados evento
+  function addEvGuest() {
+    const name = evGuestInput.trim()
+    if (!name) return
+    setEvGuestNames((prev) => [...prev, name])
+    setEvGuestInput('')
+  }
+  function removeEvGuest(index: number) {
+    setEvGuestNames((prev) => prev.filter((_, i) => i !== index))
+  }
+
   function handleSaveLesson() {
-    if (!formCourtId || !formCoachId || formPlayerIds.length === 0) return
+    if (!formCourtId || !formCoachId || (formPlayerIds.length === 0 && formGuestNames.length === 0)) return
     const coach = coaches.find((c) => c.id === formCoachId)
     const court = activeCourts.find((c) => c.id === formCourtId)
     const selectedPlayers = players.filter((p) => formPlayerIds.includes(p.id))
+    const guestIds = formGuestNames.map((_, i) => `guest-${Date.now()}-${i}`)
     const lessonData: Omit<PrivateLesson, 'id' | 'createdAt'> = {
-      playerIds: formPlayerIds,
-      playerNames: selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`),
+      playerIds: [...formPlayerIds, ...guestIds],
+      playerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...formGuestNames],
       coachId: formCoachId, coachName: coach ? `${coach.firstName} ${coach.lastName}` : '',
       courtId: formCourtId, courtName: court?.name ?? '',
       date: new Date(formDate + 'T00:00:00'), startTime: formStartTime, endTime: formEndTime,
@@ -236,16 +269,18 @@ export default function AgendaPage() {
     const selectedPlayers = players.filter((p) => evPlayerIds.includes(p.id))
     const selectedCourts = activeCourts.filter((c) => evCourtIds.includes(c.id))
     const eventPrice = parseFloat(evPrice) || 0
+    const evGuestIds = evGuestNames.map((_, i) => `guest-${Date.now()}-${i}`)
     const eventId = addEvent({
       name: evName, type: evType, date: new Date(evDate + 'T00:00:00'),
       startTime: evStartTime, endTime: evEndTime,
       courtIds: evCourtIds, courtNames: selectedCourts.map((c) => c.name),
       coachIds: evCoachIds, coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
-      attendeePlayerIds: evPlayerIds, attendeePlayerNames: selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`),
+      attendeePlayerIds: [...evPlayerIds, ...evGuestIds],
+      attendeePlayerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...evGuestNames],
       price: eventPrice, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined, isActive: true,
     })
-    // Crear pagos para los asistentes iniciales
+    // Crear pagos solo para jugadores reales (no invitados)
     for (const p of selectedPlayers) {
       addEventPayment({
         eventId,
@@ -408,6 +443,7 @@ export default function AgendaPage() {
                                 setFormEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
                                 setFormDate(toInputDate(selectedDate)); setFormCourtId(court.id)
                                 setFormCoachId(activeCoaches[0]?.id ?? ''); setFormPlayerIds([]); setFormPrice(''); setFormNotes('')
+                                setFormGuestNames([]); setFormGuestInput('')
                                 setDialogOpen(true)
                               }}
                             />
@@ -452,6 +488,25 @@ export default function AgendaPage() {
               </div>
               {formPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{formPlayerIds.length} jugador{formPlayerIds.length !== 1 ? 'es' : ''} seleccionado{formPlayerIds.length !== 1 ? 's' : ''}</p>}
             </div>
+            <div className="space-y-1.5">
+              <Label>Invitados</Label>
+              <div className="flex gap-2">
+                <Input value={formGuestInput} onChange={(e) => setFormGuestInput(e.target.value)} placeholder="Nombre del invitado" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFormGuest() } }} />
+                <Button variant="outline" size="sm" onClick={addFormGuest} disabled={!formGuestInput.trim()}>Añadir</Button>
+              </div>
+              {formGuestNames.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {formGuestNames.map((name, i) => (
+                    <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                      {name}
+                      <button onClick={() => removeFormGuest(i)} className="ml-1 hover:text-destructive">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5"><Label>Hora inicio</Label><Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Hora fin</Label><Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} /></div>
@@ -461,7 +516,7 @@ export default function AgendaPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveLesson} disabled={!formCourtId || !formCoachId || formPlayerIds.length === 0}>Guardar clase</Button>
+            <Button onClick={handleSaveLesson} disabled={!formCourtId || !formCoachId || (formPlayerIds.length === 0 && formGuestNames.length === 0)}>Guardar clase</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -508,6 +563,25 @@ export default function AgendaPage() {
                 ))}
               </div>
               {evPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{evPlayerIds.length} asistente{evPlayerIds.length !== 1 ? 's' : ''}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Invitados</Label>
+              <div className="flex gap-2">
+                <Input value={evGuestInput} onChange={(e) => setEvGuestInput(e.target.value)} placeholder="Nombre del invitado" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEvGuest() } }} />
+                <Button variant="outline" size="sm" onClick={addEvGuest} disabled={!evGuestInput.trim()}>Añadir</Button>
+              </div>
+              {evGuestNames.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {evGuestNames.map((name, i) => (
+                    <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                      {name}
+                      <button onClick={() => removeEvGuest(i)} className="ml-1 hover:text-destructive">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={evPrice} onChange={(e) => setEvPrice(e.target.value)} placeholder="0.00" /></div>
