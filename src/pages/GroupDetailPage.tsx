@@ -29,6 +29,8 @@ export default function GroupDetailPage() {
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
   const [selectedTariffId, setSelectedTariffId] = useState('')
   const [customPrice, setCustomPrice] = useState('')
+  const [discountMode, setDiscountMode] = useState<'none' | 'percentage' | 'fixed_price'>('none')
+  const [discountPercentage, setDiscountPercentage] = useState('')
 
   // Find the group
   const group = useMemo(() => groups.find((g) => g.id === id), [groups, id])
@@ -72,9 +74,28 @@ export default function GroupDetailPage() {
     setSelectedPlayerId('')
     setSelectedTariffId('')
     setCustomPrice('')
+    setDiscountMode('none')
+    setDiscountPercentage('')
   }
 
   // Handle adding a player to the group
+  // Compute final price based on discount mode
+  const selectedTariffPrice = tariffs.find((t) => t.id === selectedTariffId)?.price ?? 0
+  const computedFinalPrice = useMemo(() => {
+    if (discountMode === 'percentage') {
+      const pct = parseFloat(discountPercentage)
+      if (!isNaN(pct) && pct > 0 && pct <= 100) {
+        return Math.round(selectedTariffPrice * (1 - pct / 100) * 100) / 100
+      }
+      return selectedTariffPrice
+    }
+    if (discountMode === 'fixed_price') {
+      const parsed = parseFloat(customPrice)
+      return !isNaN(parsed) && parsed >= 0 ? parsed : selectedTariffPrice
+    }
+    return selectedTariffPrice
+  }, [discountMode, discountPercentage, customPrice, selectedTariffPrice])
+
   const handleAddPlayer = () => {
     if (!group || !selectedPlayerId || !selectedTariffId) return
 
@@ -82,7 +103,18 @@ export default function GroupDetailPage() {
     const tariff = tariffs.find((t) => t.id === selectedTariffId)
     if (!player || !tariff) return
 
-    const parsedCustomPrice = customPrice.trim() !== '' ? parseFloat(customPrice) : undefined
+    let finalCustomPrice: number | undefined
+    if (discountMode === 'percentage') {
+      const pct = parseFloat(discountPercentage)
+      if (!isNaN(pct) && pct > 0 && pct <= 100) {
+        finalCustomPrice = Math.round(tariff.price * (1 - pct / 100) * 100) / 100
+      }
+    } else if (discountMode === 'fixed_price') {
+      const parsed = parseFloat(customPrice)
+      if (!isNaN(parsed) && parsed >= 0) {
+        finalCustomPrice = parsed
+      }
+    }
 
     addEnrollment({
       playerId: player.id,
@@ -91,7 +123,7 @@ export default function GroupDetailPage() {
       groupName: group.name,
       tariffId: tariff.id,
       tariffName: tariff.name,
-      customPrice: parsedCustomPrice,
+      customPrice: finalCustomPrice,
       enrollmentDate: new Date(),
       isActive: true,
     })
@@ -396,23 +428,81 @@ export default function GroupDetailPage() {
               />
             </div>
 
-            {/* Custom Price */}
-            <div className="space-y-2">
-              <Label>Precio personalizado (opcional)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Dejar vacío para usar precio de tarifa"
-                value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
-              />
-              {selectedTariffId && (
-                <p className="text-xs text-muted-foreground">
-                  Precio de tarifa: {formatCurrency(tariffs.find((t) => t.id === selectedTariffId)?.price ?? 0)}
-                </p>
-              )}
-            </div>
+            {/* Discount mode */}
+            {selectedTariffId && (
+              <div className="space-y-3">
+                <Label>Precio</Label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="discountMode"
+                      checked={discountMode === 'none'}
+                      onChange={() => setDiscountMode('none')}
+                      className="accent-primary"
+                    />
+                    Precio tarifa ({formatCurrency(selectedTariffPrice)})
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="discountMode"
+                      checked={discountMode === 'percentage'}
+                      onChange={() => setDiscountMode('percentage')}
+                      className="accent-primary"
+                    />
+                    Descuento %
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="discountMode"
+                      checked={discountMode === 'fixed_price'}
+                      onChange={() => setDiscountMode('fixed_price')}
+                      className="accent-primary"
+                    />
+                    Precio especial
+                  </label>
+                </div>
+
+                {discountMode === 'percentage' && (
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      max="100"
+                      placeholder="Porcentaje de descuento"
+                      value={discountPercentage}
+                      onChange={(e) => setDiscountPercentage(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {discountMode === 'fixed_price' && (
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Precio especial"
+                      value={customPrice}
+                      onChange={(e) => setCustomPrice(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="rounded-md bg-muted/50 p-3 text-sm">
+                  <span className="text-muted-foreground">Precio final: </span>
+                  <span className="font-semibold">{formatCurrency(computedFinalPrice)}</span>
+                  {discountMode === 'percentage' && discountPercentage && (
+                    <span className="text-muted-foreground ml-1">
+                      (-{discountPercentage}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowAddPlayer(false); resetAddForm() }}>
