@@ -355,15 +355,15 @@ export function prepareSepaPayments(
       }
 
       // Generar ID único end-to-end: combinación de inscripción + mes/año
-      const endToEndId = `${payment.enrollmentId}-${String(payment.billingMonth).padStart(2, '0')}${payment.billingYear}`
+      const endToEndId = `${payment.enrollmentId ?? payment.id}-${String(payment.billingMonth).padStart(2, '0')}${payment.billingYear}`
 
       // Construir concepto del pago
-      const remittanceInfo = payment.concept || `${payment.groupName} - ${String(payment.billingMonth).padStart(2, '0')}/${payment.billingYear}`
+      const remittanceInfo = payment.concept || `${payment.groupName ?? 'Pago manual'} - ${String(payment.billingMonth).padStart(2, '0')}/${payment.billingYear}`
 
       return {
         endToEndId,
         amount: payment.amount,
-        mandateId: payment.enrollmentId,
+        mandateId: payment.enrollmentId ?? payment.id,
         mandateDate: player?.registrationDate ?? payment.createdAt,
         debtorName,
         debtorIBAN,

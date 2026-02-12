@@ -1,4 +1,4 @@
-import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus } from '@/types'
+import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, PaymentCategory, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus, StaffRole } from '@/types'
 
 // --- Niveles ---
 export const PLAYER_LEVELS: { value: PlayerLevel; label: string; color: string }[] = [
@@ -45,6 +45,22 @@ export const USER_ROLES: { value: UserRole; label: string }[] = [
   { value: 'entrenador', label: 'Entrenador' },
   { value: 'jugador', label: 'Jugador' },
   { value: 'tutor', label: 'Padre/Madre/Tutor' },
+]
+
+// --- Categorías de Pago ---
+export const PAYMENT_CATEGORIES: { value: PaymentCategory; label: string }[] = [
+  { value: 'cuota', label: 'Cuota' },
+  { value: 'evento', label: 'Evento' },
+  { value: 'clase_particular', label: 'Clase particular' },
+  { value: 'manual', label: 'Pago manual' },
+  { value: 'otro', label: 'Otro' },
+]
+
+// --- Roles de Personal ---
+export const STAFF_ROLES: { value: StaffRole; label: string }[] = [
+  { value: 'entrenador', label: 'Entrenador' },
+  { value: 'coordinador', label: 'Coordinador' },
+  { value: 'director', label: 'Director' },
 ]
 
 // --- Tipos de Pista ---
