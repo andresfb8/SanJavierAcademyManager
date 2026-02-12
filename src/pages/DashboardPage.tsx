@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Header } from '@/components/layout/Header'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -22,6 +22,7 @@ import {
   Settings as SettingsIcon,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from 'lucide-react'
 import {
   BarChart,
@@ -52,6 +53,7 @@ const defaultKpiConfig: KpiConfig = {
   todayClasses: true,
   totalEnrolled: true,
   waitingList: true,
+  rotationIndex: true,
   // Chart visibility
   attendanceChart: true,
   levelChart: true,
@@ -60,7 +62,7 @@ const defaultKpiConfig: KpiConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const { players, payments, groups, activities, enrollments } = useDataStore()
+  const { players, payments, groups, activities, enrollments, attendance, checkAndAutoGenerateReceipts } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -75,6 +77,11 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(kpiConfig))
   }, [kpiConfig])
+
+  // Auto-generate receipts on mount
+  useEffect(() => {
+    checkAndAutoGenerateReceipts()
+  }, [checkAndAutoGenerateReceipts])
 
   const [chartCollapsed, setChartCollapsed] = useState<Record<string, boolean>>({})
 
@@ -121,15 +128,62 @@ export default function DashboardPage() {
     .reduce((sum, p) => sum + p.amount, 0)
   const collectionRate = totalCurrentMonth > 0 ? Math.round((currentRevenue / totalCurrentMonth) * 100) : 0
 
-  // Attendance chart data (simulated weekly)
-  const attendanceData = [
-    { day: 'Lun', asistencia: 14, faltas: 2 },
-    { day: 'Mar', asistencia: 12, faltas: 3 },
-    { day: 'Mié', asistencia: 15, faltas: 1 },
-    { day: 'Jue', asistencia: 11, faltas: 4 },
-    { day: 'Vie', asistencia: 8, faltas: 2 },
-    { day: 'Sáb', asistencia: 6, faltas: 0 },
-  ]
+  // Rotation index KPI
+  const monthStart = new Date(currentYear, currentMonth - 1, 1)
+  const monthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59)
+
+  const altasEsteMes = players.filter(
+    (p) => p.registrationDate >= monthStart && p.registrationDate <= monthEnd
+  ).length
+  const bajasEsteMes = players.filter(
+    (p) => p.cancellationDate && p.cancellationDate >= monthStart && p.cancellationDate <= monthEnd
+  ).length
+  const rotationDivisor = activePlayers + bajasEsteMes
+  const rotationIndex = rotationDivisor > 0
+    ? Math.round(((bajasEsteMes + altasEsteMes) / rotationDivisor) * 100)
+    : 0
+
+  // Attendance chart data (real data from current week)
+  const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  const attendanceData = useMemo(() => {
+    // Get start of current week (Monday)
+    const todayDate = new Date()
+    const dayOfWeek = todayDate.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const weekStart = new Date(todayDate)
+    weekStart.setDate(todayDate.getDate() + mondayOffset)
+    weekStart.setHours(0, 0, 0, 0)
+
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    weekEnd.setHours(23, 59, 59, 999)
+
+    // Initialize data for Mon-Sat (indexes 1-6)
+    const weekDays = [1, 2, 3, 4, 5, 6] // Mon to Sat
+    const data = weekDays.map((d) => ({
+      day: DAY_LABELS[d],
+      asistencia: 0,
+      faltas: 0,
+    }))
+
+    // Iterate attendance records from the current week
+    for (const record of attendance) {
+      const recordDate = new Date(record.date)
+      if (recordDate < weekStart || recordDate > weekEnd) continue
+      const recordDay = recordDate.getDay()
+      const idx = weekDays.indexOf(recordDay)
+      if (idx === -1) continue
+
+      for (const entry of record.records) {
+        if (entry.status === 'presente') {
+          data[idx].asistencia++
+        } else if (entry.status === 'ausente' || entry.status === 'justificado') {
+          data[idx].faltas++
+        }
+      }
+    }
+    return data
+  }, [attendance])
 
   // Level distribution
   const levelData = [
@@ -259,6 +313,14 @@ export default function DashboardPage() {
               value={players.filter((p) => p.status === 'lista_espera').length}
               icon={Clock}
               iconClassName="bg-orange-50 text-orange-600"
+            />
+          )}
+          {kpiConfig.rotationIndex && (
+            <StatCard
+              title="Índice de rotación"
+              value={`${rotationIndex}%`}
+              icon={RefreshCw}
+              iconClassName="bg-teal-50 text-teal-600"
             />
           )}
         </div>
@@ -518,6 +580,7 @@ export default function DashboardPage() {
                 { key: 'todayClasses', label: 'Clases de hoy' },
                 { key: 'totalEnrolled', label: 'Total alumnos inscritos' },
                 { key: 'waitingList', label: 'Lista de espera' },
+                { key: 'rotationIndex', label: 'Índice de rotación' },
               ].map((item) => (
                 <div key={item.key} className="flex items-center gap-3">
                   <Checkbox
