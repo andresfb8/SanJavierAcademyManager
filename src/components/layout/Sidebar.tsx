@@ -15,6 +15,9 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronDown,
+  ChevronRight,
+  CalendarPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
@@ -28,24 +31,131 @@ interface NavItem {
   requiredModule?: string
 }
 
-const navigation: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Jugadores', href: '/jugadores', icon: Users },
-  { name: 'Grupos', href: '/grupos', icon: GraduationCap },
-  { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
-  { name: 'Agenda', href: '/agenda', icon: Calendar },
-  { name: 'Pagos', href: '/pagos', icon: CreditCard },
-  { name: 'Personal', href: '/entrenadores', icon: UserCog },
-  { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
-  { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
-  { name: 'Configuración', href: '/configuracion', icon: Settings },
-  { name: 'Planificación', href: '/planificacion', icon: BookOpen },
+interface NavGroup {
+  label?: string
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
+  {
+    // Dashboard - sin grupo, siempre visible
+    items: [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Administración',
+    items: [
+      { name: 'Jugadores', href: '/jugadores', icon: Users },
+      { name: 'Grupos', href: '/grupos', icon: GraduationCap },
+      { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
+      { name: 'Agenda', href: '/agenda', icon: Calendar },
+      { name: 'Eventos y Actividades', href: '/eventos', icon: CalendarPlus },
+      { name: 'Personal', href: '/entrenadores', icon: UserCog },
+      { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
+      { name: 'Planificación', href: '/planificacion', icon: BookOpen },
+    ],
+  },
+  {
+    label: 'Financiera',
+    items: [
+      { name: 'Pagos', href: '/pagos', icon: CreditCard },
+    ],
+  },
+  {
+    label: 'Configuración',
+    items: [
+      { name: 'Configuración', href: '/configuracion', icon: Settings },
+      { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
+    ],
+  },
 ]
 
 export function Sidebar() {
   const { user, logout } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+
+  const toggleGroup = (label: string) => {
+    setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
+  }
+
+  const isItemActive = (href: string) =>
+    href === '/' ? location.pathname === '/' : location.pathname.startsWith(href)
+
+  const isGroupActive = (items: NavItem[]) =>
+    items.some((item) => isItemActive(item.href))
+
+  const filterItem = (item: NavItem) => {
+    if (item.requiredModule && user?.role) {
+      return hasPermission(user.role as UserRole, item.requiredModule, 'read')
+    }
+    return true
+  }
+
+  const renderNavItem = (item: NavItem) => {
+    const isActive = isItemActive(item.href)
+    return (
+      <NavLink
+        key={item.name}
+        to={item.href}
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-sidebar-accent text-sidebar-primary'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+        )}
+      >
+        <item.icon className="h-5 w-5 shrink-0" />
+        {item.name}
+      </NavLink>
+    )
+  }
+
+  const renderGroup = (group: NavGroup, index: number) => {
+    const visibleItems = group.items.filter(filterItem)
+    if (visibleItems.length === 0) return null
+
+    // Grupo sin label (Dashboard) - renderizar items directamente
+    if (!group.label) {
+      return (
+        <div key={index}>
+          {visibleItems.map(renderNavItem)}
+        </div>
+      )
+    }
+
+    const isCollapsed = collapsedGroups[group.label] ?? false
+    const groupActive = isGroupActive(visibleItems)
+
+    return (
+      <div key={group.label}>
+        <button
+          onClick={() => toggleGroup(group.label!)}
+          className={cn(
+            'flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors',
+            groupActive
+              ? 'text-sidebar-foreground'
+              : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/70'
+          )}
+        >
+          {group.label}
+          {isCollapsed ? (
+            <ChevronRight className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </button>
+        {!isCollapsed && (
+          <div className="ml-1 space-y-0.5">
+            {visibleItems.map(renderNavItem)}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -61,37 +171,8 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navigation
-          .filter((item) => {
-            // If the nav item requires a specific module, check permissions
-            if (item.requiredModule && user?.role) {
-              return hasPermission(user.role as UserRole, item.requiredModule, 'read')
-            }
-            return true
-          })
-          .map((item) => {
-            const isActive = item.href === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.href)
-
-            return (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-primary'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                )}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                {item.name}
-              </NavLink>
-            )
-          })}
+      <nav className="flex-1 space-y-3 px-3 py-4 overflow-y-auto">
+        {navGroups.map(renderGroup)}
       </nav>
 
       {/* User */}
