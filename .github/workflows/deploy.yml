@@ -39,10 +39,17 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      # 7. Desplegar a Firebase escribiendo el service account a un archivo
+      # 7. Verificar credenciales y desplegar
       - name: Deploy to Firebase
         env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa-key.json
-          firebase deploy --only hosting,functions,firestore --non-interactive --project san-javieracademy-manager
+          # Escribir service account a archivo usando printf (robusto con JSON)
+          printf '%s' "$SA_JSON" > /tmp/sa-key.json
+          # Verificar que el JSON es válido
+          python3 -c "import json; d=json.load(open('/tmp/sa-key.json')); print('SA key OK, project:', d.get('project_id','?'), 'email:', d.get('client_email','?'))"
+          # Deploy solo hosting primero para verificar auth
+          firebase deploy --only hosting --non-interactive --project san-javieracademy-manager
+          # Deploy functions y firestore
+          firebase deploy --only functions,firestore --non-interactive --project san-javieracademy-manager
