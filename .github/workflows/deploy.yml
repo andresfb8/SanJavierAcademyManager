@@ -16,11 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configurar Node.js 20 (versión requerida por Cloud Functions)
-      - name: Set up Node.js 20
+      # 2. Configurar Node.js 22 (versión requerida por Cloud Functions)
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       # 3. Instalar dependencias del frontend
@@ -33,7 +33,7 @@ jobs:
 
       # 5. Instalar dependencias de Cloud Functions
       - name: Install functions dependencies
-        run: npm --prefix functions ci
+        run: npm --prefix functions install
 
       # 6. Instalar Firebase CLI
       - name: Install Firebase CLI
