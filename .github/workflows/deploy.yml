@@ -16,8 +16,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configurar Node.js 18 (versión requerida por Cloud Functions)
-      - name: Set up Node.js 18
+      # 2. Configurar Node.js 20 (versión requerida por Cloud Functions)
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -27,7 +27,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # 4. Build del frontend (la config de Firebase está hardcodeada en src/lib/firebase.ts)
+      # 4. Build del frontend
       - name: Build frontend
         run: npm run build
 
@@ -35,17 +35,14 @@ jobs:
       - name: Install functions dependencies
         run: npm --prefix functions ci
 
-      # 6. Autenticar con Google Cloud usando el Service Account
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-      # 7. Instalar Firebase CLI
+      # 6. Instalar Firebase CLI
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      # 8. Desplegar a Firebase (hosting + functions + firestore rules/indexes)
-      #    El predeploy hook en firebase.json hace el build de functions automáticamente
+      # 7. Desplegar a Firebase escribiendo el service account a un archivo
       - name: Deploy to Firebase
-        run: firebase deploy --only hosting,functions,firestore --non-interactive --project san-javieracademy-manager
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa-key.json
+          firebase deploy --only hosting,functions,firestore --non-interactive --project san-javieracademy-manager
