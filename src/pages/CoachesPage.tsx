@@ -41,9 +41,11 @@ import {
   List,
   Euro,
   Eye,
+  UserPlus,
 } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
-import type { Coach } from '@/types'
+import { formatDate, formatCurrency, generateId } from '@/lib/utils'
+import { STAFF_ROLES } from '@/constants'
+import type { Coach, StaffRole } from '@/types'
 
 // ==========================================
 // CoachesPage - Gestion de personal (entrenadores y coordinadores)
@@ -60,6 +62,7 @@ interface CoachForm {
   certifications: string
   notes: string
   isActive: boolean
+  staffRole: StaffRole
   ratePerGroup: string
   ratePerPrivateLesson: string
   bonuses: string
@@ -77,6 +80,7 @@ const emptyForm: CoachForm = {
   certifications: '',
   notes: '',
   isActive: true,
+  staffRole: 'entrenador',
   ratePerGroup: '',
   ratePerPrivateLesson: '',
   bonuses: '',
@@ -89,20 +93,25 @@ export default function CoachesPage() {
     groups,
     coachSalaryConfigs,
     privateLessons,
+    invitations,
     addCoach,
     updateCoach,
     deleteCoach,
     updateCoachSalaryConfig,
+    addInvitation,
   } = useDataStore()
 
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('active')
+  const [roleFilter, setRoleFilter] = useState<string>('')
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [form, setForm] = useState<CoachForm>({ ...emptyForm })
+  const [showInviteSuccess, setShowInviteSuccess] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
 
   const resetForm = () => setForm({ ...emptyForm })
 
@@ -115,9 +124,11 @@ export default function CoachesPage() {
         c.phone.includes(search)
       const matchesActive =
         activeFilter === 'all' || (activeFilter === 'active' && c.isActive)
-      return matchesSearch && matchesActive
+      const matchesRole =
+        roleFilter === '' || (c.staffRole ?? 'entrenador') === roleFilter
+      return matchesSearch && matchesActive && matchesRole
     })
-  }, [coaches, search, activeFilter])
+  }, [coaches, search, activeFilter, roleFilter])
 
   const getCoachGroups = (coachId: string) =>
     groups.filter((g) => g.coachId === coachId)
@@ -157,6 +168,7 @@ export default function CoachesPage() {
       certifications: form.certifications || undefined,
       notes: form.notes || undefined,
       isActive: form.isActive,
+      staffRole: form.staffRole,
       hireDate: editingCoach ? editingCoach.hireDate : new Date(),
     }
 
@@ -192,6 +204,7 @@ export default function CoachesPage() {
       certifications: coach.certifications || '',
       notes: coach.notes || '',
       isActive: coach.isActive,
+      staffRole: coach.staffRole ?? 'entrenador',
       ratePerGroup: config ? String(config.ratePerGroup) : '',
       ratePerPrivateLesson: config ? String(config.ratePerPrivateLesson) : '',
       bonuses: config ? String(config.bonuses) : '',
@@ -205,6 +218,43 @@ export default function CoachesPage() {
     resetForm()
     setEditingCoach(null)
     setShowCreateDialog(true)
+  }
+
+  const getStaffRoleLabel = (role?: StaffRole) =>
+    STAFF_ROLES.find((r) => r.value === (role ?? 'entrenador'))?.label ?? 'Entrenador'
+
+  const getStaffRoleBadgeVariant = (role?: StaffRole) => {
+    switch (role) {
+      case 'director':
+        return 'default' as const
+      case 'coordinador':
+        return 'warning' as const
+      default:
+        return 'outline' as const
+    }
+  }
+
+  const handleCreateAccount = (coach: Coach) => {
+    const token = generateId()
+    const activationUrl = `${window.location.origin}/activar/${token}`
+    const now = new Date()
+    const expiresAt = new Date(now)
+    expiresAt.setDate(expiresAt.getDate() + 7)
+
+    const role = coach.staffRole === 'coordinador' ? 'coordinador' : 'entrenador'
+    addInvitation({
+      email: coach.email,
+      role,
+      clubId: 'club-001',
+      status: 'pendiente',
+      token,
+      createdBy: 'system',
+      createdAt: now,
+      expiresAt,
+    })
+
+    setInviteLink(activationUrl)
+    setShowInviteSuccess(true)
   }
 
   const activeCount = coaches.filter((c) => c.isActive).length
@@ -236,12 +286,21 @@ export default function CoachesPage() {
           </div>
           <Select
             options={[
+              { value: '', label: 'Todos los roles' },
+              ...STAFF_ROLES.map((r) => ({ value: r.value, label: r.label })),
+            ]}
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="w-full sm:w-40"
+          />
+          <Select
+            options={[
               { value: 'active', label: 'Solo activos' },
               { value: 'all', label: 'Todos' },
             ]}
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value)}
-            className="w-full sm:w-48"
+            className="w-full sm:w-40"
           />
           <div className="flex gap-1 border rounded-md p-1">
             <Button
@@ -289,10 +348,13 @@ export default function CoachesPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-base truncate">
                             {coach.firstName} {coach.lastName}
                           </h3>
+                          <Badge variant={getStaffRoleBadgeVariant(coach.staffRole)} className="shrink-0">
+                            {getStaffRoleLabel(coach.staffRole)}
+                          </Badge>
                           <Badge
                             variant={coach.isActive ? 'success' : 'secondary'}
                             className="shrink-0"
@@ -300,11 +362,16 @@ export default function CoachesPage() {
                             {coach.isActive ? 'Activo' : 'Inactivo'}
                           </Badge>
                         </div>
-                        {coach.specialization && (
-                          <p className="text-sm text-muted-foreground truncate mt-0.5">
-                            {coach.specialization}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {coach.specialization && (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {coach.specialization}
+                            </p>
+                          )}
+                          <Badge variant={coach.userId ? 'success' : 'secondary'} className="text-[10px] shrink-0">
+                            {coach.userId ? 'Con cuenta' : 'Sin cuenta'}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
 
@@ -364,6 +431,16 @@ export default function CoachesPage() {
                         <Eye className="h-3.5 w-3.5 mr-1" />
                         Ver perfil
                       </Button>
+                      {!coach.userId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCreateAccount(coach)}
+                        >
+                          <UserPlus className="h-3.5 w-3.5 mr-1" />
+                          Crear cuenta
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -395,10 +472,11 @@ export default function CoachesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Especializacion</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead className="hidden md:table-cell">Email</TableHead>
+                    <TableHead className="hidden lg:table-cell">Especializacion</TableHead>
                     <TableHead className="text-center">Grupos</TableHead>
-                    <TableHead className="text-right">Salario est.</TableHead>
+                    <TableHead className="text-right hidden md:table-cell">Salario est.</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -419,21 +497,29 @@ export default function CoachesPage() {
                                 {coach.firstName[0]}{coach.lastName[0]}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
+                            <div className="flex flex-col">
                               <span className="font-medium text-sm">
                                 {coach.firstName} {coach.lastName}
                               </span>
+                              <Badge variant={coach.userId ? 'success' : 'secondary'} className="text-[10px] w-fit mt-0.5">
+                                {coach.userId ? 'Con cuenta' : 'Sin cuenta'}
+                              </Badge>
                             </div>
                           </button>
                         </TableCell>
-                        <TableCell className="text-sm">{coach.email}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell>
+                          <Badge variant={getStaffRoleBadgeVariant(coach.staffRole)}>
+                            {getStaffRoleLabel(coach.staffRole)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm hidden md:table-cell">{coach.email}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
                           {coach.specialization || '-'}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline">{coachGroups.length}</Badge>
                         </TableCell>
-                        <TableCell className="text-right text-sm font-medium">
+                        <TableCell className="text-right text-sm font-medium hidden md:table-cell">
                           {formatCurrency(salary)}
                         </TableCell>
                         <TableCell>
@@ -443,6 +529,16 @@ export default function CoachesPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {!coach.userId && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Crear cuenta de usuario"
+                                onClick={() => handleCreateAccount(coach)}
+                              >
+                                <UserPlus className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -519,6 +615,14 @@ export default function CoachesPage() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="600 000 000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Rol en el staff</Label>
+              <Select
+                options={STAFF_ROLES.map((r) => ({ value: r.value, label: r.label }))}
+                value={form.staffRole}
+                onChange={(e) => setForm({ ...form, staffRole: e.target.value as StaffRole })}
               />
             </div>
             <div className="space-y-2">
@@ -662,6 +766,39 @@ export default function CoachesPage() {
           setShowDeleteConfirm(null)
         }}
       />
+
+      {/* Dialogo de cuenta creada */}
+      <Dialog open={showInviteSuccess} onOpenChange={setShowInviteSuccess}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-green-600" />
+              Invitacion creada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Se ha creado una invitacion para el miembro. Comparte el siguiente enlace para que active su cuenta.
+            </p>
+            <div className="flex gap-2">
+              <Input readOnly value={inviteLink} className="flex-1 font-mono text-xs" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(inviteLink)
+                }}
+              >
+                Copiar
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">La invitacion expira en 7 dias.</p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowInviteSuccess(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

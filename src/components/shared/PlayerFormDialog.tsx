@@ -34,6 +34,7 @@ interface PlayerFormData {
   level: PlayerLevel
   dominantHand: DominantHand
   position: PlayerPosition
+  licenseNumber: string
   previousExperience: string
   medicalNotes: string
   bankAccountHolder: string
@@ -59,7 +60,7 @@ const defaultForm: PlayerFormData = {
   firstName: '', lastName: '', dni: '', birthDate: '',
   email: '', phone: '', address: '', city: 'San Javier', postalCode: '30730',
   level: 'iniciacion', dominantHand: 'derecha', position: 'ambos',
-  previousExperience: '', medicalNotes: '',
+  licenseNumber: '', previousExperience: '', medicalNotes: '',
   bankAccountHolder: '', iban: '',
   status: 'activo', notes: '',
   guardianFirstName: '', guardianLastName: '', guardianDni: '',
@@ -88,6 +89,7 @@ function PlayerFormDialog({ open, onOpenChange, player, onSubmit }: PlayerFormDi
         level: player.level,
         dominantHand: player.dominantHand,
         position: player.position,
+        licenseNumber: player.licenseNumber || '',
         previousExperience: player.previousExperience || '',
         medicalNotes: player.medicalNotes || '',
         bankAccountHolder: player.bankAccountHolder,
@@ -202,6 +204,10 @@ function PlayerFormDialog({ open, onOpenChange, player, onSubmit }: PlayerFormDi
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as PlayerStatus })}
                 />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Numero de licencia</Label>
+                <Input value={form.licenseNumber} onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })} placeholder="Ej: MU-12345" />
               </div>
               <div className="col-span-2 space-y-2">
                 <Label>Experiencia previa</Label>
