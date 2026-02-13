@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import type { PrivateLesson, EventType } from '@/types'
@@ -93,7 +94,7 @@ interface GridBlock {
 
 export default function AgendaPage() {
   const navigate = useNavigate()
-  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, events, addEvent, addEventPayment } = useDataStore()
+  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, events, addEvent, addEventPayment } = useDataStore()
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -129,6 +130,20 @@ export default function AgendaPage() {
   // Invitados evento
   const [evGuestNames, setEvGuestNames] = useState<string[]>([])
   const [evGuestInput, setEvGuestInput] = useState('')
+
+  // Dialogo detalle/edicion clase particular
+  const [lessonDetailOpen, setLessonDetailOpen] = useState(false)
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null)
+  const [lessonEditMode, setLessonEditMode] = useState(false)
+  const [deleteLessonDialogOpen, setDeleteLessonDialogOpen] = useState(false)
+  const [editLessonDate, setEditLessonDate] = useState('')
+  const [editLessonCourtId, setEditLessonCourtId] = useState('')
+  const [editLessonCoachId, setEditLessonCoachId] = useState('')
+  const [editLessonStartTime, setEditLessonStartTime] = useState('')
+  const [editLessonEndTime, setEditLessonEndTime] = useState('')
+  const [editLessonPrice, setEditLessonPrice] = useState('')
+  const [editLessonNotes, setEditLessonNotes] = useState('')
+  const [editLessonIsPaid, setEditLessonIsPaid] = useState(false)
 
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
   const selectedDayOfWeek = selectedDate.getDay()
@@ -294,6 +309,64 @@ export default function AgendaPage() {
     setEventDialogOpen(false)
   }
 
+  const selectedLesson = useMemo(
+    () => selectedLessonId ? privateLessons.find((l) => l.id === selectedLessonId) : null,
+    [privateLessons, selectedLessonId]
+  )
+
+  function openLessonDetail(lessonId: string) {
+    const lesson = privateLessons.find((l) => l.id === lessonId)
+    if (!lesson) return
+    setSelectedLessonId(lessonId)
+    setLessonEditMode(false)
+    const d = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    setEditLessonDate(`${y}-${m}-${day}`)
+    setEditLessonCourtId(lesson.courtId)
+    setEditLessonCoachId(lesson.coachId)
+    setEditLessonStartTime(lesson.startTime)
+    setEditLessonEndTime(lesson.endTime)
+    setEditLessonPrice(String(lesson.price))
+    setEditLessonNotes(lesson.notes ?? '')
+    setEditLessonIsPaid(lesson.isPaid)
+    setLessonDetailOpen(true)
+  }
+
+  function handleSaveLessonEdit() {
+    if (!selectedLessonId || !editLessonCourtId || !editLessonCoachId) return
+    const coach = coaches.find((c) => c.id === editLessonCoachId)
+    const court = activeCourts.find((c) => c.id === editLessonCourtId)
+    updatePrivateLesson(selectedLessonId, {
+      date: new Date(editLessonDate + 'T00:00:00'),
+      courtId: editLessonCourtId,
+      courtName: court?.name ?? '',
+      coachId: editLessonCoachId,
+      coachName: coach ? `${coach.firstName} ${coach.lastName}` : '',
+      startTime: editLessonStartTime,
+      endTime: editLessonEndTime,
+      price: parseFloat(editLessonPrice) || 0,
+      notes: editLessonNotes || undefined,
+      isPaid: editLessonIsPaid,
+    })
+    setLessonDetailOpen(false)
+  }
+
+  function handleDeleteLesson() {
+    if (!selectedLessonId) return
+    deletePrivateLesson(selectedLessonId)
+    setDeleteLessonDialogOpen(false)
+    setLessonDetailOpen(false)
+  }
+
+  function handleToggleLessonPaid() {
+    if (!selectedLessonId) return
+    const newPaid = !editLessonIsPaid
+    setEditLessonIsPaid(newPaid)
+    updatePrivateLesson(selectedLessonId, { isPaid: newPaid })
+  }
+
   const activePlayers = useMemo(
     () => players.filter((p) => p.status === 'activo').sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [players]
@@ -422,7 +495,7 @@ export default function AgendaPage() {
 
                             return (
                               <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
-                                <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm" style={{ height: blockHeight - 8 }}>
+                                <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }} onClick={() => openLessonDetail(startingBlock.id)}>
                                   <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
                                   <div className="mt-1 space-y-0.5">
                                     <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
@@ -520,6 +593,95 @@ export default function AgendaPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialogo: Detalle/Edicion clase particular */}
+      <Dialog open={lessonDetailOpen} onOpenChange={setLessonDetailOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{lessonEditMode ? 'Editar clase particular' : 'Clase particular'}</DialogTitle></DialogHeader>
+          {selectedLesson && !lessonEditMode && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Jugadores</p>
+                  <p className="text-sm font-medium">{selectedLesson.playerNames.join(', ')}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Entrenador</p>
+                  <p className="text-sm font-medium">{selectedLesson.coachName}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Pista</p>
+                  <p className="text-sm font-medium">{selectedLesson.courtName}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Horario</p>
+                  <p className="text-sm font-medium">{selectedLesson.startTime} - {selectedLesson.endTime}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Precio</p>
+                  <p className="text-sm font-bold">{formatCurrency(selectedLesson.price)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Estado pago</p>
+                  <Badge className={editLessonIsPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>{editLessonIsPaid ? 'Pagado' : 'Pendiente'}</Badge>
+                </div>
+              </div>
+              {selectedLesson.notes && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Notas</p>
+                  <p className="text-sm">{selectedLesson.notes}</p>
+                </div>
+              )}
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleToggleLessonPaid}>
+                  <Euro className="h-4 w-4 mr-1" />
+                  {editLessonIsPaid ? 'Marcar pendiente' : 'Marcar pagado'}
+                </Button>
+                <div className="flex gap-2 ml-auto">
+                  <Button variant="outline" size="sm" onClick={() => setLessonEditMode(true)}>
+                    <Edit2 className="h-4 w-4 mr-1" />Editar
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => setDeleteLessonDialogOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-1" />Eliminar
+                  </Button>
+                </div>
+              </DialogFooter>
+            </div>
+          )}
+          {lessonEditMode && (
+            <div className="space-y-4">
+              <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={editLessonDate} onChange={(e) => setEditLessonDate(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Pista</Label><Select value={editLessonCourtId} onChange={(e) => setEditLessonCourtId(e.target.value)} options={activeCourts.map((c) => ({ value: c.id, label: c.name }))} /></div>
+              <div className="space-y-1.5"><Label>Entrenador</Label><Select value={editLessonCoachId} onChange={(e) => setEditLessonCoachId(e.target.value)} options={activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5"><Label>Hora inicio</Label><Input type="time" value={editLessonStartTime} onChange={(e) => setEditLessonStartTime(e.target.value)} /></div>
+                <div className="space-y-1.5"><Label>Hora fin</Label><Input type="time" value={editLessonEndTime} onChange={(e) => setEditLessonEndTime(e.target.value)} /></div>
+              </div>
+              <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={editLessonPrice} onChange={(e) => setEditLessonPrice(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Notas</Label><Input value={editLessonNotes} onChange={(e) => setEditLessonNotes(e.target.value)} placeholder="Notas (opcional)" /></div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={editLessonIsPaid} onCheckedChange={(v) => setEditLessonIsPaid(!!v)} />
+                <Label>Pagado</Label>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setLessonEditMode(false)}>Cancelar</Button>
+                <Button onClick={handleSaveLessonEdit}>Guardar cambios</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar eliminacion clase particular */}
+      <ConfirmDialog
+        open={deleteLessonDialogOpen}
+        onOpenChange={setDeleteLessonDialogOpen}
+        title="Eliminar clase particular"
+        description="¿Estas seguro de que deseas eliminar esta clase particular? Esta accion no se puede deshacer."
+        variant="destructive"
+        confirmLabel="Eliminar"
+        onConfirm={handleDeleteLesson}
+      />
 
       {/* Dialogo: Nuevo evento */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
