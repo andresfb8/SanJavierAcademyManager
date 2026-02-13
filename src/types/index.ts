@@ -93,6 +93,7 @@ export interface Player {
   level: PlayerLevel
   dominantHand: DominantHand
   position: PlayerPosition
+  licenseNumber?: string
   previousExperience?: string
   medicalNotes?: string
   // Datos bancarios
