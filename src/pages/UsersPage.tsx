@@ -38,7 +38,7 @@ export default function UsersPage() {
   const [emailError, setEmailError] = useState('')
 
   // --- Store ---
-  const { invitations, addInvitation, deleteInvitation, players } = useDataStore()
+  const { invitations, addInvitation, deleteInvitation, players, coaches, addCoach } = useDataStore()
   const { user } = useAuthStore()
 
   // --- Derived data ---
@@ -194,6 +194,29 @@ export default function UsersPage() {
     }
 
     addInvitation(invitationData)
+
+    // Auto-create coach entry for staff roles
+    if (inviteRole === 'entrenador' || inviteRole === 'coordinador') {
+      const email = inviteEmail.trim().toLowerCase()
+      const existingCoach = coaches.find((c) => c.email.toLowerCase() === email)
+      if (!existingCoach) {
+        // Derive name from email (part before @)
+        const namePart = email.split('@')[0].replace(/[._-]/g, ' ')
+        const parts = namePart.split(' ').filter(Boolean)
+        const firstName = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Nuevo'
+        const lastName = parts.slice(1).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || 'Miembro'
+        addCoach({
+          firstName,
+          lastName,
+          dni: '',
+          email,
+          phone: '',
+          hireDate: new Date(),
+          isActive: true,
+          staffRole: inviteRole as 'entrenador' | 'coordinador',
+        })
+      }
+    }
 
     // Show success
     setInviteLink(activationUrl)
