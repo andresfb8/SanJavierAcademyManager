@@ -1,0 +1,51 @@
+name: Build and Deploy to Firebase
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout del repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Configurar Node.js 18 (versión requerida por Cloud Functions)
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # 3. Instalar dependencias del frontend
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 4. Build del frontend (la config de Firebase está hardcodeada en src/lib/firebase.ts)
+      - name: Build frontend
+        run: npm run build
+
+      # 5. Instalar dependencias de Cloud Functions
+      - name: Install functions dependencies
+        run: npm --prefix functions ci
+
+      # 6. Autenticar con Google Cloud usando el Service Account
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # 7. Instalar Firebase CLI
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      # 8. Desplegar a Firebase (hosting + functions + firestore rules/indexes)
+      #    El predeploy hook en firebase.json hace el build de functions automáticamente
+      - name: Deploy to Firebase
+        run: firebase deploy --only hosting,functions,firestore --non-interactive --project san-javieracademy-manager

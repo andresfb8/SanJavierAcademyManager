@@ -12,14 +12,17 @@ import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar } from 'lucide-react'
+import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
-import { DAYS_OF_WEEK } from '@/constants'
+import { DAYS_OF_WEEK, PLAYER_LEVELS } from '@/constants'
+import { generateGroupDetailReport } from '@/lib/pdf-reports'
+import { useAuthStore } from '@/stores/authStore'
 
 export default function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { groups, players, enrollments, tariffs, addEnrollment, deactivateEnrollment } = useDataStore()
+  const { user } = useAuthStore()
 
   // Dialog state
   const [showAddPlayer, setShowAddPlayer] = useState(false)
@@ -140,6 +143,51 @@ export default function GroupDetailPage() {
     }
   }
 
+  // Handle PDF export
+  const handleExportPDF = () => {
+    if (!group) return
+
+    const clubName = user?.clubId || 'San Javier Academy'
+    const levelInfo = PLAYER_LEVELS.find((l) => l.value === group.level)
+    const defaultTariff = tariffs.find((t) => t.id === group.defaultTariffId)
+
+    // Format schedule
+    const scheduleText = group.schedule
+      .map((slot) => {
+        const day = DAYS_OF_WEEK.find((d) => d.value === slot.dayOfWeek)
+        return `${day?.label || '?'} ${slot.startTime} - ${slot.endTime}`
+      })
+      .join(', ')
+
+    // Get enrolled players
+    const enrolledPlayers = groupEnrollments.map((enrollment) => {
+      const player = players.find((p) => p.id === enrollment.playerId)
+      if (!player) return null
+
+      const playerLevel = PLAYER_LEVELS.find((l) => l.value === player.level)
+
+      return {
+        name: `${player.firstName} ${player.lastName}`,
+        level: playerLevel?.label || player.level,
+        email: player.email || 'Sin email',
+        phone: player.phone || 'Sin telefono',
+      }
+    }).filter((p) => p !== null) as { name: string; level: string; email: string; phone: string }[]
+
+    generateGroupDetailReport({
+      clubName,
+      groupName: group.name,
+      level: levelInfo?.label || group.level,
+      coach: group.coachName,
+      court: group.courtName,
+      schedule: scheduleText,
+      monthlyFee: defaultTariff?.price || 0,
+      currentEnrollment: group.currentEnrollment,
+      maxCapacity: group.maxCapacity,
+      enrolledPlayers,
+    })
+  }
+
   // ===========================
   // GROUP NOT FOUND
   // ===========================
@@ -174,6 +222,10 @@ export default function GroupDetailPage() {
             <Button variant="outline" size="sm" onClick={() => navigate('/grupos')}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Volver
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <FileDown className="h-4 w-4 mr-1" />
+              Exportar PDF
             </Button>
             <Button size="sm" onClick={() => { resetAddForm(); setShowAddPlayer(true) }}>
               <UserPlus className="h-4 w-4 mr-1" />

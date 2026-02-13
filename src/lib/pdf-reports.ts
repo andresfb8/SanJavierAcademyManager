@@ -52,6 +52,36 @@ export interface AnnualReportData {
   totalRecibos: number
 }
 
+export interface GroupListReportData {
+  clubName: string
+  groups: {
+    name: string
+    level: string
+    coach: string
+    court: string
+    schedule: string
+    enrollment: string
+  }[]
+}
+
+export interface GroupDetailReportData {
+  clubName: string
+  groupName: string
+  level: string
+  coach: string
+  court: string
+  schedule: string
+  monthlyFee: number
+  currentEnrollment: number
+  maxCapacity: number
+  enrolledPlayers: {
+    name: string
+    level: string
+    email: string
+    phone: string
+  }[]
+}
+
 // --- Constantes de diseño ---
 
 const MARGIN = 20
@@ -503,5 +533,126 @@ export function generateAnnualReport(data: AnnualReportData): void {
 
   // Save
   const filename = `Resumen_Anual_${data.year}.pdf`
+  doc.save(filename)
+}
+
+// ==========================================
+// 4. Listado de Grupos
+// ==========================================
+
+export function generateGroupsListReport(data: GroupListReportData): void {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  // Header
+  let y = drawHeader(doc, data.clubName, 'Listado de Grupos')
+
+  // Groups table
+  const headers = ['Nombre', 'Nivel', 'Entrenador', 'Pista', 'Horario', 'Ocupacion']
+  const colWidths = [32, 26, 32, 28, 32, 20]
+
+  const rows: string[][] = data.groups.map((g) => [
+    g.name,
+    g.level,
+    g.coach,
+    g.court,
+    g.schedule,
+    g.enrollment,
+  ])
+
+  drawTable(doc, headers, rows, MARGIN, y, colWidths)
+
+  // Footers
+  addFootersToAllPages(doc)
+
+  // Save
+  const filename = `Listado_Grupos.pdf`
+  doc.save(filename)
+}
+
+// ==========================================
+// 5. Detalle de Grupo
+// ==========================================
+
+export function generateGroupDetailReport(data: GroupDetailReportData): void {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  // Header
+  let y = drawHeader(doc, data.clubName, `Detalle de Grupo - ${data.groupName}`)
+
+  // Group info section
+  doc.setFontSize(FONT_SIZE.normal)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b)
+
+  const infoFields: [string, string][] = [
+    ['Nivel:', data.level],
+    ['Entrenador:', data.coach],
+    ['Pista:', data.court],
+    ['Horario:', data.schedule],
+    ['Cuota mensual:', formatCurrencyPdf(data.monthlyFee)],
+  ]
+
+  for (const [label, value] of infoFields) {
+    doc.setFont('helvetica', 'bold')
+    doc.text(label, MARGIN, y + 3)
+    doc.setFont('helvetica', 'normal')
+    doc.text(value, MARGIN + 35, y + 3)
+    y += 6
+  }
+
+  y += 6
+
+  // KPI section - Enrollment
+  const kpiWidth = (CONTENT_WIDTH - 3) / 2
+  const kpiHeight = 24
+  const kpiGap = 3
+
+  drawKpiBox(
+    doc,
+    MARGIN,
+    y,
+    kpiWidth,
+    kpiHeight,
+    'Alumnos inscritos',
+    String(data.currentEnrollment)
+  )
+  drawKpiBox(
+    doc,
+    MARGIN + kpiWidth + kpiGap,
+    y,
+    kpiWidth,
+    kpiHeight,
+    'Capacidad maxima',
+    String(data.maxCapacity)
+  )
+
+  y += kpiHeight + 10
+
+  // Enrolled players table
+  if (data.enrolledPlayers.length > 0) {
+    const headers = ['Nombre', 'Nivel', 'Email', 'Telefono']
+    const colWidths = [45, 30, 50, 45]
+
+    const rows: string[][] = data.enrolledPlayers.map((p) => [
+      p.name,
+      p.level,
+      p.email,
+      p.phone,
+    ])
+
+    drawTable(doc, headers, rows, MARGIN, y, colWidths)
+  } else {
+    doc.setFontSize(FONT_SIZE.normal)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(COLORS.muted.r, COLORS.muted.g, COLORS.muted.b)
+    doc.text('No hay alumnos inscritos en este grupo.', MARGIN, y + 3)
+  }
+
+  // Footers
+  addFootersToAllPages(doc)
+
+  // Save
+  const safeName = data.groupName.replace(/\s+/g, '_')
+  const filename = `Detalle_Grupo_${safeName}.pdf`
   doc.save(filename)
 }

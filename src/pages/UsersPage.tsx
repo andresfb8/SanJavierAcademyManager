@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
@@ -8,14 +8,37 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
 import { formatDate, generateId } from '@/lib/utils'
 import type { UserRole, InvitationStatus } from '@/types'
-import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search } from 'lucide-react'
+import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, Users, UserX } from 'lucide-react'
+import { doc, setDoc, deleteDoc, collection, getDocs, query, where, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+
+interface FirestoreUser {
+  id: string
+  email: string
+  displayName: string
+  role: UserRole
+  clubId: string
+  isActive: boolean
+  createdAt: Date
+  linkedPlayerId?: string
+  linkedPlayerIds?: string[]
+}
 
 export default function UsersPage() {
+  // --- Tab state ---
+  const [activeTab, setActiveTab] = useState<'invitations' | 'users'>('invitations')
+
   // --- Dialog state ---
   const [showInviteDialog, setShowInviteDialog] = useState(false)
+
+  // --- Users state ---
+  const [users, setUsers] = useState<FirestoreUser[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [deactivateUserId, setDeactivateUserId] = useState<string | null>(null)
 
   // --- Filter state ---
   const [searchTerm, setSearchTerm] = useState('')
@@ -40,6 +63,46 @@ export default function UsersPage() {
   // --- Store ---
   const { invitations, addInvitation, deleteInvitation, players, coaches, addCoach } = useDataStore()
   const { user } = useAuthStore()
+
+  // --- Load users from Firestore ---
+  useEffect(() => {
+    async function loadUsers() {
+      if (!user?.clubId) return
+
+      setIsLoadingUsers(true)
+      try {
+        const usersQuery = query(
+          collection(db, 'users'),
+          where('clubId', '==', user.clubId)
+        )
+        const snapshot = await getDocs(usersQuery)
+        const loadedUsers: FirestoreUser[] = []
+
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          loadedUsers.push({
+            id: doc.id,
+            email: data.email || '',
+            displayName: data.displayName || '',
+            role: data.role as UserRole,
+            clubId: data.clubId || '',
+            isActive: data.isActive !== false, // Default to true if not set
+            createdAt: data.createdAt?.toDate?.() || new Date(),
+            linkedPlayerId: data.linkedPlayerId,
+            linkedPlayerIds: data.linkedPlayerIds,
+          })
+        })
+
+        setUsers(loadedUsers)
+      } catch (err) {
+        console.error('Error loading users:', err)
+      } finally {
+        setIsLoadingUsers(false)
+      }
+    }
+
+    loadUsers()
+  }, [user?.clubId])
 
   // --- Derived data ---
   const activePlayers = useMemo(
@@ -85,6 +148,18 @@ export default function UsersPage() {
       return matchesSearch && matchesRole && matchesStatus
     })
   }, [invitations, searchTerm, filterRole, filterStatus])
+
+  // --- Filtered users ---
+  const filteredUsers = useMemo(() => {
+    return users.filter((usr) => {
+      const matchesSearch =
+        !searchTerm ||
+        usr.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        usr.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesRole = !filterRole || usr.role === filterRole
+      return matchesSearch && matchesRole
+    })
+  }, [users, searchTerm, filterRole])
 
   // --- Helpers ---
   function getRoleLabel(role: UserRole): string {
@@ -148,7 +223,7 @@ export default function UsersPage() {
     return emailRegex.test(email)
   }
 
-  function handleSubmitInvitation() {
+  async function handleSubmitInvitation() {
     // Validate
     setEmailError('')
 
@@ -218,6 +293,15 @@ export default function UsersPage() {
       }
     }
 
+    // Also save to Firestore using token as document ID
+    try {
+      await setDoc(doc(db, 'invitations', token), invitationData)
+    } catch (err) {
+      console.error('Error saving invitation to Firestore:', err)
+      setEmailError('Error al guardar la invitacion. Intentalo de nuevo.')
+      return
+    }
+
     // Show success
     setInviteLink(activationUrl)
     setInviteSuccess(true)
@@ -230,8 +314,41 @@ export default function UsersPage() {
     })
   }
 
-  function handleDeleteInvitation(id: string) {
+  async function handleDeleteInvitation(id: string) {
+    // Find the invitation to get its token
+    const invitation = invitations.find((inv) => inv.id === id)
+    if (!invitation) return
+
+    // Delete from local store
     deleteInvitation(id)
+
+    // Also delete from Firestore using the token as document ID
+    try {
+      await deleteDoc(doc(db, 'invitations', invitation.token))
+    } catch (err) {
+      console.error('Error deleting invitation from Firestore:', err)
+    }
+  }
+
+  async function handleDeactivateUser() {
+    if (!deactivateUserId) return
+
+    try {
+      await updateDoc(doc(db, 'users', deactivateUserId), {
+        isActive: false,
+      })
+
+      // Update local state
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === deactivateUserId ? { ...u, isActive: false } : u
+        )
+      )
+    } catch (err) {
+      console.error('Error deactivating user:', err)
+    } finally {
+      setDeactivateUserId(null)
+    }
   }
 
   function handleAddTutorPlayer() {
@@ -265,6 +382,38 @@ export default function UsersPage() {
         </Button>
       </div>
 
+      {/* Tabs */}
+      <div className="px-6 pt-4">
+        <div className="flex gap-4 border-b">
+          <button
+            className={`px-4 py-2 font-medium text-sm transition-colors relative ${
+              activeTab === 'invitations'
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('invitations')}
+          >
+            Invitaciones
+            {activeTab === 'invitations' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+          <button
+            className={`px-4 py-2 font-medium text-sm transition-colors relative ${
+              activeTab === 'users'
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('users')}
+          >
+            Usuarios activos
+            {activeTab === 'users' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+        </div>
+      </div>
+
       <div className="p-6 space-y-4">
 
       {/* Filters */}
@@ -273,7 +422,7 @@ export default function UsersPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por email..."
+              placeholder={activeTab === 'invitations' ? 'Buscar por email...' : 'Buscar por email o nombre...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -287,76 +436,169 @@ export default function UsersPage() {
             onChange={(e) => setFilterRole(e.target.value)}
           />
         </div>
-        <div className="w-full sm:w-48">
-          <Select
-            options={statusFilterOptions}
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          />
-        </div>
+        {activeTab === 'invitations' && (
+          <div className="w-full sm:w-48">
+            <Select
+              options={statusFilterOptions}
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Jugador vinculado</TableHead>
-              <TableHead>Fecha creacion</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredInvitations.length === 0 ? (
+      {/* Table - Invitations */}
+      {activeTab === 'invitations' && (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  {invitations.length === 0
-                    ? 'No hay invitaciones. Haz clic en "Invitar usuario" para crear una.'
-                    : 'No se encontraron invitaciones con los filtros aplicados.'}
-                </TableCell>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Jugador vinculado</TableHead>
+                <TableHead>Fecha creacion</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
-            ) : (
-              filteredInvitations.map((inv) => (
-                <TableRow key={inv.id}>
-                  <TableCell className="font-medium">{inv.email}</TableCell>
-                  <TableCell>{getRoleLabel(inv.role)}</TableCell>
-                  <TableCell>{getStatusBadge(inv.status)}</TableCell>
-                  <TableCell>
-                    {inv.linkedPlayerIds && inv.linkedPlayerIds.length > 0 ? (
-                      <span title={getLinkedPlayerNames(inv)}>
-                        {inv.linkedPlayerIds.length} jugador{inv.linkedPlayerIds.length > 1 ? 'es' : ''}
-                        {' — '}
-                        {getLinkedPlayerNames(inv)}
-                      </span>
-                    ) : inv.linkedPlayerId ? (
-                      getLinkedPlayerNames(inv)
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatDate(inv.createdAt)}</TableCell>
-                  <TableCell className="text-right">
-                    {inv.status === 'pendiente' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteInvitation(inv.id)}
-                        title="Eliminar invitacion"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
+            </TableHeader>
+            <TableBody>
+              {filteredInvitations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    {invitations.length === 0
+                      ? 'No hay invitaciones. Haz clic en "Invitar usuario" para crear una.'
+                      : 'No se encontraron invitaciones con los filtros aplicados.'}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filteredInvitations.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.email}</TableCell>
+                    <TableCell>{getRoleLabel(inv.role)}</TableCell>
+                    <TableCell>{getStatusBadge(inv.status)}</TableCell>
+                    <TableCell>
+                      {inv.linkedPlayerIds && inv.linkedPlayerIds.length > 0 ? (
+                        <span title={getLinkedPlayerNames(inv)}>
+                          {inv.linkedPlayerIds.length} jugador{inv.linkedPlayerIds.length > 1 ? 'es' : ''}
+                          {' — '}
+                          {getLinkedPlayerNames(inv)}
+                        </span>
+                      ) : inv.linkedPlayerId ? (
+                        getLinkedPlayerNames(inv)
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{formatDate(inv.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      {inv.status === 'pendiente' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteInvitation(inv.id)}
+                          title="Eliminar invitacion"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Table - Active Users */}
+      {activeTab === 'users' && (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Jugador vinculado</TableHead>
+                <TableHead>Fecha creacion</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingUsers ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    Cargando usuarios...
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    {users.length === 0
+                      ? 'No hay usuarios activos.'
+                      : 'No se encontraron usuarios con los filtros aplicados.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((usr) => (
+                  <TableRow key={usr.id}>
+                    <TableCell className="font-medium">{usr.displayName}</TableCell>
+                    <TableCell>{usr.email}</TableCell>
+                    <TableCell>{getRoleLabel(usr.role)}</TableCell>
+                    <TableCell>
+                      {usr.isActive ? (
+                        <Badge variant="success">Activo</Badge>
+                      ) : (
+                        <Badge variant="secondary">Inactivo</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {usr.linkedPlayerIds && usr.linkedPlayerIds.length > 0 ? (
+                        <span title={getLinkedPlayerNames(usr)}>
+                          {usr.linkedPlayerIds.length} jugador{usr.linkedPlayerIds.length > 1 ? 'es' : ''}
+                          {' — '}
+                          {getLinkedPlayerNames(usr)}
+                        </span>
+                      ) : usr.linkedPlayerId ? (
+                        getLinkedPlayerNames(usr)
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{formatDate(usr.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      {usr.isActive && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeactivateUserId(usr.id)}
+                          title="Desactivar usuario"
+                        >
+                          <UserX className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
       </div>
-      </div>
+
+      {/* Deactivate User Confirmation Dialog */}
+      <ConfirmDialog
+        open={deactivateUserId !== null}
+        onOpenChange={(open) => !open && setDeactivateUserId(null)}
+        title="Desactivar usuario"
+        description="Esta accion desactivara el usuario y no podra iniciar sesion. Puedes reactivar al usuario mas tarde si es necesario."
+        confirmLabel="Desactivar"
+        cancelLabel="Cancelar"
+        variant="destructive"
+        onConfirm={handleDeactivateUser}
+      />
 
       {/* Invite Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>

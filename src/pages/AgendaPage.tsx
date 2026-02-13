@@ -450,7 +450,7 @@ export default function AgendaPage() {
                           const coveredByBlock = blocks.find((b) => b.startSlot < slotIdx && b.endSlot > slotIdx)
 
                           if (coveredByBlock) {
-                            return <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'}`} style={{ height: SLOT_HEIGHT }} />
+                            return <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} pointer-events-none`} style={{ height: SLOT_HEIGHT }} />
                           }
 
                           if (startingBlock) {
@@ -757,6 +757,7 @@ export default function AgendaPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   )
 }
