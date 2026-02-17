@@ -422,15 +422,25 @@ export default function EventDetailPage() {
                     return (
                       <TableRow key={playerId}>
                         <TableCell>
-                          <button
-                            className="flex items-center gap-3 text-left hover:underline"
-                            onClick={() => navigate(`/jugadores/${playerId}`)}
-                          >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
-                              {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                          {playerId.startsWith('guest-') ? (
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-medium shrink-0">
+                                {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                              </div>
+                              <span className="font-medium text-sm text-muted-foreground">{playerName}</span>
+                              <Badge variant="outline" className="text-[10px]">Invitado</Badge>
                             </div>
-                            <span className="font-medium text-sm">{playerName}</span>
-                          </button>
+                          ) : (
+                            <button
+                              className="flex items-center gap-3 text-left hover:underline"
+                              onClick={() => navigate(`/jugadores/${playerId}`)}
+                            >
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
+                                {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                              </div>
+                              <span className="font-medium text-sm">{playerName}</span>
+                            </button>
+                          )}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={payment?.status ?? 'pendiente'} />

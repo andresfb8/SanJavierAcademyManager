@@ -27,6 +27,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { normalizeAllPayments } from '@/lib/payment-utils'
 import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
 import type { Payment, PaymentMethod, PaymentCategory } from '@/types'
 import {
@@ -80,7 +81,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, markPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, markPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -144,32 +145,38 @@ export default function PaymentsPage() {
     })
   }, [payments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear])
 
-  // KPI calculations for current selected month
-  const currentMonthPayments = useMemo(() => {
-    return payments.filter(
+  // Unificar todos los pagos para KPIs globales
+  const allPayments = useMemo(
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
+    [payments, eventPayments, privateLessonPayments]
+  )
+
+  // KPI calculations for current selected month (usando TODOS los origenes)
+  const currentMonthAllPayments = useMemo(() => {
+    return allPayments.filter(
       (p) => p.billingMonth === selectedMonth && p.billingYear === selectedYear
     )
-  }, [payments, selectedMonth, selectedYear])
+  }, [allPayments, selectedMonth, selectedYear])
 
-  const previousMonthPayments = useMemo(() => {
+  const previousMonthAllPayments = useMemo(() => {
     const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1
     const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear
-    return payments.filter(
+    return allPayments.filter(
       (p) => p.billingMonth === prevMonth && p.billingYear === prevYear
     )
-  }, [payments, selectedMonth, selectedYear])
+  }, [allPayments, selectedMonth, selectedYear])
 
   const ingresosMes = useMemo(() => {
-    return currentMonthPayments
+    return currentMonthAllPayments
       .filter((p) => p.status === 'pagado')
       .reduce((sum, p) => sum + p.amount, 0)
-  }, [currentMonthPayments])
+  }, [currentMonthAllPayments])
 
   const ingresosMesAnterior = useMemo(() => {
-    return previousMonthPayments
+    return previousMonthAllPayments
       .filter((p) => p.status === 'pagado')
       .reduce((sum, p) => sum + p.amount, 0)
-  }, [previousMonthPayments])
+  }, [previousMonthAllPayments])
 
   const ingresosTrend = useMemo(() => {
     if (ingresosMesAnterior === 0) return 0
@@ -177,23 +184,23 @@ export default function PaymentsPage() {
   }, [ingresosMes, ingresosMesAnterior])
 
   const pendienteCobro = useMemo(() => {
-    return currentMonthPayments
+    return currentMonthAllPayments
       .filter((p) => p.status === 'pendiente')
       .reduce((sum, p) => sum + p.amount, 0)
-  }, [currentMonthPayments])
+  }, [currentMonthAllPayments])
 
   const tasaCobro = useMemo(() => {
-    if (currentMonthPayments.length === 0) return 0
-    const pagados = currentMonthPayments.filter((p) => p.status === 'pagado').length
-    return Math.round((pagados / currentMonthPayments.length) * 100)
-  }, [currentMonthPayments])
+    if (currentMonthAllPayments.length === 0) return 0
+    const pagados = currentMonthAllPayments.filter((p) => p.status === 'pagado').length
+    return Math.round((pagados / currentMonthAllPayments.length) * 100)
+  }, [currentMonthAllPayments])
 
-  const totalRecibos = currentMonthPayments.length
+  const totalRecibos = currentMonthAllPayments.length
 
-  // --- Annual summary data ---
+  // --- Annual summary data (usando TODOS los origenes) ---
   const annualSummary = useMemo<AnnualSummaryRow[]>(() => {
     return MONTHS.map((m) => {
-      const monthPayments = payments.filter(
+      const monthPayments = allPayments.filter(
         (p) => p.billingMonth === m.value && p.billingYear === selectedYear
       )
       const ingresos = monthPayments
@@ -215,14 +222,14 @@ export default function PaymentsPage() {
         recibos: total,
       }
     })
-  }, [payments, selectedYear])
+  }, [allPayments, selectedYear])
 
   const annualTotals = useMemo(() => {
     const totalIngresos = annualSummary.reduce((sum, r) => sum + r.ingresos, 0)
     const totalPendiente = annualSummary.reduce((sum, r) => sum + r.pendiente, 0)
     const totalRecibos = annualSummary.reduce((sum, r) => sum + r.recibos, 0)
     const totalPagados = annualSummary.reduce((sum, r) => {
-      const monthPayments = payments.filter(
+      const monthPayments = allPayments.filter(
         (p) => p.billingMonth === r.month && p.billingYear === selectedYear && p.status === 'pagado'
       )
       return sum + monthPayments.length
@@ -230,7 +237,7 @@ export default function PaymentsPage() {
     const tasaCobroAnual = totalRecibos > 0 ? Math.round((totalPagados / totalRecibos) * 100) : 0
 
     return { totalIngresos, totalPendiente, tasaCobroAnual, totalRecibos }
-  }, [annualSummary, payments, selectedYear])
+  }, [annualSummary, allPayments, selectedYear])
 
   // --- TanStack React Table columns ---
   const columns = useMemo<ColumnDef<Payment>[]>(

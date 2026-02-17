@@ -56,6 +56,7 @@ export default function EventsActivitiesPage() {
     players,
     eventPayments,
     addPrivateLesson,
+    addPrivateLessonPayment,
     deletePrivateLesson,
     addEvent,
     addEventPayment,
@@ -256,7 +257,38 @@ export default function EventsActivitiesPage() {
       isPaid: false,
       notes: formNotes || undefined,
     }
-    addPrivateLesson(lessonData)
+    const newLessonId = addPrivateLesson(lessonData)
+
+    // Crear pagos individuales por participante
+    const totalPrice = parseFloat(formPrice) || 0
+    const participantCount = formPlayerIds.length + formGuestNames.length
+    const perPlayerAmount = participantCount > 0 ? totalPrice / participantCount : 0
+    const lessonDate = new Date(formDate + 'T00:00:00')
+
+    for (const pid of formPlayerIds) {
+      const player = selectedPlayers.find((p) => p.id === pid)
+      if (player) {
+        addPrivateLessonPayment({
+          lessonId: newLessonId,
+          lessonDate,
+          playerId: pid,
+          playerName: `${player.firstName} ${player.lastName}`,
+          amount: perPlayerAmount,
+          status: 'pendiente',
+        })
+      }
+    }
+    for (let i = 0; i < formGuestNames.length; i++) {
+      addPrivateLessonPayment({
+        lessonId: newLessonId,
+        lessonDate,
+        playerId: guestIds[i],
+        playerName: formGuestNames[i],
+        amount: perPlayerAmount,
+        status: 'pendiente',
+      })
+    }
+
     setLessonDialogOpen(false)
   }
 
@@ -291,6 +323,17 @@ export default function EventsActivitiesPage() {
         eventName: evName,
         playerId: p.id,
         playerName: `${p.firstName} ${p.lastName}`,
+        amount: eventPrice,
+        status: 'pendiente',
+      })
+    }
+    // Crear pagos para invitados
+    for (let i = 0; i < evGuestNames.length; i++) {
+      addEventPayment({
+        eventId,
+        eventName: evName,
+        playerId: evGuestIds[i],
+        playerName: evGuestNames[i],
         amount: eventPrice,
         status: 'pendiente',
       })

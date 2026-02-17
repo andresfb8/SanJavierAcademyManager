@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { normalizeAllPayments } from '@/lib/payment-utils'
 import {
   Users,
   DollarSign,
@@ -62,7 +63,7 @@ const defaultKpiConfig: KpiConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const { players, payments, groups, activities, enrollments, attendance, checkAndAutoGenerateReceipts } = useDataStore()
+  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -99,31 +100,37 @@ export default function DashboardPage() {
   const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
-  const currentMonthPayments = payments.filter(
+  // Unificar todos los pagos (cuotas + eventos + clases particulares)
+  const allPayments = useMemo(
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
+    [payments, eventPayments, privateLessonPayments]
+  )
+
+  const currentMonthAllPayments = allPayments.filter(
     (p) => p.billingMonth === currentMonth && p.billingYear === currentYear
   )
-  const prevMonthPayments = payments.filter(
+  const prevMonthAllPayments = allPayments.filter(
     (p) => p.billingMonth === prevMonth && p.billingYear === prevYear
   )
 
-  const currentRevenue = currentMonthPayments
+  const currentRevenue = currentMonthAllPayments
     .filter((p) => p.status === 'pagado')
     .reduce((sum, p) => sum + p.amount, 0)
-  const prevRevenue = prevMonthPayments
+  const prevRevenue = prevMonthAllPayments
     .filter((p) => p.status === 'pagado')
     .reduce((sum, p) => sum + p.amount, 0)
   const revenueDiff = prevRevenue > 0 ? Math.round(((currentRevenue - prevRevenue) / prevRevenue) * 100) : 0
 
-  const currentPending = currentMonthPayments
+  const currentPending = currentMonthAllPayments
     .filter((p) => p.status === 'pendiente')
     .reduce((sum, p) => sum + p.amount, 0)
-  const prevPending = prevMonthPayments
+  const prevPending = prevMonthAllPayments
     .filter((p) => p.status === 'pendiente')
     .reduce((sum, p) => sum + p.amount, 0)
   const pendingDiff = prevPending > 0 ? Math.round(((currentPending - prevPending) / prevPending) * 100) : 0
 
   // Collection rate
-  const totalCurrentMonth = currentMonthPayments
+  const totalCurrentMonth = currentMonthAllPayments
     .filter((p) => p.status !== 'cancelado')
     .reduce((sum, p) => sum + p.amount, 0)
   const collectionRate = totalCurrentMonth > 0 ? Math.round((currentRevenue / totalCurrentMonth) * 100) : 0
@@ -194,13 +201,13 @@ export default function DashboardPage() {
     { name: 'Menores', value: players.filter((p) => p.level === 'menores' && p.status === 'activo').length, color: '#f59e0b' },
   ].filter((d) => d.value > 0)
 
-  // Financial chart data (last 6 months)
+  // Financial chart data (last 6 months) — incluye todos los origenes de pago
   const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
   const financialData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(currentYear, currentMonth - 1 - (5 - i), 1)
     const m = d.getMonth() + 1
     const y = d.getFullYear()
-    const monthPayments = payments.filter((p) => p.billingMonth === m && p.billingYear === y)
+    const monthPayments = allPayments.filter((p) => p.billingMonth === m && p.billingYear === y)
     return {
       month: MONTH_NAMES[d.getMonth()],
       cobrado: monthPayments.filter((p) => p.status === 'pagado').reduce((sum, p) => sum + p.amount, 0),

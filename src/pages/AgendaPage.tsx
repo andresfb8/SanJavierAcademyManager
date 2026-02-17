@@ -12,9 +12,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro } from 'lucide-react'
-import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES } from '@/constants'
+import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
-import type { PrivateLesson, EventType } from '@/types'
+import type { PrivateLesson, EventType, PaymentMethod } from '@/types'
 
 // ==========================================
 // Constantes de la agenda
@@ -94,7 +94,7 @@ interface GridBlock {
 
 export default function AgendaPage() {
   const navigate = useNavigate()
-  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, events, addEvent, addEventPayment } = useDataStore()
+  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment } = useDataStore()
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -130,6 +130,9 @@ export default function AgendaPage() {
   // Invitados evento
   const [evGuestNames, setEvGuestNames] = useState<string[]>([])
   const [evGuestInput, setEvGuestInput] = useState('')
+
+  // Metodos de pago por jugador en detalle de leccion
+  const [lessonPaymentMethods, setLessonPaymentMethods] = useState<Record<string, string>>({})
 
   // Dialogo detalle/edicion clase particular
   const [lessonDetailOpen, setLessonDetailOpen] = useState(false)
@@ -266,15 +269,46 @@ export default function AgendaPage() {
     const court = activeCourts.find((c) => c.id === formCourtId)
     const selectedPlayers = players.filter((p) => formPlayerIds.includes(p.id))
     const guestIds = formGuestNames.map((_, i) => `guest-${Date.now()}-${i}`)
+    const totalPrice = parseFloat(formPrice) || 0
+    const lessonDate = new Date(formDate + 'T00:00:00')
     const lessonData: Omit<PrivateLesson, 'id' | 'createdAt'> = {
       playerIds: [...formPlayerIds, ...guestIds],
       playerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...formGuestNames],
       coachId: formCoachId, coachName: coach ? `${coach.firstName} ${coach.lastName}` : '',
       courtId: formCourtId, courtName: court?.name ?? '',
-      date: new Date(formDate + 'T00:00:00'), startTime: formStartTime, endTime: formEndTime,
-      price: parseFloat(formPrice) || 0, isPaid: false, notes: formNotes || undefined,
+      date: lessonDate, startTime: formStartTime, endTime: formEndTime,
+      price: totalPrice, isPaid: false, notes: formNotes || undefined,
     }
-    addPrivateLesson(lessonData)
+    const newLessonId = addPrivateLesson(lessonData)
+
+    // Crear pagos individuales por participante
+    const participantCount = formPlayerIds.length + formGuestNames.length
+    const perPlayerAmount = participantCount > 0 ? totalPrice / participantCount : 0
+
+    for (const pid of formPlayerIds) {
+      const player = selectedPlayers.find((p) => p.id === pid)
+      if (player) {
+        addPrivateLessonPayment({
+          lessonId: newLessonId,
+          lessonDate,
+          playerId: pid,
+          playerName: `${player.firstName} ${player.lastName}`,
+          amount: perPlayerAmount,
+          status: 'pendiente',
+        })
+      }
+    }
+    for (let i = 0; i < formGuestNames.length; i++) {
+      addPrivateLessonPayment({
+        lessonId: newLessonId,
+        lessonDate,
+        playerId: guestIds[i],
+        playerName: formGuestNames[i],
+        amount: perPlayerAmount,
+        status: 'pendiente',
+      })
+    }
+
     setDialogOpen(false)
   }
 
@@ -295,7 +329,7 @@ export default function AgendaPage() {
       price: eventPrice, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined, isActive: true,
     })
-    // Crear pagos solo para jugadores reales (no invitados)
+    // Crear pagos para jugadores reales
     for (const p of selectedPlayers) {
       addEventPayment({
         eventId,
@@ -306,12 +340,28 @@ export default function AgendaPage() {
         status: 'pendiente',
       })
     }
+    // Crear pagos para invitados
+    for (let i = 0; i < evGuestNames.length; i++) {
+      addEventPayment({
+        eventId,
+        eventName: evName,
+        playerId: evGuestIds[i],
+        playerName: evGuestNames[i],
+        amount: eventPrice,
+        status: 'pendiente',
+      })
+    }
     setEventDialogOpen(false)
   }
 
   const selectedLesson = useMemo(
     () => selectedLessonId ? privateLessons.find((l) => l.id === selectedLessonId) : null,
     [privateLessons, selectedLessonId]
+  )
+
+  const selectedLessonPayments = useMemo(
+    () => selectedLessonId ? privateLessonPayments.filter((p) => p.lessonId === selectedLessonId) : [],
+    [privateLessonPayments, selectedLessonId]
   )
 
   function openLessonDetail(lessonId: string) {
@@ -360,11 +410,31 @@ export default function AgendaPage() {
     setLessonDetailOpen(false)
   }
 
-  function handleToggleLessonPaid() {
-    if (!selectedLessonId) return
-    const newPaid = !editLessonIsPaid
-    setEditLessonIsPaid(newPaid)
-    updatePrivateLesson(selectedLessonId, { isPaid: newPaid })
+  function handleMarkLessonPlayerPaid(paymentId: string) {
+    const method = (lessonPaymentMethods[paymentId] || 'efectivo') as PaymentMethod
+    updatePrivateLessonPayment(paymentId, {
+      status: 'pagado',
+      paidDate: new Date(),
+      paymentMethod: method,
+    })
+  }
+
+  function handleMigrateLessonPayments() {
+    if (!selectedLesson || !selectedLessonId) return
+    const participantCount = selectedLesson.playerIds.length
+    const perPlayerAmount = participantCount > 0 ? selectedLesson.price / participantCount : 0
+    const lessonDate = selectedLesson.date instanceof Date ? selectedLesson.date : new Date(selectedLesson.date)
+    for (let i = 0; i < selectedLesson.playerIds.length; i++) {
+      addPrivateLessonPayment({
+        lessonId: selectedLessonId,
+        lessonDate,
+        playerId: selectedLesson.playerIds[i],
+        playerName: selectedLesson.playerNames[i],
+        amount: perPlayerAmount,
+        status: selectedLesson.isPaid ? 'pagado' : 'pendiente',
+        ...(selectedLesson.isPaid ? { paidDate: new Date(), paymentMethod: 'efectivo' as PaymentMethod } : {}),
+      })
+    }
   }
 
   const activePlayers = useMemo(
@@ -493,7 +563,11 @@ export default function AgendaPage() {
                               )
                             }
 
-                            return (
+                            {
+                              const lessonPmts = privateLessonPayments.filter((p) => p.lessonId === startingBlock.id)
+                              const paidCount = lessonPmts.filter((p) => p.status === 'pagado').length
+                              const totalCount = lessonPmts.length
+                              return (
                               <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
                                 <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }} onClick={() => openLessonDetail(startingBlock.id)}>
                                   <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
@@ -501,10 +575,16 @@ export default function AgendaPage() {
                                     <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>
                                     {startingBlock.price !== undefined && startingBlock.price > 0 && <p className="text-xs font-medium text-amber-700">{formatCurrency(startingBlock.price)}</p>}
+                                    {totalCount > 0 && (
+                                      <p className={`text-[10px] font-medium ${paidCount === totalCount ? 'text-green-700' : 'text-yellow-700'}`}>
+                                        <Euro className="h-3 w-3 inline mr-0.5" />{paidCount}/{totalCount} pagados
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
-                            )
+                              )
+                            }
                           }
 
                           return (
@@ -602,10 +682,6 @@ export default function AgendaPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Jugadores</p>
-                  <p className="text-sm font-medium">{selectedLesson.playerNames.join(', ')}</p>
-                </div>
-                <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Entrenador</p>
                   <p className="text-sm font-medium">{selectedLesson.coachName}</p>
                 </div>
@@ -618,12 +694,8 @@ export default function AgendaPage() {
                   <p className="text-sm font-medium">{selectedLesson.startTime} - {selectedLesson.endTime}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Precio</p>
+                  <p className="text-sm text-muted-foreground">Precio total</p>
                   <p className="text-sm font-bold">{formatCurrency(selectedLesson.price)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Estado pago</p>
-                  <Badge className={editLessonIsPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>{editLessonIsPaid ? 'Pagado' : 'Pendiente'}</Badge>
                 </div>
               </div>
               {selectedLesson.notes && (
@@ -632,11 +704,53 @@ export default function AgendaPage() {
                   <p className="text-sm">{selectedLesson.notes}</p>
                 </div>
               )}
+
+              {/* Pagos individuales por jugador */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Estado de pagos por jugador</p>
+                {selectedLessonPayments.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedLessonPayments.map((payment) => {
+                      const isPaid = payment.status === 'pagado'
+                      return (
+                        <div key={payment.id} className="flex items-center justify-between rounded-md border px-3 py-2 gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{payment.playerName}</p>
+                            <p className="text-xs text-muted-foreground">{formatCurrency(payment.amount)}</p>
+                          </div>
+                          {isPaid ? (
+                            <Badge className="bg-green-100 text-green-800 shrink-0">Pagado</Badge>
+                          ) : (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Select
+                                className="w-32 h-8 text-xs"
+                                options={PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label }))}
+                                value={lessonPaymentMethods[payment.id] || 'efectivo'}
+                                onChange={(e) => setLessonPaymentMethods((prev) => ({ ...prev, [payment.id]: e.target.value }))}
+                              />
+                              <Button variant="outline" size="sm" onClick={() => handleMarkLessonPlayerPaid(payment.id)}>
+                                <Euro className="h-3.5 w-3.5 mr-1" />Pagado
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Esta clase usa el sistema de pago antiguo.
+                      {selectedLesson.isPaid ? ' Estado: Pagada.' : ' Estado: Pendiente.'}
+                    </p>
+                    <Button variant="outline" size="sm" onClick={handleMigrateLessonPayments}>
+                      Migrar a pagos individuales
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <DialogFooter className="flex-col sm:flex-row gap-2">
-                <Button variant="outline" size="sm" onClick={handleToggleLessonPaid}>
-                  <Euro className="h-4 w-4 mr-1" />
-                  {editLessonIsPaid ? 'Marcar pendiente' : 'Marcar pagado'}
-                </Button>
                 <div className="flex gap-2 ml-auto">
                   <Button variant="outline" size="sm" onClick={() => setLessonEditMode(true)}>
                     <Edit2 className="h-4 w-4 mr-1" />Editar
@@ -659,10 +773,6 @@ export default function AgendaPage() {
               </div>
               <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={editLessonPrice} onChange={(e) => setEditLessonPrice(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Notas</Label><Input value={editLessonNotes} onChange={(e) => setEditLessonNotes(e.target.value)} placeholder="Notas (opcional)" /></div>
-              <div className="flex items-center gap-2">
-                <Checkbox checked={editLessonIsPaid} onCheckedChange={(v) => setEditLessonIsPaid(!!v)} />
-                <Label>Pagado</Label>
-              </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setLessonEditMode(false)}>Cancelar</Button>
                 <Button onClick={handleSaveLessonEdit}>Guardar cambios</Button>

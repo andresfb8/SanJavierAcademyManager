@@ -14,9 +14,10 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { Select } from '@/components/ui/select'
 import { useDataStore } from '@/stores/dataStore'
-import { PLAYER_LEVELS, DAYS_OF_WEEK } from '@/constants'
-import type { AttendanceEntry } from '@/types'
+import { PLAYER_LEVELS, DAYS_OF_WEEK, PAYMENT_METHODS } from '@/constants'
+import type { AttendanceEntry, PaymentMethod } from '@/types'
 import {
   ArrowLeft,
   CalendarDays,
@@ -112,11 +113,18 @@ export default function ClassDetailPage() {
     players,
     enrollments,
     attendance,
+    payments,
+    markPaymentPaid,
     addAttendanceRecord,
     updateAttendanceRecord,
     updatePlayer,
     addEventPayment,
   } = useDataStore()
+
+  // ===================
+  // STATE - Pagos
+  // ===================
+  const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
 
   // ===================
   // STATE - Anadir jugadores
@@ -219,6 +227,34 @@ export default function ClassDetailPage() {
         recoveryCredits: number
       }[]
   }, [activeEnrollments, players])
+
+  // Pagos del mes actual para este grupo
+  const currentMonthPayments = useMemo(() => {
+    if (!groupId) return []
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = now.getFullYear()
+    return payments.filter(
+      (p) => p.groupId === groupId && p.billingMonth === month && p.billingYear === year && p.status !== 'cancelado'
+    )
+  }, [payments, groupId])
+
+  const paymentSummary = useMemo(() => {
+    const paid = currentMonthPayments.filter((p) => p.status === 'pagado')
+    const pending = currentMonthPayments.filter((p) => p.status === 'pendiente')
+    return {
+      paidCount: paid.length,
+      pendingCount: pending.length,
+      totalPaid: paid.reduce((s, p) => s + p.amount, 0),
+      totalPending: pending.reduce((s, p) => s + p.amount, 0),
+      total: currentMonthPayments.length,
+    }
+  }, [currentMonthPayments])
+
+  function handleMarkGroupPaymentPaid(paymentId: string) {
+    const method = (paymentMethods[paymentId] || 'efectivo') as PaymentMethod
+    markPaymentPaid(paymentId, method)
+  }
 
   // Jugadores con creditos de recuperacion que NO estan en este grupo y NO estan ya en la asistencia
   const recoveryEligiblePlayers = useMemo(() => {
@@ -737,6 +773,89 @@ export default function ClassDetailPage() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ============================== */}
+        {/* ESTADO DE PAGOS DEL MES        */}
+        {/* ============================== */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Euro className="h-5 w-5" />
+              Estado de pagos del mes
+              {paymentSummary.total > 0 && (
+                <Badge
+                  variant="outline"
+                  className={paymentSummary.pendingCount === 0 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}
+                >
+                  {paymentSummary.paidCount}/{paymentSummary.total} pagados
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {currentMonthPayments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                <Euro className="h-8 w-8 mb-2 opacity-50" />
+                <p className="text-sm">No hay recibos generados para este mes.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Resumen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md border p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Cobrado</p>
+                    <p className="text-lg font-bold text-green-600">{paymentSummary.totalPaid.toFixed(2)} &euro;</p>
+                  </div>
+                  <div className="rounded-md border p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Pendiente</p>
+                    <p className="text-lg font-bold text-yellow-600">{paymentSummary.totalPending.toFixed(2)} &euro;</p>
+                  </div>
+                </div>
+
+                {/* Lista de pagos por alumno */}
+                <div className="space-y-2">
+                  {currentMonthPayments.map((payment) => {
+                    const isPaid = payment.status === 'pagado'
+                    return (
+                      <div key={payment.id} className="flex items-center justify-between rounded-md border px-3 py-2.5 gap-2">
+                        <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            className="text-sm font-medium text-primary hover:underline text-left truncate block"
+                            onClick={() => navigate(`/jugadores/${payment.playerId}`)}
+                          >
+                            {payment.playerName}
+                          </button>
+                          <p className="text-xs text-muted-foreground">{payment.amount.toFixed(2)} &euro;</p>
+                        </div>
+                        {isPaid ? (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge className="bg-green-100 text-green-800">Pagado</Badge>
+                            {payment.paymentMethod && (
+                              <span className="text-[10px] text-muted-foreground capitalize">{payment.paymentMethod}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Select
+                              className="w-32 h-8 text-xs"
+                              options={PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label }))}
+                              value={paymentMethods[payment.id] || 'efectivo'}
+                              onChange={(e) => setPaymentMethods((prev) => ({ ...prev, [payment.id]: e.target.value }))}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => handleMarkGroupPaymentPaid(payment.id)}>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Pagado
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
