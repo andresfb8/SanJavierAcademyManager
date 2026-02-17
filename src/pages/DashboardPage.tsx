@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Header } from '@/components/layout/Header'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { normalizeAllPayments } from '@/lib/payment-utils'
 import {
   Users,
   DollarSign,
@@ -22,6 +23,7 @@ import {
   Settings as SettingsIcon,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from 'lucide-react'
 import {
   BarChart,
@@ -52,6 +54,7 @@ const defaultKpiConfig: KpiConfig = {
   todayClasses: true,
   totalEnrolled: true,
   waitingList: true,
+  rotationIndex: true,
   // Chart visibility
   attendanceChart: true,
   levelChart: true,
@@ -60,7 +63,7 @@ const defaultKpiConfig: KpiConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const { players, payments, groups, activities, enrollments } = useDataStore()
+  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -75,6 +78,11 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(kpiConfig))
   }, [kpiConfig])
+
+  // Auto-generate receipts on mount
+  useEffect(() => {
+    checkAndAutoGenerateReceipts()
+  }, [checkAndAutoGenerateReceipts])
 
   const [chartCollapsed, setChartCollapsed] = useState<Record<string, boolean>>({})
 
@@ -92,44 +100,97 @@ export default function DashboardPage() {
   const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
-  const currentMonthPayments = payments.filter(
+  // Unificar todos los pagos (cuotas + eventos + clases particulares)
+  const allPayments = useMemo(
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
+    [payments, eventPayments, privateLessonPayments]
+  )
+
+  const currentMonthAllPayments = allPayments.filter(
     (p) => p.billingMonth === currentMonth && p.billingYear === currentYear
   )
-  const prevMonthPayments = payments.filter(
+  const prevMonthAllPayments = allPayments.filter(
     (p) => p.billingMonth === prevMonth && p.billingYear === prevYear
   )
 
-  const currentRevenue = currentMonthPayments
+  const currentRevenue = currentMonthAllPayments
     .filter((p) => p.status === 'pagado')
     .reduce((sum, p) => sum + p.amount, 0)
-  const prevRevenue = prevMonthPayments
+  const prevRevenue = prevMonthAllPayments
     .filter((p) => p.status === 'pagado')
     .reduce((sum, p) => sum + p.amount, 0)
   const revenueDiff = prevRevenue > 0 ? Math.round(((currentRevenue - prevRevenue) / prevRevenue) * 100) : 0
 
-  const currentPending = currentMonthPayments
+  const currentPending = currentMonthAllPayments
     .filter((p) => p.status === 'pendiente')
     .reduce((sum, p) => sum + p.amount, 0)
-  const prevPending = prevMonthPayments
+  const prevPending = prevMonthAllPayments
     .filter((p) => p.status === 'pendiente')
     .reduce((sum, p) => sum + p.amount, 0)
   const pendingDiff = prevPending > 0 ? Math.round(((currentPending - prevPending) / prevPending) * 100) : 0
 
   // Collection rate
-  const totalCurrentMonth = currentMonthPayments
+  const totalCurrentMonth = currentMonthAllPayments
     .filter((p) => p.status !== 'cancelado')
     .reduce((sum, p) => sum + p.amount, 0)
   const collectionRate = totalCurrentMonth > 0 ? Math.round((currentRevenue / totalCurrentMonth) * 100) : 0
 
-  // Attendance chart data (simulated weekly)
-  const attendanceData = [
-    { day: 'Lun', asistencia: 14, faltas: 2 },
-    { day: 'Mar', asistencia: 12, faltas: 3 },
-    { day: 'Mié', asistencia: 15, faltas: 1 },
-    { day: 'Jue', asistencia: 11, faltas: 4 },
-    { day: 'Vie', asistencia: 8, faltas: 2 },
-    { day: 'Sáb', asistencia: 6, faltas: 0 },
-  ]
+  // Rotation index KPI
+  const monthStart = new Date(currentYear, currentMonth - 1, 1)
+  const monthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59)
+
+  const altasEsteMes = players.filter(
+    (p) => p.registrationDate >= monthStart && p.registrationDate <= monthEnd
+  ).length
+  const bajasEsteMes = players.filter(
+    (p) => p.cancellationDate && p.cancellationDate >= monthStart && p.cancellationDate <= monthEnd
+  ).length
+  const rotationDivisor = activePlayers + bajasEsteMes
+  const rotationIndex = rotationDivisor > 0
+    ? Math.round(((bajasEsteMes + altasEsteMes) / rotationDivisor) * 100)
+    : 0
+
+  // Attendance chart data (real data from current week)
+  const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  const attendanceData = useMemo(() => {
+    // Get start of current week (Monday)
+    const todayDate = new Date()
+    const dayOfWeek = todayDate.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const weekStart = new Date(todayDate)
+    weekStart.setDate(todayDate.getDate() + mondayOffset)
+    weekStart.setHours(0, 0, 0, 0)
+
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    weekEnd.setHours(23, 59, 59, 999)
+
+    // Initialize data for Mon-Sat (indexes 1-6)
+    const weekDays = [1, 2, 3, 4, 5, 6] // Mon to Sat
+    const data = weekDays.map((d) => ({
+      day: DAY_LABELS[d],
+      asistencia: 0,
+      faltas: 0,
+    }))
+
+    // Iterate attendance records from the current week
+    for (const record of attendance) {
+      const recordDate = new Date(record.date)
+      if (recordDate < weekStart || recordDate > weekEnd) continue
+      const recordDay = recordDate.getDay()
+      const idx = weekDays.indexOf(recordDay)
+      if (idx === -1) continue
+
+      for (const entry of record.records) {
+        if (entry.status === 'presente') {
+          data[idx].asistencia++
+        } else if (entry.status === 'ausente' || entry.status === 'justificado') {
+          data[idx].faltas++
+        }
+      }
+    }
+    return data
+  }, [attendance])
 
   // Level distribution
   const levelData = [
@@ -140,13 +201,13 @@ export default function DashboardPage() {
     { name: 'Menores', value: players.filter((p) => p.level === 'menores' && p.status === 'activo').length, color: '#f59e0b' },
   ].filter((d) => d.value > 0)
 
-  // Financial chart data (last 6 months)
+  // Financial chart data (last 6 months) — incluye todos los origenes de pago
   const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
   const financialData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(currentYear, currentMonth - 1 - (5 - i), 1)
     const m = d.getMonth() + 1
     const y = d.getFullYear()
-    const monthPayments = payments.filter((p) => p.billingMonth === m && p.billingYear === y)
+    const monthPayments = allPayments.filter((p) => p.billingMonth === m && p.billingYear === y)
     return {
       month: MONTH_NAMES[d.getMonth()],
       cobrado: monthPayments.filter((p) => p.status === 'pagado').reduce((sum, p) => sum + p.amount, 0),
@@ -259,6 +320,14 @@ export default function DashboardPage() {
               value={players.filter((p) => p.status === 'lista_espera').length}
               icon={Clock}
               iconClassName="bg-orange-50 text-orange-600"
+            />
+          )}
+          {kpiConfig.rotationIndex && (
+            <StatCard
+              title="Índice de rotación"
+              value={`${rotationIndex}%`}
+              icon={RefreshCw}
+              iconClassName="bg-teal-50 text-teal-600"
             />
           )}
         </div>
@@ -518,6 +587,7 @@ export default function DashboardPage() {
                 { key: 'todayClasses', label: 'Clases de hoy' },
                 { key: 'totalEnrolled', label: 'Total alumnos inscritos' },
                 { key: 'waitingList', label: 'Lista de espera' },
+                { key: 'rotationIndex', label: 'Índice de rotación' },
               ].map((item) => (
                 <div key={item.key} className="flex items-center gap-3">
                   <Checkbox

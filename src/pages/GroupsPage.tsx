@@ -15,8 +15,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { Plus, Search, Users, Clock, MapPin, User, Trash2, Edit2, LayoutGrid, List, FileDown } from 'lucide-react'
 import { generateId } from '@/lib/utils'
-import { PLAYER_LEVELS, DAYS_OF_WEEK, BILLING_FREQUENCIES, MONTHS } from '@/constants'
-import type { Group, PlayerLevel, BillingFrequency, ScheduleSlot } from '@/types'
+import { PLAYER_LEVELS, DAYS_OF_WEEK } from '@/constants'
+import type { Group, PlayerLevel, ScheduleSlot } from '@/types'
 import { generateGroupsListReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -30,8 +30,6 @@ interface GroupFormState {
   schedule: ScheduleSlot[]
   maxCapacity: number
   defaultTariffId: string
-  billingFrequency: BillingFrequency
-  installmentMonths: number[]
   startDate: string
   endDate: string
 }
@@ -44,8 +42,6 @@ const emptyForm: GroupFormState = {
   schedule: [],
   maxCapacity: 4,
   defaultTariffId: '',
-  billingFrequency: 'monthly',
-  installmentMonths: [],
   startDate: '',
   endDate: '',
 }
@@ -148,8 +144,6 @@ export default function GroupsPage() {
       schedule: [...group.schedule],
       maxCapacity: group.maxCapacity,
       defaultTariffId: group.defaultTariffId,
-      billingFrequency: group.billingFrequency,
-      installmentMonths: group.installmentMonths ? [...group.installmentMonths] : [],
       startDate: group.startDate instanceof Date
         ? group.startDate.toISOString().split('T')[0]
         : new Date(group.startDate).toISOString().split('T')[0],
@@ -177,15 +171,6 @@ export default function GroupsPage() {
     })
   }
 
-  const toggleInstallmentMonth = (month: number) => {
-    const current = form.installmentMonths
-    if (current.includes(month)) {
-      setForm({ ...form, installmentMonths: current.filter((m) => m !== month) })
-    } else {
-      setForm({ ...form, installmentMonths: [...current, month].sort((a, b) => a - b) })
-    }
-  }
-
   const handleSubmit = () => {
     const selectedCoach = coaches.find((c) => c.id === form.coachId)
     const selectedCourt = courts.find((c) => c.id === form.courtId)
@@ -194,6 +179,8 @@ export default function GroupsPage() {
     const coachName = selectedCoach ? `${selectedCoach.firstName} ${selectedCoach.lastName}` : ''
     const courtName = selectedCourt ? selectedCourt.name : ''
     const tariffPrice = selectedTariff ? selectedTariff.price : 0
+    const billingFrequency = selectedTariff?.billingFrequency ?? 'monthly'
+    const installmentMonths = selectedTariff?.installmentMonths
 
     if (editingGroup) {
       updateGroup(editingGroup.id, {
@@ -207,8 +194,8 @@ export default function GroupsPage() {
         maxCapacity: form.maxCapacity,
         defaultTariffId: form.defaultTariffId,
         defaultTariffPrice: tariffPrice,
-        billingFrequency: form.billingFrequency,
-        installmentMonths: form.billingFrequency === 'installments' ? form.installmentMonths : undefined,
+        billingFrequency,
+        installmentMonths,
         startDate: new Date(form.startDate),
         endDate: new Date(form.endDate),
       })
@@ -224,8 +211,8 @@ export default function GroupsPage() {
         maxCapacity: form.maxCapacity,
         defaultTariffId: form.defaultTariffId,
         defaultTariffPrice: tariffPrice,
-        billingFrequency: form.billingFrequency,
-        installmentMonths: form.billingFrequency === 'installments' ? form.installmentMonths : undefined,
+        billingFrequency,
+        installmentMonths,
         startDate: new Date(form.startDate),
         endDate: new Date(form.endDate),
         isActive: true,
@@ -620,45 +607,14 @@ export default function GroupsPage() {
                     { value: '', label: 'Seleccionar tarifa' },
                     ...activeTariffs.map((t) => ({
                       value: t.id,
-                      label: `${t.name} - ${t.price.toFixed(2)} €`,
+                      label: `${t.name} - ${t.price.toFixed(2)} € (${t.billingFrequency === 'installments' ? 'Por plazos' : 'Mensual'})`,
                     })),
                   ]}
                   value={form.defaultTariffId}
                   onChange={(e) => setForm({ ...form, defaultTariffId: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Frecuencia de facturación</Label>
-                <Select
-                  options={BILLING_FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))}
-                  value={form.billingFrequency}
-                  onChange={(e) => setForm({ ...form, billingFrequency: e.target.value as BillingFrequency })}
-                />
-              </div>
             </div>
-
-            {/* Installment months */}
-            {form.billingFrequency === 'installments' && (
-              <div className="space-y-2">
-                <Label>Meses de cobro</Label>
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                  {MONTHS.map((m) => (
-                    <label
-                      key={m.value}
-                      className="flex items-center gap-2 text-sm cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.installmentMonths.includes(m.value)}
-                        onChange={() => toggleInstallmentMonth(m.value)}
-                        className="rounded border-gray-300"
-                      />
-                      <span>{m.label.substring(0, 3)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Dates */}
             <div className="grid grid-cols-2 gap-4">

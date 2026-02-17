@@ -24,10 +24,12 @@ import {
   ArrowDown,
   BarChart3,
   TableIcon,
+  Plus,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { PAYMENT_STATUSES, PAYMENT_METHODS, MONTHS } from '@/constants'
-import type { Payment, PaymentMethod } from '@/types'
+import { normalizeAllPayments } from '@/lib/payment-utils'
+import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
+import type { Payment, PaymentMethod, PaymentCategory } from '@/types'
 import {
   useReactTable,
   getCoreRowModel,
@@ -79,7 +81,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, markPaymentPaid, generateMonthlyReceipts } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, markPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -92,6 +94,16 @@ export default function PaymentsPage() {
   // Mark as paid dialog
   const [paymentToMark, setPaymentToMark] = useState<Payment | null>(null)
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('transferencia')
+
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
+
+  // Manual payment dialog
+  const [manualDialogOpen, setManualDialogOpen] = useState(false)
+  const [manualPlayerId, setManualPlayerId] = useState('')
+  const [manualConcept, setManualConcept] = useState('')
+  const [manualAmount, setManualAmount] = useState('')
+  const [manualCategory, setManualCategory] = useState<PaymentCategory>('manual')
+  const [manualNotes, setManualNotes] = useState('')
 
   // TanStack Table sorting state
   const [sorting, setSorting] = useState<SortingState>([])
@@ -111,6 +123,12 @@ export default function PaymentsPage() {
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [groups])
 
+  // Active players for manual payment selector
+  const activePlayers = useMemo(
+    () => players.filter((p) => p.status === 'activo').sort((a, b) => a.lastName.localeCompare(b.lastName)),
+    [players]
+  )
+
   // Filtered payments (for monthly view)
   const filteredPayments = useMemo(() => {
     return payments.filter((p) => {
@@ -120,38 +138,45 @@ export default function PaymentsPage() {
         p.concept.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === '' || p.status === statusFilter
       const matchesGroup = groupFilter === '' || p.groupId === groupFilter
+      const matchesCategory = categoryFilter === '' || (p.category ?? 'cuota') === categoryFilter
       const matchesMonth = p.billingMonth === selectedMonth
       const matchesYear = p.billingYear === selectedYear
-      return matchesSearch && matchesStatus && matchesGroup && matchesMonth && matchesYear
+      return matchesSearch && matchesStatus && matchesGroup && matchesCategory && matchesMonth && matchesYear
     })
-  }, [payments, search, statusFilter, groupFilter, selectedMonth, selectedYear])
+  }, [payments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear])
 
-  // KPI calculations for current selected month
-  const currentMonthPayments = useMemo(() => {
-    return payments.filter(
+  // Unificar todos los pagos para KPIs globales
+  const allPayments = useMemo(
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
+    [payments, eventPayments, privateLessonPayments]
+  )
+
+  // KPI calculations for current selected month (usando TODOS los origenes)
+  const currentMonthAllPayments = useMemo(() => {
+    return allPayments.filter(
       (p) => p.billingMonth === selectedMonth && p.billingYear === selectedYear
     )
-  }, [payments, selectedMonth, selectedYear])
+  }, [allPayments, selectedMonth, selectedYear])
 
-  const previousMonthPayments = useMemo(() => {
+  const previousMonthAllPayments = useMemo(() => {
     const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1
     const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear
-    return payments.filter(
+    return allPayments.filter(
       (p) => p.billingMonth === prevMonth && p.billingYear === prevYear
     )
-  }, [payments, selectedMonth, selectedYear])
+  }, [allPayments, selectedMonth, selectedYear])
 
   const ingresosMes = useMemo(() => {
-    return currentMonthPayments
+    return currentMonthAllPayments
       .filter((p) => p.status === 'pagado')
       .reduce((sum, p) => sum + p.amount, 0)
-  }, [currentMonthPayments])
+  }, [currentMonthAllPayments])
 
   const ingresosMesAnterior = useMemo(() => {
-    return previousMonthPayments
+    return previousMonthAllPayments
       .filter((p) => p.status === 'pagado')
       .reduce((sum, p) => sum + p.amount, 0)
-  }, [previousMonthPayments])
+  }, [previousMonthAllPayments])
 
   const ingresosTrend = useMemo(() => {
     if (ingresosMesAnterior === 0) return 0
@@ -159,23 +184,23 @@ export default function PaymentsPage() {
   }, [ingresosMes, ingresosMesAnterior])
 
   const pendienteCobro = useMemo(() => {
-    return currentMonthPayments
+    return currentMonthAllPayments
       .filter((p) => p.status === 'pendiente')
       .reduce((sum, p) => sum + p.amount, 0)
-  }, [currentMonthPayments])
+  }, [currentMonthAllPayments])
 
   const tasaCobro = useMemo(() => {
-    if (currentMonthPayments.length === 0) return 0
-    const pagados = currentMonthPayments.filter((p) => p.status === 'pagado').length
-    return Math.round((pagados / currentMonthPayments.length) * 100)
-  }, [currentMonthPayments])
+    if (currentMonthAllPayments.length === 0) return 0
+    const pagados = currentMonthAllPayments.filter((p) => p.status === 'pagado').length
+    return Math.round((pagados / currentMonthAllPayments.length) * 100)
+  }, [currentMonthAllPayments])
 
-  const totalRecibos = currentMonthPayments.length
+  const totalRecibos = currentMonthAllPayments.length
 
-  // --- Annual summary data ---
+  // --- Annual summary data (usando TODOS los origenes) ---
   const annualSummary = useMemo<AnnualSummaryRow[]>(() => {
     return MONTHS.map((m) => {
-      const monthPayments = payments.filter(
+      const monthPayments = allPayments.filter(
         (p) => p.billingMonth === m.value && p.billingYear === selectedYear
       )
       const ingresos = monthPayments
@@ -197,14 +222,14 @@ export default function PaymentsPage() {
         recibos: total,
       }
     })
-  }, [payments, selectedYear])
+  }, [allPayments, selectedYear])
 
   const annualTotals = useMemo(() => {
     const totalIngresos = annualSummary.reduce((sum, r) => sum + r.ingresos, 0)
     const totalPendiente = annualSummary.reduce((sum, r) => sum + r.pendiente, 0)
     const totalRecibos = annualSummary.reduce((sum, r) => sum + r.recibos, 0)
     const totalPagados = annualSummary.reduce((sum, r) => {
-      const monthPayments = payments.filter(
+      const monthPayments = allPayments.filter(
         (p) => p.billingMonth === r.month && p.billingYear === selectedYear && p.status === 'pagado'
       )
       return sum + monthPayments.length
@@ -212,7 +237,7 @@ export default function PaymentsPage() {
     const tasaCobroAnual = totalRecibos > 0 ? Math.round((totalPagados / totalRecibos) * 100) : 0
 
     return { totalIngresos, totalPendiente, tasaCobroAnual, totalRecibos }
-  }, [annualSummary, payments, selectedYear])
+  }, [annualSummary, allPayments, selectedYear])
 
   // --- TanStack React Table columns ---
   const columns = useMemo<ColumnDef<Payment>[]>(
@@ -233,9 +258,20 @@ export default function PaymentsPage() {
         accessorKey: 'groupName',
         header: ({ column }) => <SortableHeader column={column}>Grupo</SortableHeader>,
         cell: ({ getValue }) => (
-          <span className="text-sm text-muted-foreground">{getValue<string>()}</span>
+          <span className="text-sm text-muted-foreground">{getValue<string>() || '--'}</span>
         ),
         meta: { className: 'hidden md:table-cell' },
+      },
+      {
+        accessorKey: 'category',
+        header: 'Categoria',
+        cell: ({ getValue }) => {
+          const cat = getValue<PaymentCategory | undefined>() ?? 'cuota'
+          const info = PAYMENT_CATEGORIES.find((c) => c.value === cat)
+          return <span className="text-xs text-muted-foreground">{info?.label ?? cat}</span>
+        },
+        enableSorting: false,
+        meta: { className: 'hidden lg:table-cell' },
       },
       {
         accessorKey: 'amount',
@@ -380,11 +416,12 @@ export default function PaymentsPage() {
     } else {
       // Export monthly detail
       const wsData = [
-        ['Jugador', 'Concepto', 'Grupo', 'Importe', 'Estado', 'Vencimiento', 'Fecha pago', 'Metodo'],
+        ['Jugador', 'Concepto', 'Grupo', 'Categoria', 'Importe', 'Estado', 'Vencimiento', 'Fecha pago', 'Metodo'],
         ...filteredPayments.map((p) => [
           p.playerName,
           p.concept,
-          p.groupName,
+          p.groupName || '',
+          PAYMENT_CATEGORIES.find((c) => c.value === (p.category ?? 'cuota'))?.label ?? p.category ?? 'Cuota',
           p.amount,
           p.status === 'pagado' ? 'Pagado' : p.status === 'pendiente' ? 'Pendiente' : 'Cancelado',
           p.dueDate ? formatDate(new Date(p.dueDate)) : '',
@@ -396,13 +433,37 @@ export default function PaymentsPage() {
       ]
       const ws = XLSX.utils.aoa_to_sheet(wsData)
       ws['!cols'] = [
-        { wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 12 },
+        { wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 12 },
         { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
       ]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Pagos')
       XLSX.writeFile(wb, `pagos_${selectedMonth}_${selectedYear}.xlsx`)
     }
+  }
+
+  const openManualPaymentDialog = () => {
+    setManualPlayerId(activePlayers[0]?.id ?? '')
+    setManualConcept('')
+    setManualAmount('')
+    setManualCategory('manual')
+    setManualNotes('')
+    setManualDialogOpen(true)
+  }
+
+  const handleSaveManualPayment = () => {
+    if (!manualPlayerId || !manualConcept || !manualAmount) return
+    const player = players.find((p) => p.id === manualPlayerId)
+    if (!player) return
+    addManualPayment({
+      playerId: manualPlayerId,
+      playerName: `${player.firstName} ${player.lastName}`,
+      concept: manualConcept,
+      amount: parseFloat(manualAmount) || 0,
+      category: manualCategory,
+      notes: manualNotes || undefined,
+    })
+    setManualDialogOpen(false)
   }
 
   const openMarkPaidDialog = (payment: Payment) => {
@@ -434,13 +495,19 @@ export default function PaymentsPage() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExportXLSX}>
               <Download className="h-4 w-4 mr-1" />
-              Exportar XLSX
+              <span className="hidden sm:inline">Exportar XLSX</span>
             </Button>
             {viewMode === 'mensual' && (
-              <Button size="sm" onClick={handleGenerateReceipts}>
-                <FileText className="h-4 w-4 mr-1" />
-                Generar recibos
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={openManualPaymentDialog}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Nuevo pago</span>
+                </Button>
+                <Button size="sm" onClick={handleGenerateReceipts}>
+                  <FileText className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Generar recibos</span>
+                </Button>
+              </>
             )}
           </div>
         }
@@ -590,6 +657,15 @@ export default function PaymentsPage() {
                 ]}
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
+                className="w-full sm:w-48"
+              />
+              <Select
+                options={[
+                  { value: '', label: 'Todas las categorias' },
+                  ...PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
+                ]}
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full sm:w-48"
               />
             </div>
@@ -815,6 +891,53 @@ export default function PaymentsPage() {
             <Button onClick={handleMarkPaid}>
               <CreditCard className="h-4 w-4 mr-1" />
               Confirmar pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Payment Dialog */}
+      <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo pago manual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Jugador</Label>
+              <Select
+                options={activePlayers.map((p) => ({ value: p.id, label: `${p.lastName}, ${p.firstName}` }))}
+                value={manualPlayerId}
+                onChange={(e) => setManualPlayerId(e.target.value)}
+                placeholder="Seleccionar jugador"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Concepto</Label>
+              <Input value={manualConcept} onChange={(e) => setManualConcept(e.target.value)} placeholder="Ej: Material deportivo, Clinica especial..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Importe (&euro;)</Label>
+              <Input type="number" min="0" step="0.01" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Categoria</Label>
+              <Select
+                options={PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+                value={manualCategory}
+                onChange={(e) => setManualCategory(e.target.value as PaymentCategory)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notas</Label>
+              <Input value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="Notas adicionales (opcional)" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveManualPayment} disabled={!manualPlayerId || !manualConcept || !manualAmount}>
+              <Plus className="h-4 w-4 mr-1" />
+              Crear pago
             </Button>
           </DialogFooter>
         </DialogContent>

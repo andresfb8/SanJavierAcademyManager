@@ -39,6 +39,7 @@ export interface Tariff {
   price: number
   billingFrequency: BillingFrequency
   installmentMonths?: number[]
+  installmentPrices?: Record<number, number>
   description?: string
   isActive: boolean
   createdAt: Date
@@ -92,6 +93,7 @@ export interface Player {
   level: PlayerLevel
   dominantHand: DominantHand
   position: PlayerPosition
+  licenseNumber?: string
   previousExperience?: string
   medicalNotes?: string
   // Datos bancarios
@@ -114,6 +116,8 @@ export interface Player {
 }
 
 // --- Entrenador ---
+export type StaffRole = 'entrenador' | 'coordinador' | 'director'
+
 export interface Coach {
   id: string
   firstName: string
@@ -128,6 +132,7 @@ export interface Coach {
   certifications?: string
   photo?: string
   userId?: string
+  staffRole?: StaffRole
   notes?: string
   createdAt: Date
 }
@@ -200,15 +205,17 @@ export interface AttendanceRecord {
 // --- Pago ---
 export type PaymentStatus = 'pendiente' | 'pagado' | 'cancelado'
 export type PaymentMethod = 'transferencia' | 'efectivo' | 'domiciliacion' | 'tarjeta'
+export type PaymentCategory = 'cuota' | 'evento' | 'clase_particular' | 'manual' | 'otro'
 
 export interface Payment {
   id: string
   playerId: string
   playerName: string
-  groupId: string
-  groupName: string
-  enrollmentId: string
+  groupId?: string
+  groupName?: string
+  enrollmentId?: string
   concept: string
+  category?: PaymentCategory
   amount: number
   status: PaymentStatus
   billingMonth: number
@@ -297,6 +304,7 @@ export interface AcademyEvent {
   price: number
   maxCapacity?: number
   description?: string
+  guestNames?: string[]
   isActive: boolean
   createdAt: Date
 }
@@ -306,6 +314,20 @@ export interface EventPayment {
   id: string
   eventId: string
   eventName: string
+  playerId: string
+  playerName: string
+  amount: number
+  status: PaymentStatus
+  paymentMethod?: PaymentMethod
+  paidDate?: Date
+  createdAt: Date
+}
+
+// --- Pago de Clase Particular ---
+export interface PrivateLessonPayment {
+  id: string
+  lessonId: string
+  lessonDate: Date
   playerId: string
   playerName: string
   amount: number

@@ -16,6 +16,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import PlanningPage from '@/pages/PlanningPage'
 import UsersPage from '@/pages/UsersPage'
 import ActivateAccountPage from '@/pages/ActivateAccountPage'
+import EventsActivitiesPage from '@/pages/EventsActivitiesPage'
 import EventDetailPage from '@/pages/EventDetailPage'
 import ClassDetailPage from '@/pages/ClassDetailPage'
 import CoachProfilePage from '@/pages/CoachProfilePage'
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/grupos/:id" element={<GroupDetailPage />} />
         <Route path="/asistencia" element={<AttendancePage />} />
         <Route path="/agenda" element={<AgendaPage />} />
+        <Route path="/eventos" element={<EventsActivitiesPage />} />
         <Route path="/eventos/:id" element={<EventDetailPage />} />
         <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
         <Route path="/pagos" element={<PaymentsPage />} />

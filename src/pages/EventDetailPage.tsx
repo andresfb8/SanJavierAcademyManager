@@ -4,9 +4,14 @@ import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import {
   ArrowLeft,
@@ -20,9 +25,12 @@ import {
   Calendar,
   FileText,
   CheckCircle,
+  Edit2,
+  Trash2,
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
+import type { EventType } from '@/types'
 
 // ==========================================
 // EventDetailPage - Detalle de evento
@@ -36,7 +44,10 @@ export default function EventDetailPage() {
     events,
     eventPayments,
     players,
+    coaches,
+    courts,
     updateEvent,
+    deleteEvent,
     addEventPayment,
     updateEventPayment,
   } = useDataStore()
@@ -45,6 +56,19 @@ export default function EventDetailPage() {
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
   // Estado para metodo de pago al marcar pagado
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
+  // Estado para edicion y eliminacion
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editType, setEditType] = useState<EventType>('mini_torneo')
+  const [editDate, setEditDate] = useState('')
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
+  const [editCourtIds, setEditCourtIds] = useState<string[]>([])
+  const [editCoachIds, setEditCoachIds] = useState<string[]>([])
+  const [editPrice, setEditPrice] = useState('')
+  const [editMaxCapacity, setEditMaxCapacity] = useState('')
+  const [editDescription, setEditDescription] = useState('')
 
   // ===================
   // DATOS DERIVADOS
@@ -144,6 +168,65 @@ export default function EventDetailPage() {
     })
   }
 
+  const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
+  const activeCoaches = useMemo(
+    () => coaches.filter((c) => c.isActive).sort((a, b) => a.lastName.localeCompare(b.lastName)),
+    [coaches]
+  )
+
+  const openEditDialog = () => {
+    if (!event) return
+    const d = event.date instanceof Date ? event.date : new Date(event.date)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    setEditName(event.name)
+    setEditType(event.type)
+    setEditDate(`${y}-${m}-${day}`)
+    setEditStartTime(event.startTime)
+    setEditEndTime(event.endTime)
+    setEditCourtIds([...event.courtIds])
+    setEditCoachIds([...event.coachIds])
+    setEditPrice(String(event.price))
+    setEditMaxCapacity(event.maxCapacity !== undefined ? String(event.maxCapacity) : '')
+    setEditDescription(event.description ?? '')
+    setEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = () => {
+    if (!event || !editName || editCourtIds.length === 0) return
+    const selectedCourts = activeCourts.filter((c) => editCourtIds.includes(c.id))
+    const selectedCoaches = activeCoaches.filter((c) => editCoachIds.includes(c.id))
+    updateEvent(event.id, {
+      name: editName,
+      type: editType,
+      date: new Date(editDate + 'T00:00:00'),
+      startTime: editStartTime,
+      endTime: editEndTime,
+      courtIds: editCourtIds,
+      courtNames: selectedCourts.map((c) => c.name),
+      coachIds: editCoachIds,
+      coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
+      price: parseFloat(editPrice) || 0,
+      maxCapacity: editMaxCapacity ? parseInt(editMaxCapacity) : undefined,
+      description: editDescription || undefined,
+    })
+    setEditDialogOpen(false)
+  }
+
+  const handleDelete = () => {
+    if (!event) return
+    deleteEvent(event.id)
+    navigate('/eventos')
+  }
+
+  function toggleEditCourt(courtId: string) {
+    setEditCourtIds((prev) => prev.includes(courtId) ? prev.filter((id) => id !== courtId) : [...prev, courtId])
+  }
+  function toggleEditCoach(coachId: string) {
+    setEditCoachIds((prev) => prev.includes(coachId) ? prev.filter((id) => id !== coachId) : [...prev, coachId])
+  }
+
   // ===================
   // GUARDAS
   // ===================
@@ -175,10 +258,20 @@ export default function EventDetailPage() {
         title={event.name}
         subtitle={`${eventTypeInfo?.label ?? event.type} · ${formatDate(new Date(event.date))}`}
         actions={
-          <Button variant="outline" size="sm" onClick={() => navigate('/agenda')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={openEditDialog}>
+              <Edit2 className="h-4 w-4 mr-1" />
+              Editar
+            </Button>
+            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Eliminar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/agenda')}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Volver
+            </Button>
+          </div>
         }
       />
 
@@ -329,15 +422,25 @@ export default function EventDetailPage() {
                     return (
                       <TableRow key={playerId}>
                         <TableCell>
-                          <button
-                            className="flex items-center gap-3 text-left hover:underline"
-                            onClick={() => navigate(`/jugadores/${playerId}`)}
-                          >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
-                              {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                          {playerId.startsWith('guest-') ? (
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-medium shrink-0">
+                                {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                              </div>
+                              <span className="font-medium text-sm text-muted-foreground">{playerName}</span>
+                              <Badge variant="outline" className="text-[10px]">Invitado</Badge>
                             </div>
-                            <span className="font-medium text-sm">{playerName}</span>
-                          </button>
+                          ) : (
+                            <button
+                              className="flex items-center gap-3 text-left hover:underline"
+                              onClick={() => navigate(`/jugadores/${playerId}`)}
+                            >
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
+                                {playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                              </div>
+                              <span className="font-medium text-sm">{playerName}</span>
+                            </button>
+                          )}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={payment?.status ?? 'pendiente'} />
@@ -442,6 +545,62 @@ export default function EventDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Dialogo de edicion */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar evento</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5"><Label>Nombre</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Tipo</Label><Select value={editType} onChange={(e) => setEditType(e.target.value as EventType)} options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))} /></div>
+            <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label>Hora inicio</Label><Input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Hora fin</Label><Input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Pistas</Label>
+              <div className="max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
+                {activeCourts.map((court) => (
+                  <label key={court.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={editCourtIds.includes(court.id)} onCheckedChange={() => toggleEditCourt(court.id)} /><span>{court.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Entrenadores</Label>
+              <div className="max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
+                {activeCoaches.map((coach) => (
+                  <label key={coach.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={editCoachIds.includes(coach.id)} onCheckedChange={() => toggleEditCoach(coach.id)} /><span>{coach.firstName} {coach.lastName}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Capacidad max.</Label><Input type="number" min="1" value={editMaxCapacity} onChange={(e) => setEditMaxCapacity(e.target.value)} placeholder="Sin limite" /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Descripcion</Label><Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Descripcion (opcional)" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={!editName || editCourtIds.length === 0}>Guardar cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogo de confirmacion de eliminacion */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Eliminar evento"
+        description="¿Estas seguro de que deseas eliminar este evento? Esta accion no se puede deshacer."
+        variant="destructive"
+        confirmLabel="Eliminar"
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

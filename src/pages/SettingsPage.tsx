@@ -56,7 +56,8 @@ export default function SettingsPage() {
   const [editingTariffId, setEditingTariffId] = useState<string | null>(null)
   const [tariffForm, setTariffForm] = useState({
     name: '', price: 0, billingFrequency: 'monthly' as BillingFrequency,
-    installmentMonths: [] as number[], description: '', isActive: true,
+    installmentMonths: [] as number[], installmentPrices: {} as Record<number, number>,
+    description: '', isActive: true,
   })
   const [deleteTariffId, setDeleteTariffId] = useState<string | null>(null)
 
@@ -93,11 +94,23 @@ export default function SettingsPage() {
   }
 
   const handleSaveTariff = () => {
+    // Build installmentPrices only with months that have a custom price
+    const cleanPrices: Record<number, number> = {}
+    if (tariffForm.billingFrequency === 'installments') {
+      for (const month of tariffForm.installmentMonths) {
+        if (tariffForm.installmentPrices[month] && tariffForm.installmentPrices[month] !== tariffForm.price) {
+          cleanPrices[month] = tariffForm.installmentPrices[month]
+        }
+      }
+    }
+    const hasCustomPrices = Object.keys(cleanPrices).length > 0
+
     const data = {
       name: tariffForm.name,
       price: tariffForm.price,
       billingFrequency: tariffForm.billingFrequency,
       installmentMonths: tariffForm.billingFrequency === 'installments' ? tariffForm.installmentMonths : undefined,
+      installmentPrices: hasCustomPrices ? cleanPrices : undefined,
       description: tariffForm.description || undefined,
       isActive: tariffForm.isActive,
     }
@@ -111,7 +124,7 @@ export default function SettingsPage() {
   }
 
   const resetTariffForm = () => {
-    setTariffForm({ name: '', price: 0, billingFrequency: 'monthly', installmentMonths: [], description: '', isActive: true })
+    setTariffForm({ name: '', price: 0, billingFrequency: 'monthly', installmentMonths: [], installmentPrices: {}, description: '', isActive: true })
     setEditingTariffId(null)
   }
 
@@ -122,6 +135,7 @@ export default function SettingsPage() {
       name: tariff.name, price: tariff.price,
       billingFrequency: tariff.billingFrequency,
       installmentMonths: tariff.installmentMonths || [],
+      installmentPrices: tariff.installmentPrices ? { ...tariff.installmentPrices } : {},
       description: tariff.description || '', isActive: tariff.isActive,
     })
     setEditingTariffId(id)
@@ -262,10 +276,18 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
+                        <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">{tariff.billingFrequency === 'monthly' ? '/mes' : ' base'}</span></p>
                         <p className="text-sm text-muted-foreground">
                           {tariff.billingFrequency === 'monthly' ? 'Facturación mensual' : `Plazos: ${tariff.installmentMonths?.map((m) => MONTHS.find((mo) => mo.value === m)?.label.slice(0, 3)).join(', ')}`}
                         </p>
+                        {tariff.billingFrequency === 'installments' && tariff.installmentPrices && Object.keys(tariff.installmentPrices).length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {tariff.installmentMonths
+                              ?.filter((m) => tariff.installmentPrices?.[m])
+                              .map((m) => `${MONTHS.find((mo) => mo.value === m)?.label.slice(0, 3)}: ${formatCurrency(tariff.installmentPrices![m])}`)
+                              .join(', ')}
+                          </p>
+                        )}
                         {tariff.description && <p className="text-xs text-muted-foreground">{tariff.description}</p>}
                       </div>
                     </CardContent>
@@ -328,27 +350,70 @@ export default function SettingsPage() {
               <Select options={BILLING_FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))} value={tariffForm.billingFrequency} onChange={(e) => setTariffForm({ ...tariffForm, billingFrequency: e.target.value as BillingFrequency })} />
             </div>
             {tariffForm.billingFrequency === 'installments' && (
-              <div className="space-y-2">
-                <Label>Meses de facturación</Label>
-                <div className="flex flex-wrap gap-2">
-                  {MONTHS.map((m) => (
-                    <label key={m.value} className="flex items-center gap-1.5 text-sm">
-                      <Checkbox
-                        checked={tariffForm.installmentMonths.includes(m.value)}
-                        onCheckedChange={(checked) => {
-                          setTariffForm({
-                            ...tariffForm,
-                            installmentMonths: checked
+              <>
+                <div className="space-y-2">
+                  <Label>Meses de facturación</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {MONTHS.map((m) => (
+                      <label key={m.value} className="flex items-center gap-1.5 text-sm">
+                        <Checkbox
+                          checked={tariffForm.installmentMonths.includes(m.value)}
+                          onCheckedChange={(checked) => {
+                            const newMonths = checked
                               ? [...tariffForm.installmentMonths, m.value]
-                              : tariffForm.installmentMonths.filter((v) => v !== m.value),
-                          })
-                        }}
-                      />
-                      {m.label.slice(0, 3)}
-                    </label>
-                  ))}
+                              : tariffForm.installmentMonths.filter((v) => v !== m.value)
+                            const newPrices = { ...tariffForm.installmentPrices }
+                            if (!checked) delete newPrices[m.value]
+                            setTariffForm({
+                              ...tariffForm,
+                              installmentMonths: newMonths,
+                              installmentPrices: newPrices,
+                            })
+                          }}
+                        />
+                        {m.label.slice(0, 3)}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+                {tariffForm.installmentMonths.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Precio por plazo</Label>
+                    <p className="text-xs text-muted-foreground">Deja en blanco para usar el precio base ({formatCurrency(tariffForm.price)})</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {tariffForm.installmentMonths
+                        .slice()
+                        .sort((a, b) => a - b)
+                        .map((month) => {
+                          const monthLabel = MONTHS.find((m) => m.value === month)?.label ?? `Mes ${month}`
+                          return (
+                            <div key={month} className="flex items-center gap-2">
+                              <span className="text-sm w-12 shrink-0">{monthLabel.slice(0, 3)}</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                placeholder={String(tariffForm.price)}
+                                value={tariffForm.installmentPrices[month] ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  const newPrices = { ...tariffForm.installmentPrices }
+                                  if (val === '' || val === '0') {
+                                    delete newPrices[month]
+                                  } else {
+                                    newPrices[month] = Number(val)
+                                  }
+                                  setTariffForm({ ...tariffForm, installmentPrices: newPrices })
+                                }}
+                                className="h-8"
+                              />
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div className="space-y-2">
               <Label>Descripción</Label>

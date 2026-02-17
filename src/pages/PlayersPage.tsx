@@ -91,6 +91,7 @@ export default function PlayersPage() {
       level: formData.level,
       dominantHand: formData.dominantHand,
       position: formData.position,
+      licenseNumber: formData.licenseNumber || undefined,
       previousExperience: formData.previousExperience || undefined,
       medicalNotes: formData.medicalNotes || undefined,
       bankAccountHolder: formData.bankAccountHolder,
@@ -158,6 +159,7 @@ export default function PlayersPage() {
       'CP': p.postalCode,
       'Mano': p.dominantHand,
       'Posicion': p.position,
+      'Licencia': p.licenseNumber || '',
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
