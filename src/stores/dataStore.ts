@@ -23,6 +23,7 @@ import type {
   Invitation,
   AcademyEvent,
   EventPayment,
+  PrivateLessonPayment,
   Evaluation,
   MatchReport,
   CoachSalaryConfig,
@@ -68,6 +69,7 @@ interface DataState {
   invitations: Invitation[]
   events: AcademyEvent[]
   eventPayments: EventPayment[]
+  privateLessonPayments: PrivateLessonPayment[]
   evaluations: Evaluation[]
   matchReports: MatchReport[]
   coachSalaryConfigs: CoachSalaryConfig[]
@@ -126,9 +128,14 @@ interface DataState {
   addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => void
 
   // --- Private Lessons ---
-  addPrivateLesson: (lesson: Omit<PrivateLesson, 'id' | 'createdAt'>) => void
+  addPrivateLesson: (lesson: Omit<PrivateLesson, 'id' | 'createdAt'>) => string
   updatePrivateLesson: (id: string, data: Partial<PrivateLesson>) => void
   deletePrivateLesson: (id: string) => void
+
+  // --- Private Lesson Payments ---
+  addPrivateLessonPayment: (payment: Omit<PrivateLessonPayment, 'id' | 'createdAt'>) => void
+  updatePrivateLessonPayment: (id: string, data: Partial<PrivateLessonPayment>) => void
+  deletePrivateLessonPaymentsByLesson: (lessonId: string) => void
 
   // --- Invitations ---
   addInvitation: (invitation: Omit<Invitation, 'id'>) => void
@@ -211,6 +218,7 @@ export const useDataStore = create<DataState>()(
   invitations: [],
   events: [],
   eventPayments: [],
+  privateLessonPayments: [],
   evaluations: [],
   matchReports: [],
   coachSalaryConfigs: [],
@@ -847,14 +855,16 @@ export const useDataStore = create<DataState>()(
   // ================================
 
   addPrivateLesson: (lessonData) => {
+    const newId = generateId()
     const newLesson: PrivateLesson = {
       ...lessonData,
-      id: generateId(),
+      id: newId,
       createdAt: new Date(),
     }
     set((state) => ({
       privateLessons: [...state.privateLessons, newLesson],
     }))
+    return newId
   },
 
   updatePrivateLesson: (id, data) => {
@@ -868,6 +878,7 @@ export const useDataStore = create<DataState>()(
   deletePrivateLesson: (id) => {
     set((state) => ({
       privateLessons: state.privateLessons.filter((l) => l.id !== id),
+      privateLessonPayments: state.privateLessonPayments.filter((p) => p.lessonId !== id),
     }))
   },
 
@@ -948,6 +959,35 @@ export const useDataStore = create<DataState>()(
       eventPayments: state.eventPayments.map((p) =>
         p.id === id ? { ...p, ...data } : p
       ),
+    }))
+  },
+
+  // ================================
+  // PRIVATE LESSON PAYMENTS
+  // ================================
+
+  addPrivateLessonPayment: (paymentData) => {
+    const newPayment: PrivateLessonPayment = {
+      ...paymentData,
+      id: generateId(),
+      createdAt: new Date(),
+    }
+    set((state) => ({
+      privateLessonPayments: [...state.privateLessonPayments, newPayment],
+    }))
+  },
+
+  updatePrivateLessonPayment: (id, data) => {
+    set((state) => ({
+      privateLessonPayments: state.privateLessonPayments.map((p) =>
+        p.id === id ? { ...p, ...data } : p
+      ),
+    }))
+  },
+
+  deletePrivateLessonPaymentsByLesson: (lessonId) => {
+    set((state) => ({
+      privateLessonPayments: state.privateLessonPayments.filter((p) => p.lessonId !== lessonId),
     }))
   },
 
@@ -1056,6 +1096,7 @@ export const useDataStore = create<DataState>()(
         invitations: state.invitations,
         events: state.events,
         eventPayments: state.eventPayments,
+        privateLessonPayments: state.privateLessonPayments,
         evaluations: state.evaluations,
         matchReports: state.matchReports,
         coachSalaryConfigs: state.coachSalaryConfigs,

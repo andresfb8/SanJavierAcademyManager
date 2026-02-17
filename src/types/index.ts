@@ -323,6 +323,20 @@ export interface EventPayment {
   createdAt: Date
 }
 
+// --- Pago de Clase Particular ---
+export interface PrivateLessonPayment {
+  id: string
+  lessonId: string
+  lessonDate: Date
+  playerId: string
+  playerName: string
+  amount: number
+  status: PaymentStatus
+  paymentMethod?: PaymentMethod
+  paidDate?: Date
+  createdAt: Date
+}
+
 // --- Evaluación / Informe ---
 export interface EvaluationScore {
   criterionKey: string
