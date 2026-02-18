@@ -87,13 +87,20 @@ export default function GroupsPage() {
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
   const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
 
+  const isEntrenador = user?.role === 'entrenador'
+  const currentCoach = useMemo(
+    () => coaches.find((c) => c.userId === user?.id),
+    [coaches, user?.id]
+  )
+
   const filteredGroups = useMemo(() => {
     return groups.filter((g) => {
       const matchesSearch = search === '' || g.name.toLowerCase().includes(search.toLowerCase())
       const matchesLevel = levelFilter === '' || g.level === levelFilter
-      return matchesSearch && matchesLevel
+      const matchesCoach = !isEntrenador || g.coachId === currentCoach?.id
+      return matchesSearch && matchesLevel && matchesCoach
     })
-  }, [groups, search, levelFilter])
+  }, [groups, search, levelFilter, isEntrenador, currentCoach])
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
 
@@ -237,10 +244,12 @@ export default function GroupsPage() {
               <FileDown className="h-4 w-4 mr-1" />
               Exportar PDF
             </Button>
-            <Button size="sm" onClick={openCreateDialog}>
-              <Plus className="h-4 w-4 mr-1" />
-              Nuevo grupo
-            </Button>
+            {!isEntrenador && (
+              <Button size="sm" onClick={openCreateDialog}>
+                <Plus className="h-4 w-4 mr-1" />
+                Nuevo grupo
+              </Button>
+            )}
           </div>
         }
       />

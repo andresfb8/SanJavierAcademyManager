@@ -18,6 +18,7 @@ import UsersPage from '@/pages/UsersPage'
 import ActivateAccountPage from '@/pages/ActivateAccountPage'
 import EventsActivitiesPage from '@/pages/EventsActivitiesPage'
 import EventDetailPage from '@/pages/EventDetailPage'
+import PrivateLessonDetailPage from '@/pages/PrivateLessonDetailPage'
 import ClassDetailPage from '@/pages/ClassDetailPage'
 import CoachProfilePage from '@/pages/CoachProfilePage'
 import EvaluacionesPage from '@/pages/EvaluacionesPage'
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/eventos" element={<EventsActivitiesPage />} />
         <Route path="/eventos/:id" element={<EventDetailPage />} />
+        <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
         <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
         <Route path="/pagos" element={<PaymentsPage />} />
         <Route path="/entrenadores" element={<CoachesPage />} />

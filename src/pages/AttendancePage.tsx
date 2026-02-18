@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore } from '@/stores/authStore'
 import {
   CheckCircle,
   XCircle,
@@ -35,7 +36,8 @@ import type { AttendanceEntry, AttendanceStatus } from '@/types'
 // ==========================================
 
 export default function AttendancePage() {
-  const { groups, players, enrollments, attendance, addAttendanceRecord } =
+  const { user } = useAuthStore()
+  const { groups, players, enrollments, attendance, addAttendanceRecord, coaches } =
     useDataStore()
 
   // --- Seleccion de grupo y fecha ---
@@ -73,9 +75,21 @@ export default function AttendancePage() {
   // DATOS DERIVADOS
   // ===================
 
+  const isEntrenador = user?.role === 'entrenador'
+  const currentCoach = useMemo(
+    () => coaches.find((c) => c.userId === user?.id),
+    [coaches, user?.id]
+  )
+
   const activeGroups = useMemo(
-    () => groups.filter((g) => g.isActive),
-    [groups]
+    () => {
+      const allActive = groups.filter((g) => g.isActive)
+      if (isEntrenador && currentCoach) {
+        return allActive.filter((g) => g.coachId === currentCoach.id)
+      }
+      return allActive
+    },
+    [groups, isEntrenador, currentCoach]
   )
 
   const selectedGroup = useMemo(

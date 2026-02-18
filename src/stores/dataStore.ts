@@ -1030,6 +1030,7 @@ export const useDataStore = create<DataState>()(
   deleteEvent: (id) => {
     set((state) => ({
       events: state.events.filter((e) => e.id !== id),
+      eventPayments: state.eventPayments.filter((ep) => ep.eventId !== id),
     }))
   },
 
