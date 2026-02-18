@@ -52,7 +52,7 @@ const navGroups: NavGroup[] = [
       { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
       { name: 'Agenda', href: '/agenda', icon: Calendar },
       { name: 'Eventos y Actividades', href: '/eventos', icon: CalendarPlus },
-      { name: 'Personal', href: '/entrenadores', icon: UserCog },
+      { name: 'Personal', href: '/entrenadores', icon: UserCog, requiredModule: 'coaches' },
       { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
       { name: 'Planificación', href: '/planificacion', icon: BookOpen },
     ],
@@ -60,14 +60,14 @@ const navGroups: NavGroup[] = [
   {
     label: 'Financiera',
     items: [
-      { name: 'Pagos', href: '/pagos', icon: CreditCard },
+      { name: 'Pagos', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
     ],
   },
   {
     label: 'Configuración',
     items: [
-      { name: 'Configuración', href: '/configuracion', icon: Settings },
-      { name: 'Registro de actividad', href: '/actividad', icon: History },
+      { name: 'Configuración', href: '/configuracion', icon: Settings, requiredModule: 'settings' },
+      { name: 'Registro de actividad', href: '/actividad', icon: History, requiredModule: 'settings' },
       { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
     ],
   },

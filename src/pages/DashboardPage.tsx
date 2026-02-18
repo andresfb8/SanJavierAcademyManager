@@ -8,7 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useDataStore } from '@/stores/dataStore'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, hasPermission } from '@/stores/authStore'
+import type { UserRole } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import {
@@ -63,6 +64,7 @@ const defaultKpiConfig: KpiConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
+  const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
   const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
@@ -215,6 +217,11 @@ export default function DashboardPage() {
     }
   })
 
+  // Filtered activities (hide payment events for roles without payment access)
+  const visibleActivities = canReadPayments
+    ? activities
+    : activities.filter((a) => a.type !== 'payment_received')
+
   // Today's classes
   const today = now.getDay()
   const todayGroups = groups.filter(
@@ -264,7 +271,7 @@ export default function DashboardPage() {
               iconClassName="bg-blue-50 text-blue-600"
             />
           )}
-          {kpiConfig.revenue && (
+          {canReadPayments && kpiConfig.revenue && (
             <StatCard
               title="Ingresos este mes"
               value={formatCurrency(currentRevenue)}
@@ -273,7 +280,7 @@ export default function DashboardPage() {
               iconClassName="bg-green-50 text-green-600"
             />
           )}
-          {kpiConfig.pendingPayments && (
+          {canReadPayments && kpiConfig.pendingPayments && (
             <StatCard
               title="Pagos pendientes"
               value={formatCurrency(currentPending)}
@@ -290,7 +297,7 @@ export default function DashboardPage() {
               iconClassName="bg-purple-50 text-purple-600"
             />
           )}
-          {kpiConfig.collectionRate && (
+          {canReadPayments && kpiConfig.collectionRate && (
             <StatCard
               title="Ratio de cobro"
               value={`${collectionRate}%`}
@@ -445,7 +452,7 @@ export default function DashboardPage() {
         )}
 
         {/* Financial chart row */}
-        {kpiConfig.financialChart && (
+        {canReadPayments && kpiConfig.financialChart && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -504,7 +511,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {activities.slice(0, 8).map((activity) => {
+                {visibleActivities.slice(0, 8).map((activity) => {
                   const config = activityConfig[activity.type] || { icon: '📌', color: 'text-gray-600' }
                   return (
                     <div key={activity.id} className="flex items-start gap-3">
@@ -579,16 +586,16 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">Selecciona qué indicadores quieres mostrar en el panel principal.</p>
             <div className="space-y-3">
               {[
-                { key: 'activePlayers', label: 'Jugadores activos' },
-                { key: 'revenue', label: 'Ingresos del mes' },
-                { key: 'pendingPayments', label: 'Pagos pendientes' },
-                { key: 'activeGroups', label: 'Grupos activos' },
-                { key: 'collectionRate', label: 'Ratio de cobro' },
-                { key: 'todayClasses', label: 'Clases de hoy' },
-                { key: 'totalEnrolled', label: 'Total alumnos inscritos' },
-                { key: 'waitingList', label: 'Lista de espera' },
-                { key: 'rotationIndex', label: 'Índice de rotación' },
-              ].map((item) => (
+                { key: 'activePlayers', label: 'Jugadores activos', financial: false },
+                { key: 'revenue', label: 'Ingresos del mes', financial: true },
+                { key: 'pendingPayments', label: 'Pagos pendientes', financial: true },
+                { key: 'activeGroups', label: 'Grupos activos', financial: false },
+                { key: 'collectionRate', label: 'Ratio de cobro', financial: true },
+                { key: 'todayClasses', label: 'Clases de hoy', financial: false },
+                { key: 'totalEnrolled', label: 'Total alumnos inscritos', financial: false },
+                { key: 'waitingList', label: 'Lista de espera', financial: false },
+                { key: 'rotationIndex', label: 'Índice de rotación', financial: false },
+              ].filter((item) => !item.financial || canReadPayments).map((item) => (
                 <div key={item.key} className="flex items-center gap-3">
                   <Checkbox
                     checked={kpiConfig[item.key]}
@@ -603,10 +610,10 @@ export default function DashboardPage() {
               <div className="border-t pt-3 mt-3">
                 <p className="text-sm font-medium mb-3">Graficos</p>
                 {[
-                  { key: 'attendanceChart', label: 'Grafico de asistencia semanal' },
-                  { key: 'levelChart', label: 'Grafico de distribucion por nivel' },
-                  { key: 'financialChart', label: 'Grafico resumen financiero' },
-                ].map((item) => (
+                  { key: 'attendanceChart', label: 'Grafico de asistencia semanal', financial: false },
+                  { key: 'levelChart', label: 'Grafico de distribucion por nivel', financial: false },
+                  { key: 'financialChart', label: 'Grafico resumen financiero', financial: true },
+                ].filter((item) => !item.financial || canReadPayments).map((item) => (
                   <div key={item.key} className="flex items-center gap-3 mb-3">
                     <Checkbox
                       checked={kpiConfig[item.key]}
