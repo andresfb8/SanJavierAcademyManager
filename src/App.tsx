@@ -21,6 +21,7 @@ import EventDetailPage from '@/pages/EventDetailPage'
 import ClassDetailPage from '@/pages/ClassDetailPage'
 import CoachProfilePage from '@/pages/CoachProfilePage'
 import EvaluacionesPage from '@/pages/EvaluacionesPage'
+import ActivityLogPage from '@/pages/ActivityLogPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/informes" element={<EvaluacionesPage />} />
         <Route path="/usuarios" element={<UsersPage />} />
         <Route path="/configuracion" element={<SettingsPage />} />
+        <Route path="/actividad" element={<ActivityLogPage />} />
         <Route path="/planificacion" element={<PlanningPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
