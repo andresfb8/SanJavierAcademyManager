@@ -29,7 +29,8 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
-import type { Payment, PaymentMethod, PaymentCategory } from '@/types'
+import type { PaymentMethod, PaymentCategory } from '@/types'
+import type { NormalizedPayment } from '@/lib/payment-utils'
 import {
   useReactTable,
   getCoreRowModel,
@@ -81,7 +82,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, eventPayments, privateLessonPayments, markPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -92,7 +93,7 @@ export default function PaymentsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('mensual')
 
   // Mark as paid dialog
-  const [paymentToMark, setPaymentToMark] = useState<Payment | null>(null)
+  const [paymentToMark, setPaymentToMark] = useState<NormalizedPayment | null>(null)
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('transferencia')
 
   const [categoryFilter, setCategoryFilter] = useState<string>('')
@@ -129,27 +130,27 @@ export default function PaymentsPage() {
     [players]
   )
 
-  // Filtered payments (for monthly view)
+  // Unificar todos los pagos para KPIs globales y tabla principal
+  const allPayments = useMemo(
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
+    [payments, eventPayments, privateLessonPayments]
+  )
+
+  // Filtered payments (para vista mensual — incluye los 3 origenes de pago)
   const filteredPayments = useMemo(() => {
-    return payments.filter((p) => {
+    return allPayments.filter((p) => {
       const matchesSearch =
         search === '' ||
         p.playerName.toLowerCase().includes(search.toLowerCase()) ||
         p.concept.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === '' || p.status === statusFilter
       const matchesGroup = groupFilter === '' || p.groupId === groupFilter
-      const matchesCategory = categoryFilter === '' || (p.category ?? 'cuota') === categoryFilter
+      const matchesCategory = categoryFilter === '' || p.source === categoryFilter
       const matchesMonth = p.billingMonth === selectedMonth
       const matchesYear = p.billingYear === selectedYear
       return matchesSearch && matchesStatus && matchesGroup && matchesCategory && matchesMonth && matchesYear
     })
-  }, [payments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear])
-
-  // Unificar todos los pagos para KPIs globales
-  const allPayments = useMemo(
-    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
-    [payments, eventPayments, privateLessonPayments]
-  )
+  }, [allPayments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear])
 
   // KPI calculations for current selected month (usando TODOS los origenes)
   const currentMonthAllPayments = useMemo(() => {
@@ -240,7 +241,7 @@ export default function PaymentsPage() {
   }, [annualSummary, allPayments, selectedYear])
 
   // --- TanStack React Table columns ---
-  const columns = useMemo<ColumnDef<Payment>[]>(
+  const columns = useMemo<ColumnDef<NormalizedPayment>[]>(
     () => [
       {
         accessorKey: 'playerName',
@@ -263,12 +264,12 @@ export default function PaymentsPage() {
         meta: { className: 'hidden md:table-cell' },
       },
       {
-        accessorKey: 'category',
+        accessorKey: 'source',
         header: 'Categoria',
         cell: ({ getValue }) => {
-          const cat = getValue<PaymentCategory | undefined>() ?? 'cuota'
-          const info = PAYMENT_CATEGORIES.find((c) => c.value === cat)
-          return <span className="text-xs text-muted-foreground">{info?.label ?? cat}</span>
+          const src = getValue<NormalizedPayment['source']>() ?? 'cuota'
+          const info = PAYMENT_CATEGORIES.find((c) => c.value === src)
+          return <span className="text-xs text-muted-foreground">{info?.label ?? src}</span>
         },
         enableSorting: false,
         meta: { className: 'hidden lg:table-cell' },
@@ -333,6 +334,17 @@ export default function PaymentsPage() {
         meta: { className: 'hidden md:table-cell' },
       },
       {
+        accessorKey: 'registeredBy',
+        header: 'Registrado por',
+        cell: ({ getValue }) => (
+          <span className="text-xs text-muted-foreground">
+            {getValue<string | undefined>() ?? '-'}
+          </span>
+        ),
+        enableSorting: false,
+        meta: { className: 'hidden xl:table-cell' },
+      },
+      {
         id: 'actions',
         header: () => <span className="sr-only">Acciones</span>,
         cell: ({ row }) => {
@@ -367,9 +379,21 @@ export default function PaymentsPage() {
   })
 
   // --- Handlers ---
+  const openMarkPaidDialog = (payment: NormalizedPayment) => {
+    setPaymentToMark(payment)
+    setSelectedMethod('transferencia')
+  }
+
   const handleMarkPaid = () => {
     if (!paymentToMark) return
-    markPaymentPaid(paymentToMark.id, selectedMethod)
+    const { id, source } = paymentToMark
+    if (source === 'evento') {
+      markEventPaymentPaid(id, selectedMethod)
+    } else if (source === 'clase_particular') {
+      markPrivateLessonPaymentPaid(id, selectedMethod)
+    } else {
+      markPaymentPaid(id, selectedMethod)
+    }
     setPaymentToMark(null)
     setSelectedMethod('transferencia')
   }
@@ -416,12 +440,12 @@ export default function PaymentsPage() {
     } else {
       // Export monthly detail
       const wsData = [
-        ['Jugador', 'Concepto', 'Grupo', 'Categoria', 'Importe', 'Estado', 'Vencimiento', 'Fecha pago', 'Metodo'],
+        ['Jugador', 'Concepto', 'Grupo', 'Categoria', 'Importe', 'Estado', 'Vencimiento', 'Fecha pago', 'Metodo', 'Registrado por'],
         ...filteredPayments.map((p) => [
           p.playerName,
           p.concept,
           p.groupName || '',
-          PAYMENT_CATEGORIES.find((c) => c.value === (p.category ?? 'cuota'))?.label ?? p.category ?? 'Cuota',
+          PAYMENT_CATEGORIES.find((c) => c.value === p.source)?.label ?? p.source,
           p.amount,
           p.status === 'pagado' ? 'Pagado' : p.status === 'pendiente' ? 'Pendiente' : 'Cancelado',
           p.dueDate ? formatDate(new Date(p.dueDate)) : '',
@@ -429,12 +453,13 @@ export default function PaymentsPage() {
           p.paymentMethod
             ? PAYMENT_METHODS.find((m) => m.value === p.paymentMethod)?.label || p.paymentMethod
             : '',
+          p.registeredBy ?? '',
         ]),
       ]
       const ws = XLSX.utils.aoa_to_sheet(wsData)
       ws['!cols'] = [
         { wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 12 },
-        { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
+        { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 },
       ]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Pagos')
@@ -464,11 +489,6 @@ export default function PaymentsPage() {
       notes: manualNotes || undefined,
     })
     setManualDialogOpen(false)
-  }
-
-  const openMarkPaidDialog = (payment: Payment) => {
-    setPaymentToMark(payment)
-    setSelectedMethod('transferencia')
   }
 
   const selectedMonthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label || ''

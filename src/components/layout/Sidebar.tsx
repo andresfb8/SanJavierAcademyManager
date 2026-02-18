@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronRight,
   CalendarPlus,
+  History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
@@ -66,6 +67,7 @@ const navGroups: NavGroup[] = [
     label: 'Configuración',
     items: [
       { name: 'Configuración', href: '/configuracion', icon: Settings },
+      { name: 'Registro de actividad', href: '/actividad', icon: History },
       { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
     ],
   },

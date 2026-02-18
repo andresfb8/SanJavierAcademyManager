@@ -13,6 +13,10 @@ export interface NormalizedPayment {
   billingYear: number
   paidDate?: Date
   paymentMethod?: PaymentMethod
+  groupId?: string
+  groupName?: string
+  dueDate?: Date
+  registeredBy?: string
 }
 
 /**
@@ -40,6 +44,10 @@ export function normalizeAllPayments(
       billingYear: p.billingYear,
       paidDate: p.paidDate,
       paymentMethod: p.paymentMethod,
+      groupId: p.groupId,
+      groupName: p.groupName,
+      dueDate: p.dueDate,
+      registeredBy: p.registeredBy,
     })
   }
 
@@ -59,6 +67,7 @@ export function normalizeAllPayments(
       billingYear: d.getFullYear(),
       paidDate: ep.paidDate,
       paymentMethod: ep.paymentMethod,
+      registeredBy: ep.registeredBy,
     })
   }
 
@@ -77,6 +86,7 @@ export function normalizeAllPayments(
       billingYear: d.getFullYear(),
       paidDate: plp.paidDate,
       paymentMethod: plp.paymentMethod,
+      registeredBy: plp.registeredBy,
     })
   }
 
