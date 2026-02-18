@@ -11,7 +11,9 @@ import {
   setDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
-import { loadAllData, migrateLocalToFirestore } from '@/lib/dataLoader'
+import { migrateLocalToFirestore } from '@/lib/dataLoader'
+import { subscribeToAllData } from '@/lib/realtimeSync'
+import { useDataStore } from '@/stores/dataStore'
 import type { AppUser, UserRole } from '@/types'
 
 interface AuthState {
@@ -23,6 +25,34 @@ interface AuthState {
   logout: () => void
   setUser: (user: AppUser | null) => void
   initAuth: () => () => void
+}
+
+// Mantiene el unsubscribe de los 17 listeners onSnapshot fuera del estado
+// para evitar problemas de serialización y acceso desde cualquier función.
+let _dataUnsubscribe: (() => void) | null = null
+
+// Limpia todas las colecciones del store al hacer logout o cuando expira la sesión.
+// Evita que el próximo usuario vea datos del usuario anterior en el mismo dispositivo.
+function clearDataStore(): void {
+  useDataStore.setState({
+    courts: [],
+    tariffs: [],
+    players: [],
+    coaches: [],
+    groups: [],
+    enrollments: [],
+    payments: [],
+    attendance: [],
+    activities: [],
+    privateLessons: [],
+    invitations: [],
+    events: [],
+    eventPayments: [],
+    privateLessonPayments: [],
+    evaluations: [],
+    matchReports: [],
+    coachSalaryConfigs: [],
+  })
 }
 
 // Build an AppUser from Firebase Auth user data (fallback when Firestore is unavailable)
@@ -38,7 +68,8 @@ function buildUserFromAuth(firebaseUser: FirebaseUser): AppUser {
   }
 }
 
-// Try to load user profile from Firestore, fallback to Auth data
+// Try to load user profile from Firestore, fallback to Auth data.
+// Tras obtener el perfil, inicia los 17 listeners onSnapshot (tiempo real).
 async function loadUserProfile(
   firebaseUser: FirebaseUser,
   setDataLoading: (v: boolean) => void
@@ -83,14 +114,24 @@ async function loadUserProfile(
     appUser = buildUserFromAuth(firebaseUser)
   }
 
-  // Cargar todos los datos del club desde Firestore (fire-and-forget respecto al login)
+  // Iniciar sincronización en tiempo real con Firestore
   if (appUser.clubId) {
     setDataLoading(true)
-    // Primero migrar datos de localStorage si Firestore está vacío
+    // Cancelar listeners previos antes de crear nuevos (guard para doble disparo de onAuthStateChanged)
+    if (_dataUnsubscribe) {
+      _dataUnsubscribe()
+      _dataUnsubscribe = null
+    }
     migrateLocalToFirestore(appUser.clubId)
-      .then(() => loadAllData(appUser.clubId))
-      .catch((err) => console.warn('[Firestore] Error loading initial data:', err))
-      .finally(() => setDataLoading(false))
+      .then(() => {
+        _dataUnsubscribe = subscribeToAllData(appUser.clubId, () => {
+          setDataLoading(false)
+        })
+      })
+      .catch((err) => {
+        console.warn('[Firestore] Error en carga inicial:', err)
+        setDataLoading(false)
+      })
   }
 
   return appUser
@@ -118,6 +159,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    // 1. Cancelar los 17 listeners de Firestore
+    if (_dataUnsubscribe) {
+      _dataUnsubscribe()
+      _dataUnsubscribe = null
+    }
+    // 2. Limpiar datos del store para el siguiente usuario
+    clearDataStore()
+    // 3. Cerrar sesión en Firebase Auth (dispara la rama null de onAuthStateChanged)
     signOut(auth)
     set({ user: null, isAuthenticated: false, isDataLoading: false })
   },
@@ -135,6 +184,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         )
         set({ user: appUser, isAuthenticated: true, isLoading: false })
       } else {
+        // Sesión expirada o logout externo (otra pestaña, token caducado...)
+        if (_dataUnsubscribe) {
+          _dataUnsubscribe()
+          _dataUnsubscribe = null
+        }
+        clearDataStore()
         set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
       }
     })
