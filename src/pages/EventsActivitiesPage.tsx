@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore } from '@/stores/authStore'
 import {
   Search,
   CalendarPlus,
@@ -48,6 +49,7 @@ interface UnifiedItem {
 
 export default function EventsActivitiesPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const {
     events,
     privateLessons,
@@ -62,6 +64,12 @@ export default function EventsActivitiesPage() {
     addEventPayment,
     deleteEvent,
   } = useDataStore()
+
+  const isEntrenador = user?.role === 'entrenador'
+  const currentCoach = useMemo(
+    () => coaches.find((c) => c.userId === user?.id),
+    [coaches, user?.id]
+  )
 
   const [activeTab, setActiveTab] = useState<TabValue>('all')
   const [search, setSearch] = useState('')
@@ -109,11 +117,19 @@ export default function EventsActivitiesPage() {
     [players]
   )
 
-  // Build unified items
+  // Build unified items (filtrados por coach si es entrenador)
   const unifiedItems: UnifiedItem[] = useMemo(() => {
     const items: UnifiedItem[] = []
 
-    for (const ev of events) {
+    const visibleEvents = isEntrenador && currentCoach
+      ? events.filter((ev) => ev.coachIds?.includes(currentCoach.id))
+      : events
+
+    const visibleLessons = isEntrenador && currentCoach
+      ? privateLessons.filter((l) => l.coachId === currentCoach.id)
+      : privateLessons
+
+    for (const ev of visibleEvents) {
       if (!ev.isActive) continue
       const typeInfo = EVENT_TYPES.find((t) => t.value === ev.type)
       items.push({
@@ -132,7 +148,7 @@ export default function EventsActivitiesPage() {
       })
     }
 
-    for (const lesson of privateLessons) {
+    for (const lesson of visibleLessons) {
       items.push({
         type: 'private',
         id: lesson.id,
@@ -152,7 +168,7 @@ export default function EventsActivitiesPage() {
     // Sort by date descending
     items.sort((a, b) => b.date.getTime() - a.date.getTime())
     return items
-  }, [events, privateLessons])
+  }, [events, privateLessons, isEntrenador, currentCoach])
 
   // Apply filters
   const filteredItems = useMemo(() => {
@@ -501,6 +517,17 @@ export default function EventsActivitiesPage() {
                                 size="icon"
                                 className="h-8 w-8"
                                 onClick={() => navigate(`/eventos/${item.id}`)}
+                                title="Ver detalle"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {item.type === 'private' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => navigate(`/clases-particulares/${item.id}`)}
                                 title="Ver detalle"
                               >
                                 <Eye className="h-4 w-4" />
