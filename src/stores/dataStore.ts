@@ -49,6 +49,12 @@ import {
 import { generateId } from '@/lib/utils'
 import { CANCELLATION_DEADLINE_DAY } from '@/constants'
 import { useAuthStore } from '@/stores/authStore'
+import { syncDoc, deleteFirestoreDoc } from '@/lib/firestoreSync'
+
+// Helper: obtiene el clubId del usuario autenticado para sync con Firestore
+function getClubId(): string | undefined {
+  return useAuthStore.getState().user?.clubId
+}
 
 // ===================
 // STORE INTERFACE
@@ -257,18 +263,24 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       courts: [...state.courts, newCourt],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('courts', newCourt.id, newCourt as unknown as Record<string, unknown>, clubId)
   },
 
   updateCourt: (id, data) => {
     set((state) => ({
       courts: state.courts.map((c) => (c.id === id ? { ...c, ...data } : c)),
     }))
+    const clubId = getClubId()
+    const updated = get().courts.find((c) => c.id === id)
+    if (clubId && updated) syncDoc('courts', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteCourt: (id) => {
     set((state) => ({
       courts: state.courts.filter((c) => c.id !== id),
     }))
+    deleteFirestoreDoc('courts', id)
   },
 
   // ================================
@@ -284,18 +296,24 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       tariffs: [...state.tariffs, newTariff],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('tariffs', newTariff.id, newTariff as unknown as Record<string, unknown>, clubId)
   },
 
   updateTariff: (id, data) => {
     set((state) => ({
       tariffs: state.tariffs.map((t) => (t.id === id ? { ...t, ...data } : t)),
     }))
+    const clubId = getClubId()
+    const updated = get().tariffs.find((t) => t.id === id)
+    if (clubId && updated) syncDoc('tariffs', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteTariff: (id) => {
     set((state) => ({
       tariffs: state.tariffs.filter((t) => t.id !== id),
     }))
+    deleteFirestoreDoc('tariffs', id)
   },
 
   // ================================
@@ -314,6 +332,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       players: [...state.players, newPlayer],
     }))
+    const clubIdAddPlayer = getClubId()
+    if (clubIdAddPlayer) syncDoc('players', newPlayer.id, newPlayer as unknown as Record<string, unknown>, clubIdAddPlayer)
 
     // Log activity
     const { userId: cuUserId, userName: cuUserName } = getCurrentUser()
@@ -332,13 +352,19 @@ export const useDataStore = create<DataState>()(
         p.id === id ? { ...p, ...data, updatedAt: new Date() } : p
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().players.find((p) => p.id === id)
+    if (clubId && updated) syncDoc('players', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deletePlayer: (id) => {
+    const enrollmentsToDelete = get().enrollments.filter((e) => e.playerId === id).map((e) => e.id)
     set((state) => ({
       players: state.players.filter((p) => p.id !== id),
       enrollments: state.enrollments.filter((e) => e.playerId !== id),
     }))
+    deleteFirestoreDoc('players', id)
+    enrollmentsToDelete.forEach((eid) => deleteFirestoreDoc('enrollments', eid))
   },
 
   /**
@@ -417,7 +443,31 @@ export const useDataStore = create<DataState>()(
     }
     // If day > 5, pending payments for the current month remain as-is
 
-    // 4. Log activity
+    // 4. Sync changes to Firestore
+    const clubIdCancel = getClubId()
+    if (clubIdCancel) {
+      const stateAfter = get()
+      // Sync updated player
+      const updatedPlayer = stateAfter.players.find((p) => p.id === playerId)
+      if (updatedPlayer) syncDoc('players', playerId, updatedPlayer as unknown as Record<string, unknown>, clubIdCancel)
+      // Sync modified enrollments
+      stateAfter.enrollments
+        .filter((e) => e.playerId === playerId && !e.isActive)
+        .forEach((e) => syncDoc('enrollments', e.id, e as unknown as Record<string, unknown>, clubIdCancel))
+      // Sync affected groups
+      affectedGroupIds.forEach((gid) => {
+        const g = stateAfter.groups.find((grp) => grp.id === gid)
+        if (g) syncDoc('groups', gid, g as unknown as Record<string, unknown>, clubIdCancel)
+      })
+      // Sync cancelled payments (if day <= 5)
+      if (currentDay <= CANCELLATION_DEADLINE_DAY) {
+        stateAfter.payments
+          .filter((p) => p.playerId === playerId && p.billingMonth === currentMonth && p.billingYear === currentYear && p.status === 'cancelado')
+          .forEach((p) => syncDoc('payments', p.id, p as unknown as Record<string, unknown>, clubIdCancel))
+      }
+    }
+
+    // 5. Log activity
     const { userId: cancelUserId, userName: cancelUserName } = getCurrentUser()
     get().addActivity({
       type: 'player_cancelled',
@@ -441,18 +491,24 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       coaches: [...state.coaches, newCoach],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('coaches', newCoach.id, newCoach as unknown as Record<string, unknown>, clubId)
   },
 
   updateCoach: (id, data) => {
     set((state) => ({
       coaches: state.coaches.map((c) => (c.id === id ? { ...c, ...data } : c)),
     }))
+    const clubId = getClubId()
+    const updated = get().coaches.find((c) => c.id === id)
+    if (clubId && updated) syncDoc('coaches', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteCoach: (id) => {
     set((state) => ({
       coaches: state.coaches.filter((c) => c.id !== id),
     }))
+    deleteFirestoreDoc('coaches', id)
   },
 
   // ================================
@@ -469,6 +525,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       groups: [...state.groups, newGroup],
     }))
+    const clubIdAddGroup = getClubId()
+    if (clubIdAddGroup) syncDoc('groups', newGroup.id, newGroup as unknown as Record<string, unknown>, clubIdAddGroup)
 
     const { userId: groupUserId, userName: groupUserName } = getCurrentUser()
     get().addActivity({
@@ -484,15 +542,26 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       groups: state.groups.map((g) => (g.id === id ? { ...g, ...data } : g)),
     }))
+    const clubId = getClubId()
+    const updated = get().groups.find((g) => g.id === id)
+    if (clubId && updated) syncDoc('groups', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteGroup: (id) => {
+    const affectedEnrollments = get().enrollments.filter((e) => e.groupId === id)
     set((state) => ({
       groups: state.groups.filter((g) => g.id !== id),
       enrollments: state.enrollments.map((e) =>
         e.groupId === id ? { ...e, isActive: false } : e
       ),
     }))
+    deleteFirestoreDoc('groups', id)
+    const clubId = getClubId()
+    if (clubId) {
+      affectedEnrollments.forEach((e) =>
+        syncDoc('enrollments', e.id, { ...e, isActive: false } as unknown as Record<string, unknown>, clubId)
+      )
+    }
   },
 
   // ================================
@@ -513,6 +582,13 @@ export const useDataStore = create<DataState>()(
           : g
       ),
     }))
+    const clubId = getClubId()
+    if (clubId) {
+      syncDoc('enrollments', newEnrollment.id, newEnrollment as unknown as Record<string, unknown>, clubId)
+      // Sync updated group counter
+      const updatedGroup = get().groups.find((g) => g.id === enrollmentData.groupId)
+      if (updatedGroup) syncDoc('groups', updatedGroup.id, updatedGroup as unknown as Record<string, unknown>, clubId)
+    }
   },
 
   updateEnrollment: (id, data) => {
@@ -521,6 +597,9 @@ export const useDataStore = create<DataState>()(
         e.id === id ? { ...e, ...data } : e
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().enrollments.find((e) => e.id === id)
+    if (clubId && updated) syncDoc('enrollments', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteEnrollment: (id) => {
@@ -535,6 +614,12 @@ export const useDataStore = create<DataState>()(
           )
         : state.groups,
     }))
+    deleteFirestoreDoc('enrollments', id)
+    if (enrollment?.isActive) {
+      const clubId = getClubId()
+      const updatedGroup = get().groups.find((g) => g.id === enrollment.groupId)
+      if (clubId && updatedGroup) syncDoc('groups', updatedGroup.id, updatedGroup as unknown as Record<string, unknown>, clubId)
+    }
   },
 
   deactivateEnrollment: (id) => {
@@ -553,6 +638,13 @@ export const useDataStore = create<DataState>()(
           : g
       ),
     }))
+    const clubId = getClubId()
+    if (clubId) {
+      const updatedEnrollment = get().enrollments.find((e) => e.id === id)
+      if (updatedEnrollment) syncDoc('enrollments', id, updatedEnrollment as unknown as Record<string, unknown>, clubId)
+      const updatedGroup = get().groups.find((g) => g.id === enrollment.groupId)
+      if (updatedGroup) syncDoc('groups', updatedGroup.id, updatedGroup as unknown as Record<string, unknown>, clubId)
+    }
   },
 
   // ================================
@@ -568,6 +660,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       payments: [...state.payments, newPayment],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('payments', newPayment.id, newPayment as unknown as Record<string, unknown>, clubId)
   },
 
   addManualPayment: (data) => {
@@ -592,6 +686,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       payments: [...state.payments, newPayment],
     }))
+    const clubIdMp = getClubId()
+    if (clubIdMp) syncDoc('payments', newPayment.id, newPayment as unknown as Record<string, unknown>, clubIdMp)
     get().addActivity({
       type: 'payment_created',
       description: `Pago manual creado para ${data.playerName} - ${data.concept} (${data.amount.toFixed(2)} €)`,
@@ -605,12 +701,16 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       payments: state.payments.map((p) => (p.id === id ? { ...p, ...data } : p)),
     }))
+    const clubId = getClubId()
+    const updated = get().payments.find((p) => p.id === id)
+    if (clubId && updated) syncDoc('payments', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deletePayment: (id) => {
     set((state) => ({
       payments: state.payments.filter((p) => p.id !== id),
     }))
+    deleteFirestoreDoc('payments', id)
   },
 
   /**
@@ -639,6 +739,10 @@ export const useDataStore = create<DataState>()(
           : p
       ),
     }))
+
+    const clubIdPaid = getClubId()
+    const updatedPayment = get().payments.find((p) => p.id === id)
+    if (clubIdPaid && updatedPayment) syncDoc('payments', id, updatedPayment as unknown as Record<string, unknown>, clubIdPaid)
 
     get().addActivity({
       type: 'payment_received',
@@ -669,6 +773,10 @@ export const useDataStore = create<DataState>()(
           : p
       ),
     }))
+
+    const clubIdEp = getClubId()
+    const updatedEp = get().eventPayments.find((p) => p.id === id)
+    if (clubIdEp && updatedEp) syncDoc('eventPayments', id, updatedEp as unknown as Record<string, unknown>, clubIdEp)
 
     get().addActivity({
       type: 'payment_received',
@@ -701,6 +809,10 @@ export const useDataStore = create<DataState>()(
       ),
     }))
 
+    const clubIdPlp = getClubId()
+    const updatedPlp = get().privateLessonPayments.find((p) => p.id === id)
+    if (clubIdPlp && updatedPlp) syncDoc('privateLessonPayments', id, updatedPlp as unknown as Record<string, unknown>, clubIdPlp)
+
     get().addActivity({
       type: 'payment_received',
       description: `Pago de clase particular recibido de ${payment.playerName} - ${payment.amount.toFixed(2)} € (${d.toLocaleDateString('es-ES')})`,
@@ -716,6 +828,9 @@ export const useDataStore = create<DataState>()(
         p.id === id ? { ...p, status: 'cancelado' as PaymentStatus } : p
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().payments.find((p) => p.id === id)
+    if (clubId && updated) syncDoc('payments', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   /**
@@ -804,6 +919,12 @@ export const useDataStore = create<DataState>()(
       set((prevState) => ({
         payments: [...prevState.payments, ...newPayments],
       }))
+      const clubId = getClubId()
+      if (clubId) {
+        newPayments.forEach((p) =>
+          syncDoc('payments', p.id, p as unknown as Record<string, unknown>, clubId)
+        )
+      }
     }
 
     return newPayments.length
@@ -891,6 +1012,17 @@ export const useDataStore = create<DataState>()(
           : state.players,
     }))
 
+    // Sync attendance record and modified players
+    const clubIdAtt = getClubId()
+    if (clubIdAtt) {
+      syncDoc('attendance', newRecord.id, newRecord as unknown as Record<string, unknown>, clubIdAtt)
+      if (playerUpdates.size > 0) {
+        get().players
+          .filter((p) => playerUpdates.has(p.id))
+          .forEach((p) => syncDoc('players', p.id, p as unknown as Record<string, unknown>, clubIdAtt))
+      }
+    }
+
     // Log activity
     const { userId: attUserId, userName: attUserName } = getCurrentUser()
     get().addActivity({
@@ -921,12 +1053,16 @@ export const useDataStore = create<DataState>()(
         a.id === id ? { ...a, ...data } : a
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().attendance.find((a) => a.id === id)
+    if (clubId && updated) syncDoc('attendance', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteAttendanceRecord: (id) => {
     set((state) => ({
       attendance: state.attendance.filter((a) => a.id !== id),
     }))
+    deleteFirestoreDoc('attendance', id)
   },
 
   // ================================
@@ -942,6 +1078,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       activities: [newActivity, ...state.activities],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('activities', newActivity.id, newActivity as unknown as Record<string, unknown>, clubId)
   },
 
   // ================================
@@ -958,6 +1096,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       privateLessons: [...state.privateLessons, newLesson],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('privateLessons', newId, newLesson as unknown as Record<string, unknown>, clubId)
     return newId
   },
 
@@ -967,13 +1107,19 @@ export const useDataStore = create<DataState>()(
         l.id === id ? { ...l, ...data } : l
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().privateLessons.find((l) => l.id === id)
+    if (clubId && updated) syncDoc('privateLessons', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deletePrivateLesson: (id) => {
+    const paymentsToDelete = get().privateLessonPayments.filter((p) => p.lessonId === id).map((p) => p.id)
     set((state) => ({
       privateLessons: state.privateLessons.filter((l) => l.id !== id),
       privateLessonPayments: state.privateLessonPayments.filter((p) => p.lessonId !== id),
     }))
+    deleteFirestoreDoc('privateLessons', id)
+    paymentsToDelete.forEach((pid) => deleteFirestoreDoc('privateLessonPayments', pid))
   },
 
   // ================================
@@ -988,6 +1134,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       invitations: [...state.invitations, newInvitation],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('invitations', newInvitation.id, newInvitation as unknown as Record<string, unknown>, clubId)
   },
 
   updateInvitation: (id, data) => {
@@ -996,12 +1144,16 @@ export const useDataStore = create<DataState>()(
         i.id === id ? { ...i, ...data } : i
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().invitations.find((i) => i.id === id)
+    if (clubId && updated) syncDoc('invitations', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteInvitation: (id) => {
     set((state) => ({
       invitations: state.invitations.filter((i) => i.id !== id),
     }))
+    deleteFirestoreDoc('invitations', id)
   },
 
   // ================================
@@ -1018,6 +1170,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       events: [...state.events, newEvent],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('events', newId, newEvent as unknown as Record<string, unknown>, clubId)
     return newId
   },
 
@@ -1025,12 +1179,16 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       events: state.events.map((e) => (e.id === id ? { ...e, ...data } : e)),
     }))
+    const clubId = getClubId()
+    const updated = get().events.find((e) => e.id === id)
+    if (clubId && updated) syncDoc('events', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteEvent: (id) => {
     set((state) => ({
       events: state.events.filter((e) => e.id !== id),
     }))
+    deleteFirestoreDoc('events', id)
   },
 
   // ================================
@@ -1046,6 +1204,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       eventPayments: [...state.eventPayments, newPayment],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('eventPayments', newPayment.id, newPayment as unknown as Record<string, unknown>, clubId)
   },
 
   updateEventPayment: (id, data) => {
@@ -1054,6 +1214,9 @@ export const useDataStore = create<DataState>()(
         p.id === id ? { ...p, ...data } : p
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().eventPayments.find((p) => p.id === id)
+    if (clubId && updated) syncDoc('eventPayments', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   // ================================
@@ -1069,6 +1232,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       privateLessonPayments: [...state.privateLessonPayments, newPayment],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('privateLessonPayments', newPayment.id, newPayment as unknown as Record<string, unknown>, clubId)
   },
 
   updatePrivateLessonPayment: (id, data) => {
@@ -1077,12 +1242,17 @@ export const useDataStore = create<DataState>()(
         p.id === id ? { ...p, ...data } : p
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().privateLessonPayments.find((p) => p.id === id)
+    if (clubId && updated) syncDoc('privateLessonPayments', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deletePrivateLessonPaymentsByLesson: (lessonId) => {
+    const paymentsToDelete = get().privateLessonPayments.filter((p) => p.lessonId === lessonId).map((p) => p.id)
     set((state) => ({
       privateLessonPayments: state.privateLessonPayments.filter((p) => p.lessonId !== lessonId),
     }))
+    paymentsToDelete.forEach((pid) => deleteFirestoreDoc('privateLessonPayments', pid))
   },
 
   // ================================
@@ -1100,6 +1270,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       evaluations: [...state.evaluations, newEvaluation],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('evaluations', newEvaluation.id, newEvaluation as unknown as Record<string, unknown>, clubId)
   },
 
   updateEvaluation: (id, data) => {
@@ -1108,12 +1280,16 @@ export const useDataStore = create<DataState>()(
         e.id === id ? { ...e, ...data, updatedAt: new Date() } : e
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().evaluations.find((e) => e.id === id)
+    if (clubId && updated) syncDoc('evaluations', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteEvaluation: (id) => {
     set((state) => ({
       evaluations: state.evaluations.filter((e) => e.id !== id),
     }))
+    deleteFirestoreDoc('evaluations', id)
   },
 
   // ================================
@@ -1131,6 +1307,8 @@ export const useDataStore = create<DataState>()(
     set((state) => ({
       matchReports: [...state.matchReports, newReport],
     }))
+    const clubId = getClubId()
+    if (clubId) syncDoc('matchReports', newReport.id, newReport as unknown as Record<string, unknown>, clubId)
   },
 
   updateMatchReport: (id, data) => {
@@ -1139,12 +1317,16 @@ export const useDataStore = create<DataState>()(
         r.id === id ? { ...r, ...data, updatedAt: new Date() } : r
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().matchReports.find((r) => r.id === id)
+    if (clubId && updated) syncDoc('matchReports', id, updated as unknown as Record<string, unknown>, clubId)
   },
 
   deleteMatchReport: (id) => {
     set((state) => ({
       matchReports: state.matchReports.filter((r) => r.id !== id),
     }))
+    deleteFirestoreDoc('matchReports', id)
   },
 
   // ================================
@@ -1157,6 +1339,10 @@ export const useDataStore = create<DataState>()(
         c.coachId === coachId ? { ...c, ...config } : c
       ),
     }))
+    const clubId = getClubId()
+    const updated = get().coachSalaryConfigs.find((c) => c.coachId === coachId)
+    // CoachSalaryConfig uses coachId as Firestore document id
+    if (clubId && updated) syncDoc('coachSalaryConfigs', coachId, updated as unknown as Record<string, unknown>, clubId)
   },
 }),
     {
