@@ -65,7 +65,7 @@ const defaultKpiConfig: KpiConfig = {
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
-  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts } = useDataStore()
+  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts, cleanupOrphanedPayments } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -81,10 +81,11 @@ export default function DashboardPage() {
     localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(kpiConfig))
   }, [kpiConfig])
 
-  // Auto-generate receipts on mount
+  // Auto-generate receipts and clean up orphaned payments on mount
   useEffect(() => {
     checkAndAutoGenerateReceipts()
-  }, [checkAndAutoGenerateReceipts])
+    cleanupOrphanedPayments()
+  }, [checkAndAutoGenerateReceipts, cleanupOrphanedPayments])
 
   const [chartCollapsed, setChartCollapsed] = useState<Record<string, boolean>>({})
 
