@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, hasPermission } from '@/stores/authStore'
+import type { UserRole } from '@/types'
 import { MainLayout } from '@/components/layout/MainLayout'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -23,6 +24,22 @@ import ClassDetailPage from '@/pages/ClassDetailPage'
 import CoachProfilePage from '@/pages/CoachProfilePage'
 import EvaluacionesPage from '@/pages/EvaluacionesPage'
 import ActivityLogPage from '@/pages/ActivityLogPage'
+
+function RoleRoute({
+  children,
+  module,
+  action = 'read',
+}: {
+  children: React.ReactNode
+  module: string
+  action?: string
+}) {
+  const { user } = useAuthStore()
+  if (user?.role && !hasPermission(user.role as UserRole, module, action)) {
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -81,13 +98,13 @@ export default function App() {
         <Route path="/eventos/:id" element={<EventDetailPage />} />
         <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
         <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
-        <Route path="/pagos" element={<PaymentsPage />} />
-        <Route path="/entrenadores" element={<CoachesPage />} />
-        <Route path="/entrenadores/:id" element={<CoachProfilePage />} />
+        <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
+        <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
+        <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
         <Route path="/informes" element={<EvaluacionesPage />} />
-        <Route path="/usuarios" element={<UsersPage />} />
-        <Route path="/configuracion" element={<SettingsPage />} />
-        <Route path="/actividad" element={<ActivityLogPage />} />
+        <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
+        <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
+        <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
         <Route path="/planificacion" element={<PlanningPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

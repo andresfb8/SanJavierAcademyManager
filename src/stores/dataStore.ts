@@ -172,6 +172,9 @@ interface DataState {
 
   // --- Coach Salary ---
   updateCoachSalaryConfig: (coachId: string, config: Partial<CoachSalaryConfig>) => void
+
+  // --- Cleanup ---
+  cleanupOrphanedPayments: () => void
 }
 
 // ===================
@@ -1185,11 +1188,15 @@ export const useDataStore = create<DataState>()(
   },
 
   deleteEvent: (id) => {
+    const paymentsToDelete = get().eventPayments
+      .filter((p) => p.eventId === id)
+      .map((p) => p.id)
     set((state) => ({
       events: state.events.filter((e) => e.id !== id),
       eventPayments: state.eventPayments.filter((ep) => ep.eventId !== id),
     }))
     deleteFirestoreDoc('events', id)
+    paymentsToDelete.forEach((pid) => deleteFirestoreDoc('eventPayments', pid))
   },
 
   // ================================
@@ -1254,6 +1261,28 @@ export const useDataStore = create<DataState>()(
       privateLessonPayments: state.privateLessonPayments.filter((p) => p.lessonId !== lessonId),
     }))
     paymentsToDelete.forEach((pid) => deleteFirestoreDoc('privateLessonPayments', pid))
+  },
+
+  // ================================
+  // CLEANUP
+  // ================================
+
+  cleanupOrphanedPayments: () => {
+    const { events, eventPayments, privateLessons, privateLessonPayments } = get()
+    const eventIds = new Set(events.map((e) => e.id))
+    const lessonIds = new Set(privateLessons.map((l) => l.id))
+
+    const orphanEventPayments = eventPayments.filter((p) => !eventIds.has(p.eventId))
+    const orphanLessonPayments = privateLessonPayments.filter((p) => !lessonIds.has(p.lessonId))
+
+    if (orphanEventPayments.length === 0 && orphanLessonPayments.length === 0) return
+
+    set((state) => ({
+      eventPayments: state.eventPayments.filter((p) => eventIds.has(p.eventId)),
+      privateLessonPayments: state.privateLessonPayments.filter((p) => lessonIds.has(p.lessonId)),
+    }))
+    orphanEventPayments.forEach((p) => deleteFirestoreDoc('eventPayments', p.id))
+    orphanLessonPayments.forEach((p) => deleteFirestoreDoc('privateLessonPayments', p.id))
   },
 
   // ================================
