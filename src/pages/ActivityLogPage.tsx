@@ -22,6 +22,8 @@ import type { Activity, ActivityType } from '@/types'
 // --- Labels legibles para cada tipo de actividad ---
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   player_created: 'Jugador registrado',
+  player_updated: 'Jugador actualizado',
+  player_deleted: 'Jugador eliminado',
   player_cancelled: 'Jugador dado de baja',
   payment_received: 'Pago recibido',
   payment_created: 'Pago creado',
@@ -30,7 +32,17 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   attendance_recorded: 'Asistencia registrada',
   recovery_used: 'Recuperación usada',
   evaluation_created: 'Evaluación creada',
+  evaluation_updated: 'Evaluación actualizada',
+  evaluation_deleted: 'Evaluación eliminada',
   event_created: 'Evento creado',
+  event_updated: 'Evento actualizado',
+  event_deleted: 'Evento eliminado',
+  lesson_created: 'Clase particular creada',
+  lesson_updated: 'Clase particular actualizada',
+  lesson_deleted: 'Clase particular eliminada',
+  match_report_created: 'Informe creado',
+  match_report_updated: 'Informe actualizado',
+  match_report_deleted: 'Informe eliminado',
   invitation_sent: 'Invitación enviada',
 }
 
@@ -41,6 +53,17 @@ const ACTIVITY_COLORS: Partial<Record<ActivityType, string>> = {
   payment_cancelled: 'text-red-600',
   player_cancelled: 'text-red-600',
   player_created: 'text-green-700',
+  player_updated: 'text-blue-700',
+  event_created: 'text-teal-700',
+  event_updated: 'text-teal-600',
+  event_deleted: 'text-red-600',
+  lesson_created: 'text-amber-700',
+  lesson_updated: 'text-amber-600',
+  lesson_deleted: 'text-red-600',
+  evaluation_created: 'text-indigo-700',
+  evaluation_deleted: 'text-red-600',
+  match_report_created: 'text-indigo-700',
+  match_report_deleted: 'text-red-600',
 }
 
 // --- Sortable column header helper ---
