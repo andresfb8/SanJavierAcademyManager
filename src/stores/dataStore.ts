@@ -1193,7 +1193,7 @@ export const useDataStore = create<DataState>()(
       .map((p) => p.id)
     set((state) => ({
       events: state.events.filter((e) => e.id !== id),
-      eventPayments: state.eventPayments.filter((p) => p.eventId !== id),
+      eventPayments: state.eventPayments.filter((ep) => ep.eventId !== id),
     }))
     deleteFirestoreDoc('events', id)
     paymentsToDelete.forEach((pid) => deleteFirestoreDoc('eventPayments', pid))

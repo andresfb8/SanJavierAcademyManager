@@ -188,8 +188,9 @@ service cloud.firestore {
 
     match /coaches/{coachId} {
       // director/coordinador: full CRUD within their club.
-      // All other roles: no access.
-      allow read: if isAdmin() && belongsToClub();
+      // entrenador: can read their own coach document (to resolve their coachId).
+      allow read: if isAdmin() && belongsToClub() ||
+        (hasRole('entrenador') && belongsToClub() && resource.data.userId == request.auth.uid);
       allow create: if isAdmin() && incomingBelongsToClub();
       allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
       allow delete: if isAdmin() && belongsToClub();
@@ -258,14 +259,61 @@ service cloud.firestore {
       allow delete: if isAdmin() && belongsToClub();
     }
 
+    // ─── Private Lessons Collection ─────────────────────────────────────
+    // director/coordinador: CRUD completo.
+    // entrenador: lectura y escritura de sus propias clases particulares.
+
+    match /privateLessons/{lessonId} {
+      allow read: if isAuthenticated() && belongsToClub() && (
+        isAdmin() ||
+        (hasRole('entrenador') && resource.data.coachId == request.auth.uid)
+      );
+      allow create: if isAuthenticated() && incomingBelongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador')
+      );
+      allow update: if isAuthenticated() && belongsToClub() && incomingBelongsToClub() && (
+        isAdmin() ||
+        (hasRole('entrenador') && resource.data.coachId == request.auth.uid)
+      );
+      allow delete: if isAdmin() && belongsToClub() ||
+        (hasRole('entrenador') && belongsToClub() && resource.data.coachId == request.auth.uid);
+    }
+
+    // ─── Private Lesson Payments Collection ─────────────────────────────
+    // director/coordinador: CRUD completo.
+    // entrenador: lectura y actualizacion de pagos de sus propias clases.
+    // jugador: lectura de sus propios pagos.
+    // tutor: lectura de pagos de sus hijos.
+
+    match /privateLessonPayments/{paymentId} {
+      allow read: if isAuthenticated() && belongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador') ||
+        (hasRole('jugador') && isOwnPlayer(resource.data.playerId)) ||
+        (hasRole('tutor') && isChildPlayer(resource.data.playerId))
+      );
+      allow create: if isAuthenticated() && incomingBelongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador')
+      );
+      allow update: if isAuthenticated() && belongsToClub() && incomingBelongsToClub() && (
+        isAdmin() ||
+        hasRole('entrenador')
+      );
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
     // ─── Event Payments Collection ──────────────────────────────────────
     // director/coordinador: CRUD completo.
+    // entrenador: lectura de pagos de sus propios eventos.
     // jugador: lectura de sus propios pagos de evento.
     // tutor: lectura de pagos de eventos de sus hijos.
 
     match /eventPayments/{paymentId} {
       allow read: if isAuthenticated() && belongsToClub() && (
         isAdmin() ||
+        hasRole('entrenador') ||
         (hasRole('jugador') && isOwnPlayer(resource.data.playerId)) ||
         (hasRole('tutor') && isChildPlayer(resource.data.playerId))
       );

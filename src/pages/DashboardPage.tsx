@@ -64,6 +64,7 @@ const defaultKpiConfig: KpiConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
+  const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
   const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts, cleanupOrphanedPayments } = useDataStore()
 
@@ -272,7 +273,7 @@ export default function DashboardPage() {
               iconClassName="bg-blue-50 text-blue-600"
             />
           )}
-          {canReadPayments && kpiConfig.revenue && (
+          {isAdmin && kpiConfig.revenue && (
             <StatCard
               title="Ingresos este mes"
               value={formatCurrency(currentRevenue)}
@@ -281,7 +282,7 @@ export default function DashboardPage() {
               iconClassName="bg-green-50 text-green-600"
             />
           )}
-          {canReadPayments && kpiConfig.pendingPayments && (
+          {isAdmin && kpiConfig.pendingPayments && (
             <StatCard
               title="Pagos pendientes"
               value={formatCurrency(currentPending)}
@@ -298,7 +299,7 @@ export default function DashboardPage() {
               iconClassName="bg-purple-50 text-purple-600"
             />
           )}
-          {canReadPayments && kpiConfig.collectionRate && (
+          {isAdmin && kpiConfig.collectionRate && (
             <StatCard
               title="Ratio de cobro"
               value={`${collectionRate}%`}
@@ -453,7 +454,7 @@ export default function DashboardPage() {
         )}
 
         {/* Financial chart row */}
-        {canReadPayments && kpiConfig.financialChart && (
+        {isAdmin && kpiConfig.financialChart && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -596,7 +597,7 @@ export default function DashboardPage() {
                 { key: 'totalEnrolled', label: 'Total alumnos inscritos', financial: false },
                 { key: 'waitingList', label: 'Lista de espera', financial: false },
                 { key: 'rotationIndex', label: 'Índice de rotación', financial: false },
-              ].filter((item) => !item.financial || canReadPayments).map((item) => (
+              ].filter((item) => !item.financial || isAdmin).map((item) => (
                 <div key={item.key} className="flex items-center gap-3">
                   <Checkbox
                     checked={kpiConfig[item.key]}
@@ -614,7 +615,7 @@ export default function DashboardPage() {
                   { key: 'attendanceChart', label: 'Grafico de asistencia semanal', financial: false },
                   { key: 'levelChart', label: 'Grafico de distribucion por nivel', financial: false },
                   { key: 'financialChart', label: 'Grafico resumen financiero', financial: true },
-                ].filter((item) => !item.financial || canReadPayments).map((item) => (
+                ].filter((item) => !item.financial || isAdmin).map((item) => (
                   <div key={item.key} className="flex items-center gap-3 mb-3">
                     <Checkbox
                       checked={kpiConfig[item.key]}
