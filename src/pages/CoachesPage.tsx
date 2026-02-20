@@ -338,8 +338,8 @@ export default function CoachesPage() {
               const salary = getEstimatedSalary(coach.id)
               const config = getSalaryConfig(coach.id)
               return (
-                <Card key={coach.id} className="overflow-hidden">
-                  <CardContent className="p-5">
+                <Card key={coach.id} className="flex flex-col overflow-hidden border-border/60 shadow-[var(--shadow-card)] hover-lift">
+                  <CardContent className="flex flex-col flex-1 p-5">
                     <div className="flex items-start gap-4 mb-4">
                       <Avatar className="h-14 w-14">
                         <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
@@ -375,7 +375,7 @@ export default function CoachesPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2 mb-4">
+                    <div className="space-y-2 mb-4 flex-1">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Mail className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{coach.email}</span>
@@ -422,13 +422,13 @@ export default function CoachesPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 pt-3 border-t">
+                    <div className="flex items-center gap-2 pt-3 border-t border-border/60 mt-auto">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => navigate(`/entrenadores/${coach.id}`)}
                       >
-                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
                         Ver perfil
                       </Button>
                       {!coach.userId && (
@@ -437,7 +437,7 @@ export default function CoachesPage() {
                           size="sm"
                           onClick={() => handleCreateAccount(coach)}
                         >
-                          <UserPlus className="h-3.5 w-3.5 mr-1" />
+                          <UserPlus className="h-3.5 w-3.5 mr-1.5" />
                           Crear cuenta
                         </Button>
                       )}
@@ -447,13 +447,13 @@ export default function CoachesPage() {
                         className="flex-1"
                         onClick={() => openEditDialog(coach)}
                       >
-                        <Edit2 className="h-3.5 w-3.5 mr-1" />
+                        <Edit2 className="h-3.5 w-3.5 mr-1.5" />
                         Editar
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={() => setShowDeleteConfirm(coach.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

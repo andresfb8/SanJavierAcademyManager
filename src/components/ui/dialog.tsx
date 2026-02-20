@@ -29,7 +29,6 @@ function DialogContent({ children, className }: { children: React.ReactNode; cla
   const { open, setOpen } = React.useContext(DialogContext)
   if (!open) return null
 
-  // Separate DialogFooter children from the rest so the footer is always sticky
   const childrenArray = React.Children.toArray(children)
   const footerChildren = childrenArray.filter(
     (child) => React.isValidElement(child) && (child.type as any).displayName === 'DialogFooter'
@@ -39,38 +38,49 @@ function DialogContent({ children, className }: { children: React.ReactNode; cla
   )
 
   return createPortal(
-    // On mobile: flex column anchored to bottom (bottom sheet)
-    // On sm+: centered modal (original behavior)
     <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
+      {/* Backdrop — deeper blur + darker */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => setOpen(false)}
+      />
       {/* Panel */}
       <div
         className={cn(
-          // Base
-          "relative z-50 bg-background shadow-xl border flex flex-col",
-          // Mobile: full width, rounded top corners, up to 90vh
+          // Base: white card, border, shadow, flex column
+          "relative z-50 bg-card text-card-foreground flex flex-col",
+          "border border-border/60",
+          "shadow-2xl",
+          // Mobile: full width, slide up from bottom, rounded top
           "w-full rounded-t-2xl max-h-[90svh]",
-          // Desktop: centered card, rounded all corners, constrained width
-          "sm:w-full sm:max-w-lg sm:rounded-2xl sm:max-h-[90svh] sm:mx-4",
+          // Desktop: centered, rounded all corners, max width
+          "sm:w-full sm:max-w-lg sm:rounded-2xl sm:max-h-[85svh] sm:mx-4",
+          // Animate in
+          "animate-fade-in",
           className
         )}
       >
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/25" />
         </div>
-        {/* Close button */}
-        <button onClick={() => setOpen(false)} className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 z-10">
-          <X className="h-4 w-4" />
+
+        {/* Close button — refined */}
+        <button
+          onClick={() => setOpen(false)}
+          className="absolute right-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" />
         </button>
+
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 p-4 sm:p-6">
+        <div className="overflow-y-auto flex-1 px-5 py-5 sm:px-6 sm:pt-6 sm:pb-4">
           {bodyChildren}
         </div>
-        {/* Sticky footer */}
+
+        {/* Sticky footer — same 16px inset as the close button (right-4 top-4) */}
         {footerChildren.length > 0 && (
-          <div className="border-t bg-background px-4 sm:px-6 py-3 flex-shrink-0 pb-[env(safe-area-inset-bottom,12px)]">
+          <div className="flex-shrink-0 border-t border-border/60 bg-muted/30 p-4 rounded-b-2xl pb-[max(1rem,env(safe-area-inset-bottom))]">
             {footerChildren}
           </div>
         )}
@@ -80,21 +90,41 @@ function DialogContent({ children, className }: { children: React.ReactNode; cla
   )
 }
 
-
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left mb-4", className)} {...props} />
+  return (
+    <div
+      className={cn(
+        "flex flex-col space-y-1 mb-5 pr-8", // pr-8 leaves room for close button
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
 function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />
+  return (
+    <h2
+      className={cn(
+        "text-lg font-bold leading-tight tracking-tight text-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
 function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+  return <p className={cn("text-sm text-muted-foreground mt-1", className)} {...props} />
 }
 
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />
+  return (
+    <div
+      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2", className)}
+      {...props}
+    />
+  )
 }
 DialogFooter.displayName = 'DialogFooter'
 

@@ -1,55 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
+  /* ── Base Canvas ── */
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
   --color-card: #ffffff;
-  --color-card-foreground: #0a0a0a;
+  --color-card-foreground: #0f172a;
   --color-popover: #ffffff;
-  --color-popover-foreground: #0a0a0a;
-  --color-primary: #2563eb;
+  --color-popover-foreground: #0f172a;
+
+  /* ── Brand/Primary: Deep Teal ── */
+  --color-primary: #0e7490;
   --color-primary-foreground: #ffffff;
+
+  /* ── Secondary / UI surfaces ── */
   --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0f172a;
+  --color-secondary-foreground: #334155;
   --color-muted: #f1f5f9;
   --color-muted-foreground: #64748b;
-  --color-accent: #f1f5f9;
-  --color-accent-foreground: #0f172a;
+  --color-accent: #ecfeff;
+  --color-accent-foreground: #0e7490;
+
+  /* ── Semantic ── */
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
-  --color-ring: #2563eb;
-  --color-chart-1: #2563eb;
-  --color-chart-2: #10b981;
-  --color-chart-3: #f59e0b;
-  --color-chart-4: #8b5cf6;
-  --color-chart-5: #ef4444;
-  --color-sidebar-background: #0f172a;
-  --color-sidebar-foreground: #e2e8f0;
-  --color-sidebar-primary: #3b82f6;
-  --color-sidebar-primary-foreground: #ffffff;
-  --color-sidebar-accent: #1e293b;
-  --color-sidebar-accent-foreground: #e2e8f0;
-  --color-sidebar-border: #1e293b;
-  --color-sidebar-ring: #3b82f6;
   --color-success: #10b981;
   --color-success-foreground: #ffffff;
   --color-warning: #f59e0b;
   --color-warning-foreground: #ffffff;
-  --radius-lg: 0.5rem;
+
+  /* ── Borders & Inputs ── */
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #0e7490;
+
+  /* ── Chart Palette (teal → amber → emerald → rose → slate) ── */
+  --color-chart-1: #0e7490;
+  --color-chart-2: #f59e0b;
+  --color-chart-3: #10b981;
+  --color-chart-4: #f43f5e;
+  --color-chart-5: #6366f1;
+
+  /* ── Sidebar: Rich Teal-Dark ── */
+  --color-sidebar-background: #0c3547;
+  --color-sidebar-foreground: #e2f4f9;
+  --color-sidebar-primary: #f59e0b;
+  --color-sidebar-primary-foreground: #0c3547;
+  --color-sidebar-accent: #134e68;
+  --color-sidebar-accent-foreground: #e2f4f9;
+  --color-sidebar-border: #1a5e7a;
+  --color-sidebar-ring: #f59e0b;
+
+  /* ── Radius ── */
+  --radius-lg: 0.75rem;
   --radius-md: calc(var(--radius-lg) - 2px);
   --radius-sm: calc(var(--radius-lg) - 4px);
+
+  /* ── Shadows ── */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.12), 0 2px 4px -1px rgb(0 0 0 / 0.08);
+  --shadow-header: 0 1px 8px 0 rgb(15 23 42 / 0.08);
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+  }
+}
+
+@layer utilities {
+
+  /* Page fade-in animation */
+  .animate-fade-in {
+    animation: fade-in 0.22s ease-out both;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Sidebar slide-in on mobile */
+  .animate-slide-in-left {
+    animation: slide-in-left 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  /* Interactive lift on hover */
+  .hover-lift {
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Accent bar for stat cards */
+  .stat-card-accent {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card-accent::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 4px 0 0 4px;
   }
 }

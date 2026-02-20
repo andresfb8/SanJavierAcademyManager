@@ -27,8 +27,8 @@ import * as XLSX from 'xlsx'
 import type { Player, PlayerLevel, PlayerStatus } from '@/types'
 import {
   Plus, Search, Upload, Download, Users, Mail, Phone,
-  MoreHorizontal, Eye, Edit, Trash2, UserX,
-  ArrowUpDown, ArrowUp, ArrowDown,
+  MoreHorizontal, Eye, Edit, Trash2, UserX, CheckCircle2,
+  Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
 } from 'lucide-react'
 
 export default function PlayersPage() {
@@ -336,16 +336,69 @@ export default function PlayersPage() {
 
         {/* Bulk actions */}
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 rounded-lg bg-muted p-3">
-            <span className="text-sm font-medium">{selectedIds.size} seleccionados</span>
-            <Button variant="outline" size="sm" onClick={() => {
-              selectedIds.forEach((id) => cancelPlayer(id))
-              setSelectedIds(new Set())
-            }}>
-              <UserX className="h-4 w-4 mr-1" />
-              Dar de baja
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+            <span className="text-sm font-semibold text-primary">
+              {selectedIds.size} seleccionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+            <div className="h-4 w-px bg-border mx-1" />
+
+            {/* Cambiar estado */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Cambiar estado
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => {
+                  selectedIds.forEach((id) => updatePlayer(id, { status: 'activo' }))
+                  setSelectedIds(new Set())
+                }}>
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 mr-2" />
+                  Activo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  selectedIds.forEach((id) => updatePlayer(id, { status: 'lista_espera' }))
+                  setSelectedIds(new Set())
+                }}>
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mr-2" />
+                  Lista de espera
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  selectedIds.forEach((id) => cancelPlayer(id))
+                  setSelectedIds(new Set())
+                }}>
+                  <UserX className="h-3.5 w-3.5 mr-2 text-destructive" />
+                  <span className="text-destructive">Dar de baja</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Cambiar nivel */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  Cambiar nivel
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {PLAYER_LEVELS.map((lvl) => (
+                  <DropdownMenuItem key={lvl.value} onClick={() => {
+                    selectedIds.forEach((id) => updatePlayer(id, { level: lvl.value as PlayerLevel }))
+                    setSelectedIds(new Set())
+                  }}>
+                    {lvl.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
               Deseleccionar
             </Button>
           </div>

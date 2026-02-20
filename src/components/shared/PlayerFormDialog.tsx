@@ -138,7 +138,7 @@ function PlayerFormDialog({ open, onOpenChange, player, onSubmit }: PlayerFormDi
                 <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>DNI *</Label>
+                <Label>DNI</Label>
                 <Input value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} />
               </div>
               <div className="space-y-2">

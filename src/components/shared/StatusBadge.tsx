@@ -6,21 +6,22 @@ interface StatusBadgeProps {
   className?: string
 }
 
-const defaultColorMap: Record<string, string> = {
-  activo: 'bg-green-100 text-green-800',
-  lista_espera: 'bg-yellow-100 text-yellow-800',
-  baja: 'bg-red-100 text-red-800',
-  presente: 'bg-green-100 text-green-800',
-  ausente: 'bg-red-100 text-red-800',
-  justificado: 'bg-yellow-100 text-yellow-800',
-  pendiente: 'bg-yellow-100 text-yellow-800',
-  pagado: 'bg-green-100 text-green-800',
-  cancelado: 'bg-gray-100 text-gray-800',
-  iniciacion: 'bg-green-100 text-green-800',
-  intermedio: 'bg-blue-100 text-blue-800',
-  avanzado: 'bg-purple-100 text-purple-800',
-  competicion: 'bg-red-100 text-red-800',
-  menores: 'bg-yellow-100 text-yellow-800',
+// Each entry: "dot-color bg text-color"
+const defaultColorMap: Record<string, { dot: string; badge: string }> = {
+  activo: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+  lista_espera: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  baja: { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-800 ring-rose-200' },
+  presente: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+  ausente: { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-800 ring-rose-200' },
+  justificado: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  pendiente: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  pagado: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+  cancelado: { dot: 'bg-slate-400', badge: 'bg-slate-50 text-slate-600 ring-slate-200' },
+  iniciacion: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+  intermedio: { dot: 'bg-cyan-500', badge: 'bg-cyan-50 text-cyan-800 ring-cyan-200' },
+  avanzado: { dot: 'bg-indigo-500', badge: 'bg-indigo-50 text-indigo-800 ring-indigo-200' },
+  competicion: { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-800 ring-rose-200' },
+  menores: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800 ring-amber-200' },
 }
 
 const labelMap: Record<string, string> = {
@@ -40,19 +41,32 @@ const labelMap: Record<string, string> = {
   menores: 'Menores',
 }
 
+const fallback = { dot: 'bg-slate-400', badge: 'bg-slate-50 text-slate-600 ring-slate-200' }
+
 export function StatusBadge({ status, colorMap, className }: StatusBadgeProps) {
-  const colors = colorMap || defaultColorMap
-  const colorClass = colors[status] || 'bg-gray-100 text-gray-800'
+  // colorMap prop stays backward-compatible: if plain string map passed, render legacy style
+  if (colorMap) {
+    const colorClass = colorMap[status] || 'bg-gray-100 text-gray-800'
+    const label = labelMap[status] || status
+    return (
+      <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', colorClass, className)}>
+        {label}
+      </span>
+    )
+  }
+
+  const styles = defaultColorMap[status] || fallback
   const label = labelMap[status] || status
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold',
-        colorClass,
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
+        styles.badge,
         className
       )}
     >
+      <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', styles.dot)} />
       {label}
     </span>
   )
