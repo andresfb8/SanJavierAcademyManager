@@ -555,6 +555,14 @@ export const useDataStore = create<DataState>()(
           const updatedG = get().groups.find((g) => g.id === enrollment.groupId)
           if (updatedG) syncDoc('groups', updatedG.id, updatedG as any, clubId)
         }
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'enrollment_deleted',
+          description: `${enrollment.playerName} dado de baja del grupo ${enrollment.groupName}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       addPayment: (paymentData) => {
@@ -740,13 +748,30 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         const updated = get().privateLessons.find((l) => l.id === id)
         if (clubId && updated) syncDoc('privateLessons', id, updated as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'lesson_updated',
+          description: `Clase particular actualizada (${updated?.coachName || id})`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       deletePrivateLesson: (id) => {
+        const lesson = get().privateLessons.find((l) => l.id === id)
         const paymentsToDelete = get().privateLessonPayments.filter((p) => p.lessonId === id).map((p) => p.id)
         set((state) => ({ privateLessons: state.privateLessons.filter((l) => l.id !== id), privateLessonPayments: state.privateLessonPayments.filter((p) => p.lessonId !== id) }))
         deleteFirestoreDoc('privateLessons', id)
         paymentsToDelete.forEach((pid) => deleteFirestoreDoc('privateLessonPayments', pid))
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'lesson_deleted',
+          description: `Clase particular eliminada (${lesson?.coachName || id} - ${lesson?.date ? new Date(lesson.date).toLocaleDateString('es-ES') : ''})`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       addPrivateLessonPayment: (paymentData) => {
@@ -866,8 +891,17 @@ export const useDataStore = create<DataState>()(
       },
 
       deleteEvaluation: (id) => {
+        const evaluation = get().evaluations.find((e) => e.id === id)
         set((state) => ({ evaluations: state.evaluations.filter((e) => e.id !== id) }))
         deleteFirestoreDoc('evaluations', id)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'evaluation_deleted',
+          description: `Evaluación eliminada (${evaluation?.playerName || id})`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       addMatchReport: (reportData) => {
@@ -886,8 +920,17 @@ export const useDataStore = create<DataState>()(
       },
 
       deleteMatchReport: (id) => {
+        const report = get().matchReports.find((r) => r.id === id)
         set((state) => ({ matchReports: state.matchReports.filter((r) => r.id !== id) }))
         deleteFirestoreDoc('matchReports', id)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'match_report_deleted',
+          description: `Informe de partido eliminado (${report?.title || id})`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       updateCoachSalaryConfig: (coachId, config) => {
