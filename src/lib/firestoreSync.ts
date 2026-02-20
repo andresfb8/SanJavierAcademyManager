@@ -35,12 +35,15 @@ export function fromFirestore(data: Record<string, unknown>): Record<string, unk
 export function toFirestore(data: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(data)) {
-    if (value instanceof Date) {
+    if (value === undefined || typeof value === 'function') {
+      // Omit: Firestore doesn't support undefined or functions
+    } else if (value instanceof Date) {
       result[key] = Timestamp.fromDate(value)
     } else if (Array.isArray(value)) {
       result[key] = value.map((v) => (v instanceof Date ? Timestamp.fromDate(v) : v))
-    } else if (typeof value === 'function') {
-      // skip functions (no deben llegar, pero por seguridad)
+    } else if (value !== null && typeof value === 'object') {
+      // Recursively clean nested objects (e.g. guardian, which has optional string fields)
+      result[key] = toFirestore(value as Record<string, unknown>)
     } else {
       result[key] = value
     }
@@ -64,17 +67,19 @@ export async function loadCollection<T>(
   })) as T[]
 }
 
-// Escribe/sobreescribe un doc en Firestore (fire-and-forget, no bloquea la UI)
+// Escribe/sobreescribe un doc en Firestore.
+// Retorna la Promise para que el caller pueda detectar errores de escritura.
 export function syncDoc(
   collectionName: string,
   id: string,
   data: Record<string, unknown>,
   clubId: string
-): void {
+): Promise<void> {
   const payload = toFirestore({ ...data, clubId })
-  setDoc(doc(db, collectionName, id), payload).catch((err) =>
-    console.warn(`[Firestore] Error syncing ${collectionName}/${id}:`, err)
-  )
+  return setDoc(doc(db, collectionName, id), payload).catch((err) => {
+    console.error(`[Firestore] FAILED syncing ${collectionName}/${id}:`, err)
+    throw err
+  })
 }
 
 // Elimina un doc en Firestore (fire-and-forget, no bloquea la UI)

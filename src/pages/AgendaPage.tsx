@@ -14,7 +14,7 @@ import { useDataStore } from '@/stores/dataStore'
 import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
-import type { PrivateLesson, EventType, PaymentMethod } from '@/types'
+import type { PrivateLesson, EventType } from '@/types'
 
 // ==========================================
 // Constantes de la agenda
@@ -411,30 +411,12 @@ export default function AgendaPage() {
   }
 
   function handleMarkLessonPlayerPaid(paymentId: string) {
-    const method = (lessonPaymentMethods[paymentId] || 'efectivo') as PaymentMethod
+    const method = (lessonPaymentMethods[paymentId] || 'efectivo') as 'efectivo' | 'transferencia' | 'domiciliacion' | 'tarjeta'
     updatePrivateLessonPayment(paymentId, {
       status: 'pagado',
       paidDate: new Date(),
       paymentMethod: method,
     })
-  }
-
-  function handleMigrateLessonPayments() {
-    if (!selectedLesson || !selectedLessonId) return
-    const participantCount = selectedLesson.playerIds.length
-    const perPlayerAmount = participantCount > 0 ? selectedLesson.price / participantCount : 0
-    const lessonDate = selectedLesson.date instanceof Date ? selectedLesson.date : new Date(selectedLesson.date)
-    for (let i = 0; i < selectedLesson.playerIds.length; i++) {
-      addPrivateLessonPayment({
-        lessonId: selectedLessonId,
-        lessonDate,
-        playerId: selectedLesson.playerIds[i],
-        playerName: selectedLesson.playerNames[i],
-        amount: perPlayerAmount,
-        status: selectedLesson.isPaid ? 'pagado' : 'pendiente',
-        ...(selectedLesson.isPaid ? { paidDate: new Date(), paymentMethod: 'efectivo' as PaymentMethod } : {}),
-      })
-    }
   }
 
   const activePlayers = useMemo(
@@ -568,21 +550,21 @@ export default function AgendaPage() {
                               const paidCount = lessonPmts.filter((p) => p.status === 'pagado').length
                               const totalCount = lessonPmts.length
                               return (
-                              <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
-                                <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }} onClick={() => openLessonDetail(startingBlock.id)}>
-                                  <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
-                                  <div className="mt-1 space-y-0.5">
-                                    <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>
-                                    {startingBlock.price !== undefined && startingBlock.price > 0 && <p className="text-xs font-medium text-amber-700">{formatCurrency(startingBlock.price)}</p>}
-                                    {totalCount > 0 && (
-                                      <p className={`text-[10px] font-medium ${paidCount === totalCount ? 'text-green-700' : 'text-yellow-700'}`}>
-                                        <Euro className="h-3 w-3 inline mr-0.5" />{paidCount}/{totalCount} pagados
-                                      </p>
-                                    )}
+                                <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
+                                  <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }} onClick={() => openLessonDetail(startingBlock.id)}>
+                                    <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
+                                    <div className="mt-1 space-y-0.5">
+                                      <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>
+                                      {startingBlock.price !== undefined && startingBlock.price > 0 && <p className="text-xs font-medium text-amber-700">{formatCurrency(startingBlock.price)}</p>}
+                                      {totalCount > 0 && (
+                                        <p className={`text-[10px] font-medium ${paidCount === totalCount ? 'text-green-700' : 'text-yellow-700'}`}>
+                                          <Euro className="h-3 w-3 inline mr-0.5" />{paidCount}/{totalCount} pagados
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
                               )
                             }
                           }
@@ -622,7 +604,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Nueva clase particular */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nueva clase particular</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
@@ -676,7 +658,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Detalle/Edicion clase particular */}
       <Dialog open={lessonDetailOpen} onOpenChange={setLessonDetailOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{lessonEditMode ? 'Editar clase particular' : 'Clase particular'}</DialogTitle></DialogHeader>
           {selectedLesson && !lessonEditMode && (
             <div className="space-y-4">
@@ -738,15 +720,7 @@ export default function AgendaPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="rounded-md border border-dashed p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Esta clase usa el sistema de pago antiguo.
-                      {selectedLesson.isPaid ? ' Estado: Pagada.' : ' Estado: Pendiente.'}
-                    </p>
-                    <Button variant="outline" size="sm" onClick={handleMigrateLessonPayments}>
-                      Migrar a pagos individuales
-                    </Button>
-                  </div>
+                  <p className="text-xs text-muted-foreground text-center py-2">Sin pagos registrados</p>
                 )}
               </div>
 
@@ -795,7 +769,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Nuevo evento */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nuevo evento</DialogTitle></DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div className="space-y-1.5"><Label>Nombre del evento</Label><Input value={evName} onChange={(e) => setEvName(e.target.value)} placeholder="Ej: Mini Torneo Navidad" /></div>

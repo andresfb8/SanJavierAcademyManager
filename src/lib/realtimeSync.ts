@@ -11,23 +11,23 @@ import { fromFirestore } from './firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
 
 const COLLECTIONS = [
-  { name: 'courts',                stateKey: 'courts'                },
-  { name: 'tariffs',               stateKey: 'tariffs'               },
-  { name: 'players',               stateKey: 'players'               },
-  { name: 'coaches',               stateKey: 'coaches'               },
-  { name: 'groups',                stateKey: 'groups'                },
-  { name: 'enrollments',           stateKey: 'enrollments'           },
-  { name: 'payments',              stateKey: 'payments'              },
-  { name: 'attendance',            stateKey: 'attendance'            },
-  { name: 'activities',            stateKey: 'activities'            },
-  { name: 'privateLessons',        stateKey: 'privateLessons'        },
-  { name: 'invitations',           stateKey: 'invitations'           },
-  { name: 'events',                stateKey: 'events'                },
-  { name: 'eventPayments',         stateKey: 'eventPayments'         },
+  { name: 'courts', stateKey: 'courts' },
+  { name: 'tariffs', stateKey: 'tariffs' },
+  { name: 'players', stateKey: 'players' },
+  { name: 'coaches', stateKey: 'coaches' },
+  { name: 'groups', stateKey: 'groups' },
+  { name: 'enrollments', stateKey: 'enrollments' },
+  { name: 'payments', stateKey: 'payments' },
+  { name: 'attendance', stateKey: 'attendance' },
+  { name: 'activities', stateKey: 'activities' },
+  { name: 'privateLessons', stateKey: 'privateLessons' },
+  { name: 'invitations', stateKey: 'invitations' },
+  { name: 'events', stateKey: 'events' },
+  { name: 'eventPayments', stateKey: 'eventPayments' },
   { name: 'privateLessonPayments', stateKey: 'privateLessonPayments' },
-  { name: 'evaluations',           stateKey: 'evaluations'           },
-  { name: 'matchReports',          stateKey: 'matchReports'          },
-  { name: 'coachSalaryConfigs',    stateKey: 'coachSalaryConfigs'    },
+  { name: 'evaluations', stateKey: 'evaluations' },
+  { name: 'matchReports', stateKey: 'matchReports' },
+  { name: 'coachSalaryConfigs', stateKey: 'coachSalaryConfigs' },
 ] as const
 
 /**
@@ -66,13 +66,28 @@ export function subscribeToAllData(
           ...fromFirestore(d.data() as Record<string, unknown>),
           id: d.id,
         }))
-        // Shallow merge — solo reemplaza esta colección, deja el resto intacto
+
+        // Safety guard: never replace existing local data with an empty Firestore
+        // result. This prevents data loss when a Firestore write failed silently
+        // (permission denied, wrong clubId) and the snapshot comes back empty.
+        const current = (useDataStore.getState() as unknown as Record<string, unknown>)[stateKey]
+        const currentCount = Array.isArray(current) ? current.length : 0
+
+        if (docs.length === 0 && currentCount > 0) {
+          console.warn(
+            `[realtimeSync] "${name}": Firestore returned 0 docs but store has ${currentCount}. ` +
+            `Skipping overwrite — check Firestore permissions and clubId on your documents.`
+          )
+          markLoaded(name)
+          return
+        }
+
         useDataStore.setState({ [stateKey]: docs })
         markLoaded(name)
       },
       (err) => {
         // Error de permisos u otro — no bloquear el spinner de carga
-        console.warn(`[realtimeSync] Error en colección "${name}":`, err)
+        console.error(`[realtimeSync] FAILED listening to "${name}":`, err)
         markLoaded(name)
       }
     )

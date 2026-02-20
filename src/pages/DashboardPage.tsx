@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  UserMinus,
 } from 'lucide-react'
 import {
   BarChart,
@@ -56,6 +57,7 @@ const defaultKpiConfig: KpiConfig = {
   totalEnrolled: true,
   waitingList: true,
   rotationIndex: true,
+  churnRate: true,
   // Chart visibility
   attendanceChart: true,
   levelChart: true,
@@ -139,7 +141,7 @@ export default function DashboardPage() {
     .reduce((sum, p) => sum + p.amount, 0)
   const collectionRate = totalCurrentMonth > 0 ? Math.round((currentRevenue / totalCurrentMonth) * 100) : 0
 
-  // Rotation index KPI
+  // Rotation index & Churn Rate KPIs
   const monthStart = new Date(currentYear, currentMonth - 1, 1)
   const monthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59)
 
@@ -152,6 +154,11 @@ export default function DashboardPage() {
   const rotationDivisor = activePlayers + bajasEsteMes
   const rotationIndex = rotationDivisor > 0
     ? Math.round(((bajasEsteMes + altasEsteMes) / rotationDivisor) * 100)
+    : 0
+
+  // Churn Rate = bajas / (activos al inicio del mes = activos ahora + bajas del mes)
+  const churnRate = rotationDivisor > 0
+    ? Math.round((bajasEsteMes / rotationDivisor) * 100)
     : 0
 
   // Attendance chart data (real data from current week)
@@ -337,6 +344,14 @@ export default function DashboardPage() {
               value={`${rotationIndex}%`}
               icon={RefreshCw}
               iconClassName="bg-teal-50 text-teal-600"
+            />
+          )}
+          {kpiConfig.churnRate && (
+            <StatCard
+              title="Ratio de abandono"
+              value={`${churnRate}%`}
+              icon={UserMinus}
+              iconClassName="bg-red-50 text-red-500"
             />
           )}
         </div>
@@ -597,6 +612,7 @@ export default function DashboardPage() {
                 { key: 'totalEnrolled', label: 'Total alumnos inscritos', financial: false },
                 { key: 'waitingList', label: 'Lista de espera', financial: false },
                 { key: 'rotationIndex', label: 'Índice de rotación', financial: false },
+                { key: 'churnRate', label: 'Ratio de abandono (Churn)', financial: false },
               ].filter((item) => !item.financial || isAdmin).map((item) => (
                 <div key={item.key} className="flex items-center gap-3">
                   <Checkbox

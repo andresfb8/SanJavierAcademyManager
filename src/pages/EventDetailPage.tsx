@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,10 +50,13 @@ export default function EventDetailPage() {
     deleteEvent,
     addEventPayment,
     updateEventPayment,
+    markEventPaymentPaid,
   } = useDataStore()
 
   // Estado para anadir asistente
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
+  // Estado para invitados
+  const [guestNameInput, setGuestNameInput] = useState('')
   // Estado para metodo de pago al marcar pagado
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
   // Estado para edicion y eliminacion
@@ -161,11 +164,48 @@ export default function EventDetailPage() {
 
   const handleMarkPaid = (paymentId: string) => {
     const method = paymentMethods[paymentId] || 'efectivo'
-    updateEventPayment(paymentId, {
-      status: 'pagado',
-      paidDate: new Date(),
-      paymentMethod: method as 'transferencia' | 'efectivo' | 'domiciliacion' | 'tarjeta',
+    markEventPaymentPaid(paymentId, method as 'transferencia' | 'efectivo' | 'domiciliacion' | 'tarjeta')
+  }
+
+  // Auto-crear pagos faltantes para asistentes sin pago (migración de eventos antiguos)
+  useEffect(() => {
+    if (!event) return
+    for (let i = 0; i < event.attendeePlayerIds.length; i++) {
+      const pid = event.attendeePlayerIds[i]
+      const hasPayment = thisEventPayments.some((ep) => ep.playerId === pid && ep.status !== 'cancelado')
+      if (!hasPayment) {
+        addEventPayment({
+          eventId: event.id,
+          eventName: event.name,
+          playerId: pid,
+          playerName: event.attendeePlayerNames[i] || 'Asistente',
+          amount: event.price,
+          status: 'pendiente',
+        })
+      }
+    }
+  }, [event?.id, event?.attendeePlayerIds.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAddGuest = () => {
+    if (!event || !guestNameInput.trim()) return
+    const guestName = guestNameInput.trim()
+    const guestId = `guest-${Date.now()}`
+
+    updateEvent(event.id, {
+      attendeePlayerIds: [...event.attendeePlayerIds, guestId],
+      attendeePlayerNames: [...event.attendeePlayerNames, guestName],
     })
+
+    addEventPayment({
+      eventId: event.id,
+      eventName: event.name,
+      playerId: guestId,
+      playerName: guestName,
+      amount: event.price,
+      status: 'pendiente',
+    })
+
+    setGuestNameInput('')
   }
 
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
@@ -365,7 +405,7 @@ export default function EventDetailPage() {
           </CardHeader>
           <CardContent>
             {/* Anadir asistente */}
-            <div className="flex items-end gap-3 mb-6 pb-4 border-b">
+            <div className="flex items-end gap-3 mb-3 pb-3 border-b">
               <div className="flex-1">
                 <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
                   Anadir asistente
@@ -391,7 +431,30 @@ export default function EventDetailPage() {
                 disabled={!selectedPlayerId || availablePlayers.length === 0}
               >
                 <UserPlus className="h-4 w-4 mr-1" />
-                Anadir
+                Añadir
+              </Button>
+            </div>
+
+            {/* Anadir invitado por nombre */}
+            <div className="flex items-end gap-3 mb-4 pb-4 border-b">
+              <div className="flex-1">
+                <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                  Añadir invitado (por nombre)
+                </label>
+                <Input
+                  placeholder="Nombre del invitado..."
+                  value={guestNameInput}
+                  onChange={(e) => setGuestNameInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() } }}
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleAddGuest}
+                disabled={!guestNameInput.trim()}
+              >
+                <UserPlus className="h-4 w-4 mr-1" />
+                Invitado
               </Button>
             </div>
 
@@ -548,7 +611,7 @@ export default function EventDetailPage() {
 
       {/* Dialogo de edicion */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Editar evento</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Nombre</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>

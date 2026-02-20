@@ -250,16 +250,36 @@ export interface PrivateLesson {
 // --- Actividad ---
 export type ActivityType =
   | 'player_created'
+  | 'player_updated'
+  | 'player_deleted'
   | 'player_cancelled'
   | 'payment_received'
   | 'payment_created'
   | 'payment_cancelled'
   | 'group_created'
+  | 'group_updated'
+  | 'group_deleted'
+  | 'coach_created'
+  | 'coach_updated'
+  | 'coach_deleted'
+  | 'enrollment_created'
+  | 'enrollment_deleted'
   | 'attendance_recorded'
   | 'recovery_used'
   | 'evaluation_created'
+  | 'evaluation_updated'
+  | 'evaluation_deleted'
   | 'event_created'
+  | 'event_updated'
+  | 'event_deleted'
+  | 'lesson_created'
+  | 'lesson_updated'
+  | 'lesson_deleted'
+  | 'match_report_created'
+  | 'match_report_updated'
+  | 'match_report_deleted'
   | 'invitation_sent'
+
 
 export interface Activity {
   id: string

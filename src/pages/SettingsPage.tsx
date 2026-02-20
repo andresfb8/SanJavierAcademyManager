@@ -61,6 +61,8 @@ export default function SettingsPage() {
   })
   const [deleteTariffId, setDeleteTariffId] = useState<string | null>(null)
 
+
+
   const handleSaveClub = () => {
     updateClub(clubForm)
     setClubSaved(true)
@@ -297,6 +299,7 @@ export default function SettingsPage() {
             </div>
           </TabsContent>
         </Tabs>
+
       </div>
 
       {/* Court Dialog */}
@@ -446,6 +449,7 @@ export default function SettingsPage() {
         confirmLabel="Eliminar"
         onConfirm={() => { if (deleteTariffId) deleteTariff(deleteTariffId); setDeleteTariffId(null) }}
       />
+
     </div>
   )
 }

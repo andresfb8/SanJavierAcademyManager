@@ -255,6 +255,8 @@ export default function EventsActivitiesPage() {
 
   function handleSaveLesson() {
     if (!formCourtId || !formCoachId || (formPlayerIds.length === 0 && formGuestNames.length === 0)) return
+    // Close dialog immediately
+    setLessonDialogOpen(false)
     const coach = coaches.find((c) => c.id === formCoachId)
     const court = activeCourts.find((c) => c.id === formCourtId)
     const selectedPlayers = players.filter((p) => formPlayerIds.includes(p.id))
@@ -304,12 +306,12 @@ export default function EventsActivitiesPage() {
         status: 'pendiente',
       })
     }
-
-    setLessonDialogOpen(false)
   }
 
   function handleSaveEvent() {
     if (!evName || evCourtIds.length === 0) return
+    // Close dialog immediately for instant UX feedback
+    setEventDialogOpen(false)
     const selectedCoaches = coaches.filter((c) => evCoachIds.includes(c.id))
     const selectedPlayers = players.filter((p) => evPlayerIds.includes(p.id))
     const selectedCourts = activeCourts.filter((c) => evCourtIds.includes(c.id))
@@ -354,7 +356,6 @@ export default function EventsActivitiesPage() {
         status: 'pendiente',
       })
     }
-    setEventDialogOpen(false)
   }
 
   function togglePlayer(id: string) {
@@ -567,7 +568,7 @@ export default function EventsActivitiesPage() {
 
       {/* New private lesson dialog */}
       <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nueva clase particular</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
@@ -616,9 +617,9 @@ export default function EventsActivitiesPage() {
 
       {/* New event dialog */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nuevo evento</DialogTitle></DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-4">
             <div className="space-y-1.5"><Label>Nombre del evento</Label><Input value={evName} onChange={(e) => setEvName(e.target.value)} placeholder="Ej: Mini Torneo Navidad" /></div>
             <div className="space-y-1.5"><Label>Tipo</Label><Select value={evType} onChange={(e) => setEvType(e.target.value as EventType)} options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))} /></div>
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={evDate} onChange={(e) => setEvDate(e.target.value)} /></div>

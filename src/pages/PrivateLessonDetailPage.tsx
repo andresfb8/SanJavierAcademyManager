@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +27,7 @@ import {
   Edit2,
   Trash2,
   StickyNote,
+  UserPlus,
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { PAYMENT_METHODS, PLAYER_LEVELS } from '@/constants'
@@ -49,12 +50,42 @@ export default function PrivateLessonDetailPage() {
     updatePrivateLesson,
     deletePrivateLesson,
     markPrivateLessonPaymentPaid,
+    addPrivateLessonPayment,
   } = useDataStore()
 
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
 
-  // Metodo de pago seleccionado por pago
+  // Auto-migrate legacy lessons: if there are players but no individual payments, create them
+  const lesson = useMemo(
+    () => privateLessons.find((l) => l.id === id),
+    [privateLessons, id]
+  )
+  const lessonPayments = useMemo(
+    () => privateLessonPayments.filter((p) => p.lessonId === id),
+    [privateLessonPayments, id]
+  )
+
+  useEffect(() => {
+    if (!lesson || lesson.playerIds.length === 0 || lessonPayments.length > 0) return
+    const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
+    const perPlayer = lesson.price / Math.max(lesson.playerIds.length, 1)
+    for (let i = 0; i < lesson.playerIds.length; i++) {
+      addPrivateLessonPayment({
+        lessonId: lesson.id,
+        lessonDate,
+        playerId: lesson.playerIds[i],
+        playerName: lesson.playerNames[i] || 'Jugador',
+        amount: perPlayer,
+        status: lesson.isPaid ? 'pagado' : 'pendiente',
+      })
+    }
+  }, [lesson?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
+
+  // Añadir jugadores/invitados post-creacion
+  const [addPlayerId, setAddPlayerId] = useState('')
+  const [guestNameInput, setGuestNameInput] = useState('')
 
   // Dialogs
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -74,15 +105,6 @@ export default function PrivateLessonDetailPage() {
   // DATOS DERIVADOS
   // ===================
 
-  const lesson = useMemo(
-    () => privateLessons.find((l) => l.id === id),
-    [privateLessons, id]
-  )
-
-  const lessonPayments = useMemo(
-    () => privateLessonPayments.filter((p) => p.lessonId === id),
-    [privateLessonPayments, id]
-  )
 
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
   const activeCoaches = useMemo(
@@ -191,6 +213,50 @@ export default function PrivateLessonDetailPage() {
         ? prev.filter((id) => id !== playerId)
         : [...prev, playerId]
     )
+  }
+
+  const handleAddPlayer = () => {
+    if (!lesson || !addPlayerId) return
+    if (lesson.playerIds.includes(addPlayerId)) return
+    const player = activePlayers.find((p) => p.id === addPlayerId)
+    if (!player) return
+    const playerName = `${player.firstName} ${player.lastName}`
+    const newCount = lesson.playerIds.length + 1
+    const perPlayer = lesson.price / newCount
+    updatePrivateLesson(lesson.id, {
+      playerIds: [...lesson.playerIds, addPlayerId],
+      playerNames: [...lesson.playerNames, playerName],
+    })
+    addPrivateLessonPayment({
+      lessonId: lesson.id,
+      lessonDate: lesson.date instanceof Date ? lesson.date : new Date(lesson.date),
+      playerId: addPlayerId,
+      playerName,
+      amount: perPlayer,
+      status: 'pendiente',
+    })
+    setAddPlayerId('')
+  }
+
+  const handleAddGuest = () => {
+    if (!lesson || !guestNameInput.trim()) return
+    const guestName = guestNameInput.trim()
+    const guestId = `guest-${Date.now()}`
+    const newCount = lesson.playerIds.length + 1
+    const perPlayer = lesson.price / newCount
+    updatePrivateLesson(lesson.id, {
+      playerIds: [...lesson.playerIds, guestId],
+      playerNames: [...lesson.playerNames, guestName],
+    })
+    addPrivateLessonPayment({
+      lessonId: lesson.id,
+      lessonDate: lesson.date instanceof Date ? lesson.date : new Date(lesson.date),
+      playerId: guestId,
+      playerName: guestName,
+      amount: perPlayer,
+      status: 'pendiente',
+    })
+    setGuestNameInput('')
   }
 
   // ===================
@@ -402,8 +468,8 @@ export default function PrivateLessonDetailPage() {
                             {payment
                               ? formatCurrency(payment.amount)
                               : formatCurrency(
-                                  lesson.price / Math.max(playerCount, 1)
-                                )}
+                                lesson.price / Math.max(playerCount, 1)
+                              )}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
@@ -441,6 +507,45 @@ export default function PrivateLessonDetailPage() {
               </Table>
             )}
           </CardContent>
+
+          {/* Añadir jugadores/invitados */}
+          {isAdmin && (
+            <div className="border-t px-6 py-4 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2"><UserPlus className="h-4 w-4" />Añadir participante</p>
+              {/* Jugador registrado */}
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={addPlayerId}
+                  onChange={(e) => setAddPlayerId(e.target.value)}
+                >
+                  <option value="">Seleccionar jugador registrado...</option>
+                  {activePlayers
+                    .filter((p) => !lesson.playerIds.includes(p.id))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.lastName}, {p.firstName}
+                      </option>
+                    ))}
+                </select>
+                <Button variant="outline" size="sm" onClick={handleAddPlayer} disabled={!addPlayerId}>
+                  Añadir
+                </Button>
+              </div>
+              {/* Invitado por nombre */}
+              <div className="flex gap-2">
+                <Input
+                  value={guestNameInput}
+                  onChange={(e) => setGuestNameInput(e.target.value)}
+                  placeholder="Nombre del invitado..."
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() } }}
+                />
+                <Button variant="outline" size="sm" onClick={handleAddGuest} disabled={!guestNameInput.trim()}>
+                  Invitado
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Resumen estadisticas */}
@@ -489,7 +594,7 @@ export default function PrivateLessonDetailPage() {
 
       {/* Dialogo de edicion */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar clase particular</DialogTitle>
           </DialogHeader>

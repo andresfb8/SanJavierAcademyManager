@@ -53,8 +53,19 @@ export function normalizeAllPayments(
 
   // Pagos de eventos
   for (const ep of eventPayments) {
+    let d: Date
     const refDate = ep.paidDate ?? ep.createdAt
-    const d = refDate instanceof Date ? refDate : new Date(refDate)
+    if (refDate instanceof Date) {
+      d = refDate
+    } else if (typeof refDate === 'string') {
+      d = new Date(refDate)
+    } else {
+      d = new Date() // Fallback seguro
+    }
+
+    // Ensure valid date
+    if (isNaN(d.getTime())) d = new Date()
+
     normalized.push({
       id: ep.id,
       source: 'evento',
@@ -73,7 +84,19 @@ export function normalizeAllPayments(
 
   // Pagos de clases particulares
   for (const plp of privateLessonPayments) {
-    const d = plp.lessonDate instanceof Date ? plp.lessonDate : new Date(plp.lessonDate)
+    let d: Date
+    const refDate = plp.lessonDate
+    if (refDate instanceof Date) {
+      d = refDate
+    } else if (typeof refDate === 'string') {
+      d = new Date(refDate)
+    } else {
+      d = new Date() // Fallback seguro
+    }
+
+    // Ensure valid date
+    if (isNaN(d.getTime())) d = new Date()
+
     normalized.push({
       id: plp.id,
       source: 'clase_particular',

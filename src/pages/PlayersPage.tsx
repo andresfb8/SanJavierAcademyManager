@@ -245,7 +245,7 @@ export default function PlayersPage() {
         const player = row.original
         return (
           <DropdownMenu>
-            <DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -382,8 +382,8 @@ export default function PlayersPage() {
                               {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                               {header.column.getCanSort() && (
                                 header.column.getIsSorted() === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> :
-                                header.column.getIsSorted() === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> :
-                                <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+                                  header.column.getIsSorted() === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> :
+                                    <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
                               )}
                             </div>
                           </th>

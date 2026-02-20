@@ -113,7 +113,7 @@ export default function PaymentsPage() {
   const availableYears = useMemo(() => {
     const currentYear = now.getFullYear()
     return [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2]
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Group options for filter
@@ -523,9 +523,9 @@ export default function PaymentsPage() {
                   <Plus className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Nuevo pago</span>
                 </Button>
-                <Button size="sm" onClick={handleGenerateReceipts}>
+                <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
                   <FileText className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Generar recibos</span>
+                  <span className="hidden sm:inline">Generar cuotas</span>
                 </Button>
               </>
             )}
@@ -606,11 +606,10 @@ export default function PaymentsPage() {
             <div className="inline-flex rounded-lg border border-input p-1 bg-muted/30">
               <button
                 type="button"
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  viewMode === 'mensual'
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'mensual'
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
                 onClick={() => setViewMode('mensual')}
               >
                 <TableIcon className="h-4 w-4" />
@@ -618,11 +617,10 @@ export default function PaymentsPage() {
               </button>
               <button
                 type="button"
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  viewMode === 'anual'
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'anual'
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
                 onClick={() => setViewMode('anual')}
               >
                 <BarChart3 className="h-4 w-4" />
@@ -725,9 +723,9 @@ export default function PaymentsPage() {
                                 {header.isPlaceholder
                                   ? null
                                   : flexRender(
-                                      header.column.columnDef.header,
-                                      header.getContext()
-                                    )}
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
                               </TableHead>
                             )
                           })}

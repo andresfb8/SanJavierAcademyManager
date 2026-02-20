@@ -401,6 +401,14 @@ export const useDataStore = create<DataState>()(
         set((state) => ({ coaches: [...state.coaches, newCoach] }))
         const clubId = getClubId()
         if (clubId) syncDoc('coaches', newCoach.id, newCoach as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'coach_created',
+          description: `Se añadió al entrenador ${coachData.firstName} ${coachData.lastName}`,
+          relatedEntityId: newCoach.id,
+          userId,
+          userName,
+        })
       },
 
       updateCoach: (id, data) => {
@@ -410,11 +418,28 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         const updated = get().coaches.find((c) => c.id === id)
         if (clubId && updated) syncDoc('coaches', id, updated as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'coach_updated',
+          description: `Se actualizó el perfil de ${updated?.firstName || id}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       deleteCoach: (id) => {
+        const coach = get().coaches.find((c) => c.id === id)
         set((state) => ({ coaches: state.coaches.filter((c) => c.id !== id) }))
         deleteFirestoreDoc('coaches', id)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'coach_deleted',
+          description: `Se eliminó el entrenador ${coach?.firstName || id} ${coach?.lastName || ''}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       addGroup: (groupData) => {
@@ -439,9 +464,18 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         const updated = get().groups.find((g) => g.id === id)
         if (clubId && updated) syncDoc('groups', id, updated as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'group_updated',
+          description: `Se actualizó el grupo ${updated?.name || id}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       deleteGroup: (id) => {
+        const group = get().groups.find((g) => g.id === id)
         const affectedEnrollments = get().enrollments.filter((e) => e.groupId === id)
         set((state) => ({
           groups: state.groups.filter((g) => g.id !== id),
@@ -452,6 +486,14 @@ export const useDataStore = create<DataState>()(
         if (clubId) {
           affectedEnrollments.forEach((e) => syncDoc('enrollments', e.id, { ...e, isActive: false } as any, clubId))
         }
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'group_deleted',
+          description: `Se eliminó el grupo ${group?.name || id}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
       addEnrollment: (enrollmentData) => {
         const newEnrollment: Enrollment = { ...enrollmentData, id: generateId() }
@@ -465,6 +507,14 @@ export const useDataStore = create<DataState>()(
           const updatedGroup = get().groups.find((g) => g.id === enrollmentData.groupId)
           if (updatedGroup) syncDoc('groups', updatedGroup.id, updatedGroup as any, clubId)
         }
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'enrollment_created',
+          description: `${enrollmentData.playerName} inscrito en ${enrollmentData.groupName}`,
+          relatedEntityId: newEnrollment.id,
+          userId,
+          userName,
+        })
       },
 
       updateEnrollment: (id, data) => {
@@ -481,6 +531,14 @@ export const useDataStore = create<DataState>()(
           groups: enrollment?.isActive ? state.groups.map((g) => g.id === enrollment.groupId ? { ...g, currentEnrollment: Math.max(0, g.currentEnrollment - 1) } : g) : state.groups,
         }))
         deleteFirestoreDoc('enrollments', id)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'enrollment_deleted',
+          description: `${enrollment?.playerName || 'Alumno'} dado de baja del grupo ${enrollment?.groupName || ''}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       deactivateEnrollment: (id) => {
@@ -666,6 +724,14 @@ export const useDataStore = create<DataState>()(
         set((state) => ({ privateLessons: [...state.privateLessons, newLesson] }))
         const clubId = getClubId()
         if (clubId) syncDoc('privateLessons', newId, newLesson as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'lesson_created',
+          description: `Clase particular creada con ${lessonData.coachName} (${lessonData.playerNames.join(', ')})`,
+          relatedEntityId: newId,
+          userId,
+          userName,
+        })
         return newId
       },
 
@@ -728,6 +794,14 @@ export const useDataStore = create<DataState>()(
         set((state) => ({ events: [...state.events, newEvent] }))
         const clubId = getClubId()
         if (clubId) syncDoc('events', newId, newEvent as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'event_created',
+          description: `Se creó el evento "${eventData.name}"`,
+          relatedEntityId: newId,
+          userId,
+          userName,
+        })
         return newId
       },
 
@@ -736,13 +810,30 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         const updated = get().events.find((e) => e.id === id)
         if (clubId && updated) syncDoc('events', id, updated as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'event_updated',
+          description: `Se actualizó el evento "${updated?.name || id}"`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       deleteEvent: (id) => {
+        const event = get().events.find((e) => e.id === id)
         const paymentsToDelete = get().eventPayments.filter((p) => p.eventId === id).map((p) => p.id)
         set((state) => ({ events: state.events.filter((e) => e.id !== id), eventPayments: state.eventPayments.filter((p) => p.eventId !== id) }))
         deleteFirestoreDoc('events', id)
         paymentsToDelete.forEach((pid) => deleteFirestoreDoc('eventPayments', pid))
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'event_deleted',
+          description: `Se eliminó el evento "${event?.name || id}"`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
       },
 
       addEventPayment: (paymentData) => {
