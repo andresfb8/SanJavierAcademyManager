@@ -13,6 +13,7 @@ import {
 import { auth, db } from '@/lib/firebase'
 import { migrateLocalToFirestore } from '@/lib/dataLoader'
 import { subscribeToAllData } from '@/lib/realtimeSync'
+import { retryFailedSyncs } from '@/lib/firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
 import type { AppUser, UserRole } from '@/types'
 
@@ -124,6 +125,14 @@ async function loadUserProfile(
     }
     migrateLocalToFirestore(appUser.clubId)
       .then(() => {
+        // Reintentar syncs fallidos de sesiones anteriores
+        return retryFailedSyncs()
+      })
+      .then((retriedCount) => {
+        if (retriedCount > 0) {
+          console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
+        }
+        // Iniciar listeners en tiempo real
         _dataUnsubscribe = subscribeToAllData(appUser.clubId, () => {
           setDataLoading(false)
         })

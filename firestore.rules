@@ -358,5 +358,20 @@ service cloud.firestore {
       allow update: if hasRole('director') && belongsToClub() && incomingBelongsToClub();
       allow delete: if hasRole('director') && belongsToClub();
     }
+
+    // ─── Receipt Generations Collection ─────────────────────────────────
+    // Tracking server-side de generación de recibos mensuales para prevenir duplicados.
+    // Solo directores/coordinadores pueden gestionar.
+
+    match /receiptGenerations/{generationId} {
+      // director/coordinador: lectura y escritura para tracking de generación
+      allow read: if isAdmin() && belongsToClub();
+
+      // director/coordinador: crear y actualizar tracking de generación
+      allow create, update: if isAdmin() && incomingBelongsToClub();
+
+      // Solo director puede eliminar (cleanup de records antiguos)
+      allow delete: if hasRole('director') && belongsToClub();
+    }
   }
 }

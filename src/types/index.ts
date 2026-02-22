@@ -416,3 +416,17 @@ export interface CoachSalaryConfig {
   bonuses: number
   notes?: string
 }
+
+// --- Generación de Recibos ---
+export type ReceiptGenerationStatus = 'pending' | 'completed' | 'failed'
+
+export interface ReceiptGeneration {
+  id: string // Format: `${clubId}-${year}-${month}`
+  clubId: string
+  year: number
+  month: number
+  generatedAt: Date
+  generatedBy: string // userId
+  receiptCount: number
+  status: ReceiptGenerationStatus
+}

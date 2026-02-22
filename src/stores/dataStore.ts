@@ -49,7 +49,15 @@ import {
 import { generateId } from '@/lib/utils'
 import { CANCELLATION_DEADLINE_DAY } from '@/constants'
 import { useAuthStore } from '@/stores/authStore'
-import { syncDoc, deleteFirestoreDoc } from '@/lib/firestoreSync'
+import {
+  syncDoc,
+  deleteFirestoreDoc,
+  syncDocWithRetry,
+  syncEnrollmentWithGroupCounter,
+  updateEnrollmentStatus,
+  generateMonthlyReceiptsAtomic,
+} from '@/lib/firestoreSync'
+import { toast } from '@/hooks/use-toast'
 
 // Helper: obtiene el clubId del usuario autenticado para sync con Firestore
 function getClubId(): string | undefined {
@@ -115,10 +123,10 @@ export interface DataState {
   deleteGroup: (id: string) => void
 
   // --- Enrollments CRUD ---
-  addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => void
+  addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<void>
   updateEnrollment: (id: string, data: Partial<Enrollment>) => void
   deleteEnrollment: (id: string) => void
-  deactivateEnrollment: (id: string) => void
+  deactivateEnrollment: (id: string) => Promise<void>
 
   // --- Payments ---
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => void
@@ -129,8 +137,8 @@ export interface DataState {
   markEventPaymentPaid: (id: string, method: PaymentMethod) => void
   markPrivateLessonPaymentPaid: (id: string, method: PaymentMethod) => void
   cancelPayment: (id: string) => void
-  generateMonthlyReceipts: (month: number, year: number) => number
-  checkAndAutoGenerateReceipts: () => void
+  generateMonthlyReceipts: (month: number, year: number) => Promise<number>
+  checkAndAutoGenerateReceipts: () => Promise<void>
   cleanupOrphanedPayments: () => void
   deleteAllPayments: () => Promise<void>
 
@@ -495,26 +503,51 @@ export const useDataStore = create<DataState>()(
           userName,
         })
       },
-      addEnrollment: (enrollmentData) => {
+      addEnrollment: async (enrollmentData) => {
         const newEnrollment: Enrollment = { ...enrollmentData, id: generateId() }
-        set((state) => ({
-          enrollments: [...state.enrollments, newEnrollment],
-          groups: state.groups.map((g) => g.id === enrollmentData.groupId && enrollmentData.isActive ? { ...g, currentEnrollment: g.currentEnrollment + 1 } : g),
-        }))
         const clubId = getClubId()
-        if (clubId) {
-          syncDoc('enrollments', newEnrollment.id, newEnrollment as any, clubId)
-          const updatedGroup = get().groups.find((g) => g.id === enrollmentData.groupId)
-          if (updatedGroup) syncDoc('groups', updatedGroup.id, updatedGroup as any, clubId)
+
+        if (!clubId) {
+          console.error('[addEnrollment] No clubId found')
+          return
         }
-        const { userId, userName } = getCurrentUser()
-        get().addActivity({
-          type: 'enrollment_created',
-          description: `${enrollmentData.playerName} inscrito en ${enrollmentData.groupName}`,
-          relatedEntityId: newEnrollment.id,
-          userId,
-          userName,
-        })
+
+        try {
+          // Transacción atómica para prevenir race conditions
+          await syncEnrollmentWithGroupCounter(
+            newEnrollment.id,
+            newEnrollment as any,
+            enrollmentData.groupId,
+            enrollmentData.isActive ? 1 : 0,
+            clubId
+          )
+
+          // Update local state (listeners confirmarán desde Firestore)
+          set((state) => ({
+            enrollments: [...state.enrollments, newEnrollment],
+            groups: state.groups.map((g) =>
+              g.id === enrollmentData.groupId && enrollmentData.isActive
+                ? { ...g, currentEnrollment: g.currentEnrollment + 1 }
+                : g
+            ),
+          }))
+
+          const { userId, userName } = getCurrentUser()
+          get().addActivity({
+            type: 'enrollment_created',
+            description: `${enrollmentData.playerName} inscrito en ${enrollmentData.groupName}`,
+            relatedEntityId: newEnrollment.id,
+            userId,
+            userName,
+          })
+
+          console.info('[addEnrollment] Success:', newEnrollment.id)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          console.error('[addEnrollment] Failed:', message)
+          toast.error(`Error al inscribir: ${message}`)
+          throw error
+        }
       },
 
       updateEnrollment: (id, data) => {
@@ -541,28 +574,48 @@ export const useDataStore = create<DataState>()(
         })
       },
 
-      deactivateEnrollment: (id) => {
+      deactivateEnrollment: async (id) => {
         const enrollment = get().enrollments.find((e) => e.id === id)
         if (!enrollment || !enrollment.isActive) return
-        set((state) => ({
-          enrollments: state.enrollments.map((e) => e.id === id ? { ...e, isActive: false, unenrollmentDate: new Date() } : e),
-          groups: state.groups.map((g) => g.id === enrollment.groupId ? { ...g, currentEnrollment: Math.max(0, g.currentEnrollment - 1) } : g),
-        }))
+
         const clubId = getClubId()
-        if (clubId) {
-          const updatedE = get().enrollments.find((e) => e.id === id)
-          if (updatedE) syncDoc('enrollments', id, updatedE as any, clubId)
-          const updatedG = get().groups.find((g) => g.id === enrollment.groupId)
-          if (updatedG) syncDoc('groups', updatedG.id, updatedG as any, clubId)
+        if (!clubId) {
+          console.error('[deactivateEnrollment] No clubId found')
+          return
         }
-        const { userId, userName } = getCurrentUser()
-        get().addActivity({
-          type: 'enrollment_deleted',
-          description: `${enrollment.playerName} dado de baja del grupo ${enrollment.groupName}`,
-          relatedEntityId: id,
-          userId,
-          userName,
-        })
+
+        try {
+          // Transacción atómica para actualizar enrollment y contador de grupo
+          await updateEnrollmentStatus(id, enrollment.groupId, false, clubId)
+
+          // Update local state (listeners confirmarán desde Firestore)
+          set((state) => ({
+            enrollments: state.enrollments.map((e) =>
+              e.id === id ? { ...e, isActive: false, unenrollmentDate: new Date() } : e
+            ),
+            groups: state.groups.map((g) =>
+              g.id === enrollment.groupId
+                ? { ...g, currentEnrollment: Math.max(0, g.currentEnrollment - 1) }
+                : g
+            ),
+          }))
+
+          const { userId, userName } = getCurrentUser()
+          get().addActivity({
+            type: 'enrollment_deleted',
+            description: `${enrollment.playerName} dado de baja del grupo ${enrollment.groupName}`,
+            relatedEntityId: id,
+            userId,
+            userName,
+          })
+
+          console.info('[deactivateEnrollment] Success:', id)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          console.error('[deactivateEnrollment] Failed:', message)
+          toast.error(`Error al desactivar inscripción: ${message}`)
+          throw error
+        }
       },
 
       addPayment: (paymentData) => {
@@ -644,44 +697,50 @@ export const useDataStore = create<DataState>()(
         if (clubId && updated) syncDoc('payments', id, updated as any, clubId)
       },
 
-      generateMonthlyReceipts: (month, year) => {
-        const state = get()
-        const newPayments: Payment[] = []
-        for (const group of state.groups) {
-          if (!group.isActive) continue
-          const tariff = state.tariffs.find((t) => t.id === group.defaultTariffId)
-          const billingFrequency = tariff?.billingFrequency ?? group.billingFrequency
-          const installmentMonths = tariff?.installmentMonths ?? group.installmentMonths ?? []
-          if (billingFrequency === 'installments' && !installmentMonths.includes(month)) continue
-          const groupEnrollments = state.enrollments.filter((e) => e.groupId === group.id && e.isActive)
-          for (const enrollment of groupEnrollments) {
-            const alreadyExists = state.payments.some((p) => p.enrollmentId === enrollment.id && p.billingMonth === month && p.billingYear === year)
-            if (alreadyExists) continue
-            const amount = tariff?.installmentPrices?.[month] ?? enrollment.customPrice ?? tariff?.price ?? group.defaultTariffPrice
-            newPayments.push({
-              id: generateId(), playerId: enrollment.playerId, playerName: enrollment.playerName, groupId: group.id,
-              groupName: group.name, enrollmentId: enrollment.id, concept: `Cuota ${group.name} (${month}/${year})`,
-              amount, category: 'cuota', status: 'pendiente', billingMonth: month, billingYear: year,
-              dueDate: new Date(year, month - 1, 5), autogenerated: true, createdAt: new Date(),
-            })
+      generateMonthlyReceipts: async (month, year) => {
+        const clubId = getClubId()
+        const userId = useAuthStore.getState().user?.id
+
+        if (!clubId || !userId) {
+          console.error('[generateMonthlyReceipts] No clubId or userId found')
+          return 0
+        }
+
+        try {
+          // Usar generación atómica server-side para prevenir duplicados
+          const count = await generateMonthlyReceiptsAtomic(clubId, month, year, userId, generateId)
+
+          console.info(`[generateMonthlyReceipts] Generated ${count} receipts for ${month}/${year}`)
+          if (count > 0) {
+            toast.success(`${count} recibos generados correctamente`)
           }
+
+          // Los listeners onSnapshot actualizarán el store automáticamente
+          return count
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          console.error('[generateMonthlyReceipts] Failed:', message)
+
+          // Silenciar si ya fueron generados (es esperado)
+          if (!message.includes('ya han sido generados') && !message.includes('en proceso')) {
+            toast.error(`Error al generar recibos: ${message}`)
+          }
+
+          return 0
         }
-        if (newPayments.length > 0) {
-          set((prevState) => ({ payments: [...prevState.payments, ...newPayments] }))
-          const clubId = getClubId()
-          if (clubId) newPayments.forEach((p) => syncDoc('payments', p.id, p as any, clubId))
-        }
-        return newPayments.length
       },
 
-      checkAndAutoGenerateReceipts: () => {
+      checkAndAutoGenerateReceipts: async () => {
         const now = new Date()
         const month = now.getMonth() + 1
         const year = now.getFullYear()
-        const key = `sjam-auto-receipts-${year}-${month}`
-        if (localStorage.getItem(key)) return
-        const generated = get().generateMonthlyReceipts(month, year)
-        if (generated >= 0) localStorage.setItem(key, new Date().toISOString())
+
+        try {
+          await get().generateMonthlyReceipts(month, year)
+        } catch (error) {
+          // Silenciar errores en auto-generación (no iniciada por usuario)
+          console.warn('[checkAndAutoGenerateReceipts] Failed (silent):', error)
+        }
       },
       addAttendanceRecord: (recordData) => {
         const newRecord: AttendanceRecord = { ...recordData, id: generateId(), createdAt: new Date() }

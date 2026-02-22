@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
 import type { UserRole } from '@/types'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { Toaster } from '@/components/ui/toaster'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import PlayersPage from '@/pages/PlayersPage'
@@ -77,37 +78,40 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/activar/:token" element={<ActivateAccountPage />} />
-      <Route
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/jugadores" element={<PlayersPage />} />
-        <Route path="/jugadores/:id" element={<PlayerProfilePage />} />
-        <Route path="/grupos" element={<GroupsPage />} />
-        <Route path="/grupos/:id" element={<GroupDetailPage />} />
-        <Route path="/asistencia" element={<AttendancePage />} />
-        <Route path="/agenda" element={<AgendaPage />} />
-        <Route path="/eventos" element={<EventsActivitiesPage />} />
-        <Route path="/eventos/:id" element={<EventDetailPage />} />
-        <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
-        <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
-        <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
-        <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
-        <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
-        <Route path="/informes" element={<EvaluacionesPage />} />
-        <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
-        <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
-        <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
-        <Route path="/planificacion" element={<PlanningPage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/activar/:token" element={<ActivateAccountPage />} />
+        <Route
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/jugadores" element={<PlayersPage />} />
+          <Route path="/jugadores/:id" element={<PlayerProfilePage />} />
+          <Route path="/grupos" element={<GroupsPage />} />
+          <Route path="/grupos/:id" element={<GroupDetailPage />} />
+          <Route path="/asistencia" element={<AttendancePage />} />
+          <Route path="/agenda" element={<AgendaPage />} />
+          <Route path="/eventos" element={<EventsActivitiesPage />} />
+          <Route path="/eventos/:id" element={<EventDetailPage />} />
+          <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
+          <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
+          <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
+          <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
+          <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
+          <Route path="/informes" element={<EvaluacionesPage />} />
+          <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
+          <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
+          <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
+          <Route path="/planificacion" element={<PlanningPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster />
+    </>
   )
 }

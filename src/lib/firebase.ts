@@ -15,4 +15,16 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Exportar funciones de Firestore para transacciones y operaciones atómicas
+export {
+  runTransaction,
+  writeBatch,
+  increment,
+  serverTimestamp,
+  updateDoc,
+  doc,
+  collection,
+} from 'firebase/firestore'
+
 export default app

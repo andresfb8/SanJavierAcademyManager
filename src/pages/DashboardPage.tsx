@@ -257,7 +257,7 @@ export default function DashboardPage() {
       <div className="p-5 lg:p-6 space-y-6">
 
         {/* ── KPI Cards ────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory -mx-5 px-5 lg:mx-0 lg:px-0 lg:pb-0 lg:grid lg:grid-cols-4 xl:grid-cols-5 gap-4 no-scrollbar">
           {kpiConfig.activePlayers && (
             <StatCard
               title="Jugadores activos"
@@ -265,6 +265,7 @@ export default function DashboardPage() {
               icon={Users}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {isAdmin && kpiConfig.revenue && (
@@ -275,6 +276,7 @@ export default function DashboardPage() {
               trend={{ value: revenueDiff, label: 'vs mes anterior' }}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {isAdmin && kpiConfig.pendingPayments && (
@@ -285,6 +287,7 @@ export default function DashboardPage() {
               trend={{ value: pendingDiff, label: 'vs mes anterior' }}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {kpiConfig.activeGroups && (
@@ -294,6 +297,7 @@ export default function DashboardPage() {
               icon={GraduationCap}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {isAdmin && kpiConfig.collectionRate && (
@@ -303,6 +307,7 @@ export default function DashboardPage() {
               icon={TrendingUp}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {kpiConfig.todayClasses && (
@@ -312,6 +317,7 @@ export default function DashboardPage() {
               icon={CalendarDays}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {kpiConfig.totalEnrolled && (
@@ -321,6 +327,7 @@ export default function DashboardPage() {
               icon={Activity}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {kpiConfig.waitingList && (
@@ -330,6 +337,7 @@ export default function DashboardPage() {
               icon={Clock}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {kpiConfig.rotationIndex && (
@@ -339,6 +347,7 @@ export default function DashboardPage() {
               icon={RefreshCw}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
           {kpiConfig.churnRate && (
@@ -348,6 +357,7 @@ export default function DashboardPage() {
               icon={UserMinus}
               iconClassName="bg-primary/10 text-primary"
               accentColor="#0e7490"
+              className="min-w-[280px] sm:min-w-0 snap-center"
             />
           )}
         </div>
