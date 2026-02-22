@@ -398,16 +398,21 @@ export default function PaymentsPage() {
     setSelectedMethod('transferencia')
   }
 
-  const handleGenerateReceipts = () => {
-    const count = generateMonthlyReceipts(selectedMonth, selectedYear)
-    if (count > 0) {
-      alert(
-        `Se han generado ${count} recibos para ${MONTHS.find((m) => m.value === selectedMonth)?.label} ${selectedYear}.`
-      )
-    } else {
-      alert(
-        'No se han generado nuevos recibos. Puede que ya existan recibos para este mes o no haya inscripciones activas.'
-      )
+  const handleGenerateReceipts = async () => {
+    try {
+      const count = await generateMonthlyReceipts(selectedMonth, selectedYear)
+      if (count > 0) {
+        alert(
+          `Se han generado ${count} recibos para ${MONTHS.find((m) => m.value === selectedMonth)?.label} ${selectedYear}.`
+        )
+      } else {
+        alert(
+          'No se han generado nuevos recibos. Puede que ya existan recibos para este mes o no haya inscripciones activas.'
+        )
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido'
+      alert(`Error al generar recibos: ${message}`)
     }
   }
 
