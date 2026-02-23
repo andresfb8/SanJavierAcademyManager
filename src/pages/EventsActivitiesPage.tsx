@@ -29,6 +29,7 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { EVENT_TYPES, PLAYER_LEVELS } from '@/constants'
 import type { EventType, PrivateLesson } from '@/types'
+import { checkEventConflicts, formatConflictMessage } from '@/lib/schedule-conflicts'
 
 type TabValue = 'all' | 'events' | 'private'
 
@@ -53,6 +54,7 @@ export default function EventsActivitiesPage() {
   const {
     events,
     privateLessons,
+    groups,
     coaches,
     courts,
     players,
@@ -310,6 +312,26 @@ export default function EventsActivitiesPage() {
 
   function handleSaveEvent() {
     if (!evName || evCourtIds.length === 0) return
+
+    // Verificar conflictos de horario con grupos y otros eventos
+    const eventDate = new Date(evDate + 'T00:00:00')
+    const conflicts = checkEventConflicts(
+      eventDate,
+      evStartTime,
+      evEndTime,
+      evCourtIds,
+      groups,
+      events
+    )
+
+    if (conflicts.length > 0) {
+      const message = formatConflictMessage(conflicts)
+      const confirmed = window.confirm(
+        `${message}\n\n¿Deseas crear el evento de todas formas?`
+      )
+      if (!confirmed) return
+    }
+
     // Close dialog immediately for instant UX feedback
     setEventDialogOpen(false)
     const selectedCoaches = coaches.filter((c) => evCoachIds.includes(c.id))

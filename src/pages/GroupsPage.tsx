@@ -19,6 +19,7 @@ import { PLAYER_LEVELS, DAYS_OF_WEEK } from '@/constants'
 import type { Group, PlayerLevel, ScheduleSlot } from '@/types'
 import { generateGroupsListReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
+import { checkGroupScheduleConflicts, formatConflictMessage } from '@/lib/schedule-conflicts'
 
 type ViewMode = 'grid' | 'list'
 
@@ -162,12 +163,32 @@ export default function GroupsPage() {
   }
 
   const addScheduleSlot = () => {
+    const newSlot: ScheduleSlot = {
+      dayOfWeek: newSlotDay,
+      startTime: newSlotStart,
+      endTime: newSlotEnd,
+    }
+
+    // Verificar conflictos con grupos existentes
+    const conflicts = checkGroupScheduleConflicts(
+      newSlot,
+      form.courtId,
+      form.coachId,
+      groups,
+      editingGroup?.id // Excluir el grupo actual si estamos editando
+    )
+
+    if (conflicts.length > 0) {
+      const message = formatConflictMessage(conflicts)
+      const confirmed = window.confirm(
+        `${message}\n\n¿Deseas agregar este horario de todas formas?`
+      )
+      if (!confirmed) return
+    }
+
     setForm({
       ...form,
-      schedule: [
-        ...form.schedule,
-        { dayOfWeek: newSlotDay, startTime: newSlotStart, endTime: newSlotEnd },
-      ],
+      schedule: [...form.schedule, newSlot],
     })
   }
 
@@ -179,6 +200,28 @@ export default function GroupsPage() {
   }
 
   const handleSubmit = () => {
+    // Verificar conflictos en todos los schedules
+    const allConflicts: string[] = []
+    for (const slot of form.schedule) {
+      const conflicts = checkGroupScheduleConflicts(
+        slot,
+        form.courtId,
+        form.coachId,
+        groups,
+        editingGroup?.id
+      )
+      if (conflicts.length > 0) {
+        const dayName = DAYS_OF_WEEK.find((d) => d.value === slot.dayOfWeek)?.label || 'Día desconocido'
+        allConflicts.push(`${dayName} ${slot.startTime}-${slot.endTime}: ${conflicts.map(c => c.message).join(', ')}`)
+      }
+    }
+
+    if (allConflicts.length > 0) {
+      const message = `⚠️ Conflictos de horario detectados:\n\n${allConflicts.map(c => `• ${c}`).join('\n')}\n\n¿Deseas guardar de todas formas?`
+      const confirmed = window.confirm(message)
+      if (!confirmed) return
+    }
+
     const selectedCoach = coaches.find((c) => c.id === form.coachId)
     const selectedCourt = courts.find((c) => c.id === form.courtId)
     const selectedTariff = tariffs.find((t) => t.id === form.defaultTariffId)
