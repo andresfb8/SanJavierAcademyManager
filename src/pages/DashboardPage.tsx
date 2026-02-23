@@ -78,7 +78,7 @@ export default function DashboardPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
-  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, checkAndAutoGenerateReceipts, cleanupOrphanedPayments } = useDataStore()
+  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, cleanupOrphanedPayments } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -95,9 +95,8 @@ export default function DashboardPage() {
   }, [kpiConfig])
 
   useEffect(() => {
-    checkAndAutoGenerateReceipts()
     cleanupOrphanedPayments()
-  }, [checkAndAutoGenerateReceipts, cleanupOrphanedPayments])
+  }, [cleanupOrphanedPayments])
 
   const [chartCollapsed, setChartCollapsed] = useState<Record<string, boolean>>({})
   const toggleChartCollapsed = (key: string) => {
