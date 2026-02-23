@@ -37,6 +37,13 @@ function isTomorrow(date: Date, today: Date): boolean {
   return isSameDay(date, tomorrow)
 }
 
+function hasClassEnded(schedule: { startTime: string; endTime: string }, now: Date): boolean {
+  const [hours, minutes] = schedule.endTime.split(':').map(Number)
+  const endTime = new Date(now)
+  endTime.setHours(hours, minutes, 0, 0)
+  return now >= endTime
+}
+
 const DISMISSALS_KEY = 'notification-dismissals'
 const DISMISSAL_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 horas
 
@@ -147,9 +154,14 @@ export function NotificationBell() {
 
     // --- 2. Grupos sin asistencia registrada hoy ---
     const activeGroups = groups.filter((g) => g.isActive)
-    const groupsWithClassToday = activeGroups.filter((g) =>
-      g.schedule.some((s) => s.dayOfWeek === todayDow)
-    )
+    const groupsWithClassToday = activeGroups.filter((g) => {
+      // Filtrar sesiones de hoy
+      const todaySchedules = g.schedule.filter((s) => s.dayOfWeek === todayDow)
+      if (todaySchedules.length === 0) return false
+
+      // Solo mostrar notificación si al menos una sesión ya terminó
+      return todaySchedules.some((s) => hasClassEnded(s, now))
+    })
 
     if (groupsWithClassToday.length > 0) {
       const groupsWithAttendanceToday = new Set(
