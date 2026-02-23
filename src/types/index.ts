@@ -27,6 +27,11 @@ export interface Club {
   fiscalAddress?: string  // Domicilio fiscal
   invoiceSeriesFC?: number  // Contador facturas corrientes (FC-YYYY-001)
   invoiceSeriesFR?: number  // Contador facturas rectificativas (FR-YYYY-001)
+  // Default VAT rates for different service types
+  defaultVatRateTariffs?: VatRate      // IVA por defecto para tarifas/cuotas (default: 0)
+  defaultVatRateEvents?: VatRate       // IVA por defecto para eventos (default: 21)
+  defaultVatRatePrivateLessons?: VatRate  // IVA por defecto para clases particulares (default: 21)
+  defaultVatRateOther?: VatRate        // IVA por defecto para otras ventas (default: 21)
   createdAt: Date
 }
 

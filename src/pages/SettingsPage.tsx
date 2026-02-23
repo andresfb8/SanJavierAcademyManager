@@ -42,6 +42,10 @@ export default function SettingsPage() {
     iban: club?.iban || '',
     bic: club?.bic || '',
     creditorId: club?.creditorId || '',
+    defaultVatRateTariffs: club?.defaultVatRateTariffs ?? 0,
+    defaultVatRateEvents: club?.defaultVatRateEvents ?? 21,
+    defaultVatRatePrivateLessons: club?.defaultVatRatePrivateLessons ?? 21,
+    defaultVatRateOther: club?.defaultVatRateOther ?? 21,
   })
   const [clubSaved, setClubSaved] = useState(false)
 
@@ -130,7 +134,16 @@ export default function SettingsPage() {
   }
 
   const resetTariffForm = () => {
-    setTariffForm({ name: '', price: 0, billingFrequency: 'monthly', installmentMonths: [], installmentPrices: {}, description: '', vatRate: 0, isActive: true })
+    setTariffForm({
+      name: '',
+      price: 0,
+      billingFrequency: 'monthly',
+      installmentMonths: [],
+      installmentPrices: {},
+      description: '',
+      vatRate: (club?.defaultVatRateTariffs ?? 0) as VatRate,
+      isActive: true
+    })
     setEditingTariffId(null)
   }
 
@@ -226,6 +239,66 @@ export default function SettingsPage() {
                         onChange={(e) => setClubForm({ ...clubForm, creditorId: e.target.value })}
                       />
                       <p className="text-xs text-muted-foreground">Identificador único proporcionado por tu banco para domiciliaciones SEPA</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* IVA / VAT Configuration */}
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-sm font-medium mb-4">Configuración de IVA</h3>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Tipos de IVA predeterminados para diferentes servicios. Se aplicarán automáticamente al crear nuevas tarifas y eventos.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>IVA para Cuotas/Tarifas</Label>
+                      <Select
+                        options={[
+                          { value: '0', label: '0% (Exento)' },
+                          { value: '10', label: '10% (Reducido)' },
+                          { value: '21', label: '21% (General)' },
+                        ]}
+                        value={String(clubForm.defaultVatRateTariffs)}
+                        onChange={(e) => setClubForm({ ...clubForm, defaultVatRateTariffs: Number(e.target.value) as VatRate })}
+                      />
+                      <p className="text-xs text-muted-foreground">Asociaciones sin ánimo de lucro: 0%</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>IVA para Eventos</Label>
+                      <Select
+                        options={[
+                          { value: '0', label: '0% (Exento)' },
+                          { value: '10', label: '10% (Reducido)' },
+                          { value: '21', label: '21% (General)' },
+                        ]}
+                        value={String(clubForm.defaultVatRateEvents)}
+                        onChange={(e) => setClubForm({ ...clubForm, defaultVatRateEvents: Number(e.target.value) as VatRate })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>IVA para Clases Particulares</Label>
+                      <Select
+                        options={[
+                          { value: '0', label: '0% (Exento)' },
+                          { value: '10', label: '10% (Reducido)' },
+                          { value: '21', label: '21% (General)' },
+                        ]}
+                        value={String(clubForm.defaultVatRatePrivateLessons)}
+                        onChange={(e) => setClubForm({ ...clubForm, defaultVatRatePrivateLessons: Number(e.target.value) as VatRate })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>IVA para Otros Servicios</Label>
+                      <Select
+                        options={[
+                          { value: '0', label: '0% (Exento)' },
+                          { value: '10', label: '10% (Reducido)' },
+                          { value: '21', label: '21% (General)' },
+                        ]}
+                        value={String(clubForm.defaultVatRateOther)}
+                        onChange={(e) => setClubForm({ ...clubForm, defaultVatRateOther: Number(e.target.value) as VatRate })}
+                      />
+                      <p className="text-xs text-muted-foreground">Para ventas manuales y otros conceptos</p>
                     </div>
                   </div>
                 </div>
@@ -460,6 +533,18 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Descripción</Label>
               <Input value={tariffForm.description} onChange={(e) => setTariffForm({ ...tariffForm, description: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>IVA</Label>
+              <Select
+                options={[
+                  { value: '0', label: '0% (Exento)' },
+                  { value: '10', label: '10% (Reducido)' },
+                  { value: '21', label: '21% (General)' },
+                ]}
+                value={String(tariffForm.vatRate)}
+                onChange={(e) => setTariffForm({ ...tariffForm, vatRate: Number(e.target.value) as VatRate })}
+              />
             </div>
           </div>
           <DialogFooter>

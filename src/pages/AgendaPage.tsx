@@ -94,7 +94,7 @@ interface GridBlock {
 
 export default function AgendaPage() {
   const navigate = useNavigate()
-  const { groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment } = useDataStore()
+  const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment } = useDataStore()
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -326,7 +326,7 @@ export default function AgendaPage() {
       coachIds: evCoachIds, coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
       attendeePlayerIds: [...evPlayerIds, ...evGuestIds],
       attendeePlayerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...evGuestNames],
-      price: eventPrice, vatRate: 21, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
+      price: eventPrice, vatRate: (club?.defaultVatRateEvents ?? 21), maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined, isActive: true,
     })
     // Crear pagos para jugadores reales
