@@ -37,10 +37,64 @@ function isTomorrow(date: Date, today: Date): boolean {
   return isSameDay(date, tomorrow)
 }
 
+const DISMISSALS_KEY = 'notification-dismissals'
+const DISMISSAL_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 horas
+
+interface DismissalRecord {
+  [notificationId: string]: number // timestamp
+}
+
+function loadDismissals(): Set<string> {
+  try {
+    const stored = localStorage.getItem(DISMISSALS_KEY)
+    if (!stored) return new Set()
+
+    const records: DismissalRecord = JSON.parse(stored)
+    const now = Date.now()
+    const validIds: string[] = []
+
+    // Filtrar solo los que no han expirado (< 24h)
+    for (const [id, timestamp] of Object.entries(records)) {
+      if (now - timestamp < DISMISSAL_EXPIRY_MS) {
+        validIds.push(id)
+      }
+    }
+
+    return new Set(validIds)
+  } catch {
+    return new Set()
+  }
+}
+
+function saveDismissal(id: string) {
+  try {
+    const stored = localStorage.getItem(DISMISSALS_KEY)
+    const records: DismissalRecord = stored ? JSON.parse(stored) : {}
+    records[id] = Date.now()
+    localStorage.setItem(DISMISSALS_KEY, JSON.stringify(records))
+  } catch (error) {
+    console.error('[NotificationBell] Failed to save dismissal:', error)
+  }
+}
+
+function saveDismissals(ids: string[]) {
+  try {
+    const stored = localStorage.getItem(DISMISSALS_KEY)
+    const records: DismissalRecord = stored ? JSON.parse(stored) : {}
+    const now = Date.now()
+    for (const id of ids) {
+      records[id] = now
+    }
+    localStorage.setItem(DISMISSALS_KEY, JSON.stringify(records))
+  } catch (error) {
+    console.error('[NotificationBell] Failed to save dismissals:', error)
+  }
+}
+
 export function NotificationBell() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissals())
   const panelRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -156,6 +210,7 @@ export function NotificationBell() {
   function handleDismiss(id: string, e: React.MouseEvent) {
     e.stopPropagation()
     setDismissed((prev) => new Set(prev).add(id))
+    saveDismissal(id)
   }
 
   function handleClick(notification: Notification) {
@@ -189,9 +244,11 @@ export function NotificationBell() {
             <h3 className="text-sm font-semibold">Notificaciones</h3>
             {visibleNotifications.length > 0 && (
               <button
-                onClick={() =>
-                  setDismissed(new Set(notifications.map((n) => n.id)))
-                }
+                onClick={() => {
+                  const allIds = notifications.map((n) => n.id)
+                  setDismissed(new Set(allIds))
+                  saveDismissals(allIds)
+                }}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Marcar todo como leído
