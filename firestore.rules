@@ -322,6 +322,24 @@ service cloud.firestore {
       allow delete: if isAdmin() && belongsToClub();
     }
 
+    // ─── Invoices Collection ────────────────────────────────────────────
+    // director/coordinador: CRUD completo.
+    // jugador: lectura de sus propias facturas.
+    // tutor: lectura de facturas de sus hijos.
+    // entrenador: sin acceso (las facturas son datos fiscales sensibles).
+
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated() && belongsToClub() && (
+        isAdmin() ||
+        (hasRole('jugador') && isOwnPlayer(resource.data.playerId)) ||
+        (hasRole('tutor') && isChildPlayer(resource.data.playerId))
+      );
+
+      allow create: if isAdmin() && incomingBelongsToClub();
+      allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
+      allow delete: if hasRole('director') && belongsToClub();
+    }
+
     // ─── Evaluations Collection ─────────────────────────────────────────
     // director/coordinador: CRUD completo.
     // entrenador: lectura y escritura (crea evaluaciones).

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,8 +8,10 @@ import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
+import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDialog'
 import { useDataStore } from '@/stores/dataStore'
 import {
   DollarSign,
@@ -25,6 +28,7 @@ import {
   BarChart3,
   TableIcon,
   Plus,
+  Receipt,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
@@ -84,7 +88,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, eventPayments, privateLessonPayments, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, invoices, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -110,6 +114,10 @@ export default function PaymentsPage() {
 
   // TanStack Table sorting state
   const [sorting, setSorting] = useState<SortingState>([])
+
+  // Invoice generation
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set())
+  const [showGenerateInvoiceDialog, setShowGenerateInvoiceDialog] = useState(false)
 
   // Generate available years (current year +/- 2)
   const availableYears = useMemo(() => {
@@ -242,9 +250,64 @@ export default function PaymentsPage() {
     return { totalIngresos, totalPendiente, tasaCobroAnual, totalRecibos }
   }, [annualSummary, allPayments, selectedYear])
 
+  // --- Selection handlers ---
+  const handleTogglePayment = (paymentId: string) => {
+    setSelectedPaymentIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(paymentId)) {
+        next.delete(paymentId)
+      } else {
+        next.add(paymentId)
+      }
+      return next
+    })
+  }
+
+  const handleToggleAll = () => {
+    // Solo pagos pagados sin factura pueden ser seleccionados
+    const selectablePayments = filteredPayments.filter(
+      (p) => p.status === 'pagado' && !p.invoiceId
+    )
+
+    if (selectedPaymentIds.size === selectablePayments.length) {
+      setSelectedPaymentIds(new Set())
+    } else {
+      setSelectedPaymentIds(new Set(selectablePayments.map((p) => p.id)))
+    }
+  }
+
+  const selectableCount = filteredPayments.filter(
+    (p) => p.status === 'pagado' && !p.invoiceId
+  ).length
+
   // --- TanStack React Table columns ---
   const columns = useMemo<ColumnDef<NormalizedPayment>[]>(
     () => [
+      {
+        id: 'select',
+        header: () => (
+          <Checkbox
+            checked={selectableCount > 0 && selectedPaymentIds.size === selectableCount}
+            onCheckedChange={handleToggleAll}
+            aria-label="Seleccionar todos"
+          />
+        ),
+        cell: ({ row }) => {
+          const payment = row.original
+          const isSelectable = payment.status === 'pagado' && !payment.invoiceId
+          if (!isSelectable) return null
+
+          return (
+            <Checkbox
+              checked={selectedPaymentIds.has(payment.id)}
+              onCheckedChange={() => handleTogglePayment(payment.id)}
+              aria-label="Seleccionar pago"
+            />
+          )
+        },
+        enableSorting: false,
+        meta: { className: 'w-12' },
+      },
       {
         accessorKey: 'playerName',
         header: ({ column }) => <SortableHeader column={column}>Jugador</SortableHeader>,
@@ -347,6 +410,31 @@ export default function PaymentsPage() {
         meta: { className: 'hidden xl:table-cell' },
       },
       {
+        accessorKey: 'invoiceId',
+        header: 'Factura',
+        cell: ({ row }) => {
+          const payment = row.original
+          if (!payment.invoiceId) return <span className="text-xs text-muted-foreground">-</span>
+
+          // Buscar el número de factura
+          const invoice = invoices.find((inv) => inv.id === payment.invoiceId)
+          if (!invoice) return <span className="text-xs text-muted-foreground">-</span>
+
+          return (
+            <Link
+              to="/facturas"
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Receipt className="h-3 w-3" />
+              {invoice.invoiceNumber}
+            </Link>
+          )
+        },
+        enableSorting: false,
+        meta: { className: 'hidden md:table-cell' },
+      },
+      {
         id: 'actions',
         header: () => <span className="sr-only">Acciones</span>,
         cell: ({ row }) => {
@@ -367,8 +455,7 @@ export default function PaymentsPage() {
         enableSorting: false,
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [invoices, selectedPaymentIds, selectableCount]
   )
 
   const table = useReactTable({
@@ -588,6 +675,18 @@ export default function PaymentsPage() {
                   <Plus className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Nuevo pago</span>
                 </Button>
+                {selectedPaymentIds.size > 0 && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setShowGenerateInvoiceDialog(true)}
+                    className="gap-1"
+                  >
+                    <Receipt className="h-4 w-4" />
+                    <span className="hidden sm:inline">Generar factura ({selectedPaymentIds.size})</span>
+                    <span className="sm:hidden">{selectedPaymentIds.size}</span>
+                  </Button>
+                )}
                 <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
                   <FileText className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Generar cuotas</span>
@@ -1025,6 +1124,16 @@ export default function PaymentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Generate Invoice Dialog */}
+      <GenerateInvoiceDialog
+        open={showGenerateInvoiceDialog}
+        onOpenChange={(open) => {
+          setShowGenerateInvoiceDialog(open)
+          if (!open) setSelectedPaymentIds(new Set()) // Limpiar selección al cerrar
+        }}
+        preSelectedPaymentIds={Array.from(selectedPaymentIds)}
+      />
     </div>
   )
 }

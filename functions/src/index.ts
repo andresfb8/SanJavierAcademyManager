@@ -15,6 +15,11 @@ export {
 } from "./billing/generateMonthlyReceipts";
 
 // ---------------------------------------------------------------------------
+// Invoicing functions
+// ---------------------------------------------------------------------------
+export { generateMonthlyInvoices } from "./invoicing/generateMonthlyInvoices";
+
+// ---------------------------------------------------------------------------
 // Firestore triggers
 // ---------------------------------------------------------------------------
 export { onPlayerStatusChange } from "./triggers/onPlayerStatusChange";

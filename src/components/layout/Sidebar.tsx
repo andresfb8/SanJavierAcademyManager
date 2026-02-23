@@ -19,6 +19,7 @@ import {
   ChevronRight,
   CalendarPlus,
   History,
+  Receipt,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
@@ -60,6 +61,7 @@ const navGroups: NavGroup[] = [
     label: 'Financiera',
     items: [
       { name: 'Pagos', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
+      { name: 'Facturas', href: '/facturas', icon: Receipt, requiredModule: 'payments' },
     ],
   },
   {

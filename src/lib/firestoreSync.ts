@@ -22,6 +22,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { toast } from '@/hooks/use-toast'
+import type { Invoice } from '@/types'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -438,4 +439,88 @@ export async function generateMonthlyReceiptsAtomic(
     console.error('[generateReceipts] Failed:', error)
     throw error
   }
+}
+
+// ==========================================
+// Generación Atómica de Facturas
+// ==========================================
+
+/**
+ * Crea una factura con transacción atómica que:
+ * 1. Verifica que los pagos no tengan invoiceId (previene duplicados)
+ * 2. Crea el documento de factura
+ * 3. Actualiza todos los pagos con el invoiceId
+ * 4. Incrementa el contador de facturas del club
+ *
+ * @param invoice Datos completos de la factura
+ * @param paymentIds IDs de los pagos a vincular
+ * @param clubId ID del club
+ * @throws Error si algún pago ya está facturado o no existe
+ */
+export async function createInvoiceAtomic(
+  invoice: Invoice,
+  paymentIds: string[],
+  clubId: string
+): Promise<void> {
+  return runTransaction(db, async (transaction) => {
+    // Paso 1: Verificar que ningún pago tenga invoiceId
+    // Necesitamos determinar la colección correcta para cada pago
+    const paymentCollections = ['payments', 'eventPayments', 'privateLessonPayments']
+
+    for (const paymentId of paymentIds) {
+      let found = false
+
+      // Buscar el pago en las 3 colecciones posibles
+      for (const collectionName of paymentCollections) {
+        const paymentRef = doc(db, collectionName, paymentId)
+        const paymentSnap = await transaction.get(paymentRef)
+
+        if (paymentSnap.exists()) {
+          found = true
+          const paymentData = paymentSnap.data()
+
+          // Verificar que no tenga invoiceId
+          if (paymentData.invoiceId) {
+            throw new Error(`El pago ${paymentId} ya está facturado`)
+          }
+
+          break // Encontrado, no seguir buscando
+        }
+      }
+
+      if (!found) {
+        throw new Error(`Pago ${paymentId} no encontrado`)
+      }
+    }
+
+    // Paso 2: Crear la factura
+    const invoiceRef = doc(db, 'invoices', invoice.id)
+    transaction.set(invoiceRef, toFirestore({ ...invoice, clubId }))
+
+    // Paso 3: Actualizar todos los pagos con invoiceId
+    for (const paymentId of paymentIds) {
+      // Buscar y actualizar en la colección correcta
+      for (const collectionName of paymentCollections) {
+        const paymentRef = doc(db, collectionName, paymentId)
+        const paymentSnap = await transaction.get(paymentRef)
+
+        if (paymentSnap.exists()) {
+          transaction.update(paymentRef, { invoiceId: invoice.id })
+          break
+        }
+      }
+    }
+
+    // Paso 4: Incrementar contador del club
+    const clubRef = doc(db, 'clubs', clubId)
+    const year = new Date().getFullYear()
+    const counterPath = `invoiceCounters.${year}.${invoice.series}`
+
+    transaction.update(clubRef, {
+      [counterPath]: increment(1),
+    })
+  }).catch((error) => {
+    console.error('[Firestore] createInvoiceAtomic failed:', error)
+    throw error
+  })
 }

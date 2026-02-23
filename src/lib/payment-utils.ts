@@ -17,6 +17,7 @@ export interface NormalizedPayment {
   groupName?: string
   dueDate?: Date
   registeredBy?: string
+  invoiceId?: string
 }
 
 /**
@@ -48,6 +49,7 @@ export function normalizeAllPayments(
       groupName: p.groupName,
       dueDate: p.dueDate,
       registeredBy: p.registeredBy,
+      invoiceId: p.invoiceId,
     })
   }
 
@@ -79,6 +81,7 @@ export function normalizeAllPayments(
       paidDate: ep.paidDate,
       paymentMethod: ep.paymentMethod,
       registeredBy: ep.registeredBy,
+      invoiceId: ep.invoiceId,
     })
   }
 
@@ -110,6 +113,7 @@ export function normalizeAllPayments(
       paidDate: plp.paidDate,
       paymentMethod: plp.paymentMethod,
       registeredBy: plp.registeredBy,
+      invoiceId: plp.invoiceId,
     })
   }
 

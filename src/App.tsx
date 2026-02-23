@@ -25,6 +25,7 @@ import ClassDetailPage from '@/pages/ClassDetailPage'
 import CoachProfilePage from '@/pages/CoachProfilePage'
 import EvaluacionesPage from '@/pages/EvaluacionesPage'
 import ActivityLogPage from '@/pages/ActivityLogPage'
+import InvoicesPage from '@/pages/InvoicesPage'
 
 function RoleRoute({
   children,
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
           <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
           <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
+          <Route path="/facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
           <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
           <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
           <Route path="/informes" element={<EvaluacionesPage />} />

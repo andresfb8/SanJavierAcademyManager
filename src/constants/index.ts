@@ -1,4 +1,4 @@
-import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, PaymentCategory, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus, StaffRole } from '@/types'
+import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, PaymentCategory, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus, StaffRole, InvoiceStatus, InvoiceSeries } from '@/types'
 
 // --- Niveles ---
 export const PLAYER_LEVELS: { value: PlayerLevel; label: string; color: string }[] = [
@@ -54,6 +54,20 @@ export const PAYMENT_CATEGORIES: { value: PaymentCategory; label: string }[] = [
   { value: 'clase_particular', label: 'Clase particular' },
   { value: 'manual', label: 'Pago manual' },
   { value: 'otro', label: 'Otro' },
+]
+
+// --- Estados de Factura ---
+export const INVOICE_STATUSES: { value: InvoiceStatus; label: string; color: string }[] = [
+  { value: 'draft', label: 'Borrador', color: 'bg-gray-100 text-gray-800' },
+  { value: 'issued', label: 'Emitida', color: 'bg-blue-100 text-blue-800' },
+  { value: 'paid', label: 'Pagada', color: 'bg-green-100 text-green-800' },
+  { value: 'cancelled', label: 'Cancelada', color: 'bg-red-100 text-red-800' },
+]
+
+// --- Series de Factura ---
+export const INVOICE_SERIES: { value: InvoiceSeries; label: string }[] = [
+  { value: 'FC', label: 'FC - Factura Corriente' },
+  { value: 'FR', label: 'FR - Factura Rectificativa' },
 ]
 
 // --- Roles de Personal ---

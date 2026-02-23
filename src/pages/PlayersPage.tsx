@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useDataStore } from '@/stores/dataStore'
-import { cn, isMinor as checkIsMinor } from '@/lib/utils'
+import { cn, isMinor as checkIsMinor, formatDate } from '@/lib/utils'
 import { PLAYER_LEVELS, PLAYER_STATUSES } from '@/constants'
 import {
   useReactTable,
@@ -150,6 +150,7 @@ export default function PlayersPage() {
       'Nombre': p.firstName,
       'Apellidos': p.lastName,
       'DNI': p.dni,
+      'Fecha Nacimiento': p.birthDate ? formatDate(p.birthDate) : '',
       'Email': p.email,
       'Telefono': p.phone,
       'Nivel': p.level,
@@ -160,6 +161,14 @@ export default function PlayersPage() {
       'Mano': p.dominantHand,
       'Posicion': p.position,
       'Licencia': p.licenseNumber || '',
+      'Titular Cuenta': p.bankAccountHolder || '',
+      'IBAN': p.iban || '',
+      'Tutor Nombre': p.isMinor ? p.guardian?.firstName || '' : '',
+      'Tutor Apellidos': p.isMinor ? p.guardian?.lastName || '' : '',
+      'Tutor DNI': p.isMinor ? p.guardian?.dni || '' : '',
+      'Tutor Telefono': p.isMinor ? p.guardian?.phone || '' : '',
+      'Tutor Email': p.isMinor ? p.guardian?.email || '' : '',
+      'Parentesco': p.isMinor ? p.guardian?.relationship || '' : '',
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()

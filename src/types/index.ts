@@ -25,8 +25,14 @@ export interface Club {
   nif?: string         // NIF del club (G73567539)
   legalName?: string   // Razón social oficial
   fiscalAddress?: string  // Domicilio fiscal
-  invoiceSeriesFC?: number  // Contador facturas corrientes (FC-YYYY-001)
-  invoiceSeriesFR?: number  // Contador facturas rectificativas (FR-YYYY-001)
+  invoiceSeriesFC?: number  // Contador facturas corrientes (FC-YYYY-001) - deprecated, usar invoiceCounters
+  invoiceSeriesFR?: number  // Contador facturas rectificativas (FR-YYYY-001) - deprecated, usar invoiceCounters
+  invoiceCounters?: {
+    [year: number]: {
+      FC?: number
+      FR?: number
+    }
+  }
   // Default VAT rates for different service types
   defaultVatRateTariffs?: VatRate      // IVA por defecto para tarifas/cuotas (default: 0)
   defaultVatRateEvents?: VatRate       // IVA por defecto para eventos (default: 21)
@@ -300,6 +306,10 @@ export type ActivityType =
   | 'match_report_updated'
   | 'match_report_deleted'
   | 'invitation_sent'
+  | 'invoice_created'
+  | 'invoice_issued'
+  | 'invoice_paid'
+  | 'invoice_cancelled'
 
 
 export interface Activity {

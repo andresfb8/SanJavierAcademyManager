@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -42,6 +43,9 @@ export default function SettingsPage() {
     iban: club?.iban || '',
     bic: club?.bic || '',
     creditorId: club?.creditorId || '',
+    nif: club?.nif || '',
+    legalName: club?.legalName || '',
+    fiscalAddress: club?.fiscalAddress || '',
     defaultVatRateTariffs: club?.defaultVatRateTariffs ?? 0,
     defaultVatRateEvents: club?.defaultVatRateEvents ?? 21,
     defaultVatRatePrivateLessons: club?.defaultVatRatePrivateLessons ?? 21,
@@ -299,6 +303,76 @@ export default function SettingsPage() {
                         onChange={(e) => setClubForm({ ...clubForm, defaultVatRateOther: Number(e.target.value) as VatRate })}
                       />
                       <p className="text-xs text-muted-foreground">Para ventas manuales y otros conceptos</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fiscal Configuration for Invoicing */}
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-sm font-medium mb-4">Configuración Fiscal</h3>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Datos fiscales del club requeridos para la generación de facturas.
+                  </p>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nif">NIF del Club *</Label>
+                      <Input
+                        id="nif"
+                        placeholder="A12345678"
+                        value={clubForm.nif || ''}
+                        onChange={(e) => setClubForm({ ...clubForm, nif: e.target.value })}
+                        pattern="^[A-Z]\d{8}$"
+                      />
+                      <p className="text-xs text-muted-foreground">Formato: Letra + 8 dígitos (ej: A12345678)</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="legalName">Razón Social *</Label>
+                      <Input
+                        id="legalName"
+                        placeholder="Club Deportivo San Javier S.L."
+                        value={clubForm.legalName || ''}
+                        onChange={(e) => setClubForm({ ...clubForm, legalName: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">Nombre legal completo para facturas</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fiscalAddress">Domicilio Fiscal *</Label>
+                      <Textarea
+                        id="fiscalAddress"
+                        placeholder="Calle Principal 123, 30730 San Javier, Murcia"
+                        value={clubForm.fiscalAddress || ''}
+                        onChange={(e) => setClubForm({ ...clubForm, fiscalAddress: e.target.value })}
+                        rows={2}
+                      />
+                      <p className="text-xs text-muted-foreground">Dirección fiscal completa</p>
+                    </div>
+
+                    {/* Invoice Counters Preview */}
+                    <div className="mt-4 p-4 rounded-lg bg-muted/50">
+                      <h4 className="text-sm font-medium mb-3">Numeración de Facturas</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Serie FC (Facturas Corrientes)</p>
+                          <p className="text-sm font-mono">
+                            Actual: {club?.invoiceCounters?.[new Date().getFullYear()]?.FC ?? 0}
+                          </p>
+                          <p className="text-xs text-primary mt-1">
+                            Próxima: FC-{new Date().getFullYear()}-{String((club?.invoiceCounters?.[new Date().getFullYear()]?.FC ?? 0) + 1).padStart(3, '0')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Serie FR (Facturas Rectificativas)</p>
+                          <p className="text-sm font-mono">
+                            Actual: {club?.invoiceCounters?.[new Date().getFullYear()]?.FR ?? 0}
+                          </p>
+                          <p className="text-xs text-primary mt-1">
+                            Próxima: FR-{new Date().getFullYear()}-{String((club?.invoiceCounters?.[new Date().getFullYear()]?.FR ?? 0) + 1).padStart(3, '0')}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Los contadores se incrementan automáticamente al crear facturas
+                      </p>
                     </div>
                   </div>
                 </div>

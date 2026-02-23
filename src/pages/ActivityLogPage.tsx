@@ -51,6 +51,10 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   match_report_updated: 'Informe actualizado',
   match_report_deleted: 'Informe eliminado',
   invitation_sent: 'Invitación enviada',
+  invoice_created: 'Factura generada',
+  invoice_issued: 'Factura emitida',
+  invoice_paid: 'Factura pagada',
+  invoice_cancelled: 'Factura cancelada',
 }
 
 // --- Colores por tipo de actividad ---
@@ -80,6 +84,10 @@ const ACTIVITY_COLORS: Partial<Record<ActivityType, string>> = {
   evaluation_deleted: 'text-red-600',
   match_report_created: 'text-indigo-700',
   match_report_deleted: 'text-red-600',
+  invoice_created: 'text-green-700',
+  invoice_issued: 'text-blue-700',
+  invoice_paid: 'text-green-700',
+  invoice_cancelled: 'text-red-600',
 }
 
 // --- Sortable column header helper ---

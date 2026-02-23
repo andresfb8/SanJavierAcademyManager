@@ -32,6 +32,7 @@ import type {
   PaymentCategory,
   PlayerStatus,
   ActivityType,
+  Invoice,
 } from '@/types'
 import {
   demoCourts,
@@ -56,6 +57,7 @@ import {
   syncEnrollmentWithGroupCounter,
   updateEnrollmentStatus,
   generateMonthlyReceiptsAtomic,
+  createInvoiceAtomic,
 } from '@/lib/firestoreSync'
 import { toast } from '@/hooks/use-toast'
 
@@ -92,6 +94,7 @@ export interface DataState {
   evaluations: Evaluation[]
   matchReports: MatchReport[]
   coachSalaryConfigs: CoachSalaryConfig[]
+  invoices: Invoice[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -141,6 +144,12 @@ export interface DataState {
   checkAndAutoGenerateReceipts: () => Promise<void>
   cleanupOrphanedPayments: () => void
   deleteAllPayments: () => Promise<void>
+
+  // --- Invoices ---
+  addInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<void>
+  updateInvoice: (id: string, data: Partial<Invoice>) => void
+  deleteInvoice: (id: string) => void
+  unlinkPaymentsFromInvoice: (invoiceId: string) => Promise<void>
 
   // --- Attendance ---
   addAttendanceRecord: (record: Omit<AttendanceRecord, 'id' | 'createdAt'>) => void
@@ -239,6 +248,7 @@ export const useDataStore = create<DataState>()(
       evaluations: [],
       matchReports: [],
       coachSalaryConfigs: [],
+      invoices: [],
       updateClub: (data) => {
         set((state) => ({
           club: state.club ? { ...state.club, ...data } : null,
@@ -776,6 +786,132 @@ export const useDataStore = create<DataState>()(
       deleteAttendanceRecord: (id) => {
         set((state) => ({ attendance: state.attendance.filter((a) => a.id !== id) }))
         deleteFirestoreDoc('attendance', id)
+      },
+
+      // --- Invoices ---
+
+      addInvoice: async (invoiceData) => {
+        const { userId, userName } = getCurrentUser()
+        const newInvoice: Invoice = {
+          ...invoiceData,
+          id: generateId(),
+          createdAt: new Date(),
+          createdBy: userId,
+        }
+
+        // Optimistic update
+        set((state) => ({ invoices: [...state.invoices, newInvoice] }))
+
+        const clubId = getClubId()
+        if (!clubId) {
+          throw new Error('No club ID found')
+        }
+
+        try {
+          // Transacción atómica: crear invoice + actualizar payments + incrementar contador
+          await createInvoiceAtomic(newInvoice, invoiceData.paymentIds, clubId)
+
+          // Activity log
+          get().addActivity({
+            type: 'invoice_created',
+            description: `Factura ${newInvoice.invoiceNumber} generada para ${invoiceData.playerName}`,
+            relatedEntityId: newInvoice.id,
+            userId,
+            userName,
+          })
+
+          toast.success(`Factura ${newInvoice.invoiceNumber} creada correctamente`)
+        } catch (error) {
+          // Rollback optimistic update
+          set((state) => ({ invoices: state.invoices.filter((i) => i.id !== newInvoice.id) }))
+
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          console.error('[addInvoice] Failed:', message)
+          toast.error(`Error al crear factura: ${message}`)
+          throw error
+        }
+      },
+
+      updateInvoice: (id, data) => {
+        const { userId, userName } = getCurrentUser()
+        set((state) => ({
+          invoices: state.invoices.map((i) => (i.id === id ? { ...i, ...data } : i)),
+        }))
+
+        const clubId = getClubId()
+        const updated = get().invoices.find((i) => i.id === id)
+        if (clubId && updated) {
+          syncDoc('invoices', id, updated as any, clubId)
+
+          // Activity log para cambios de estado importantes
+          if (data.status) {
+            let activityType: ActivityType = 'invoice_created'
+            let description = ''
+
+            if (data.status === 'issued') {
+              activityType = 'invoice_issued'
+              description = `Factura ${updated.invoiceNumber} emitida`
+            } else if (data.status === 'paid') {
+              activityType = 'invoice_paid'
+              description = `Factura ${updated.invoiceNumber} marcada como pagada`
+            } else if (data.status === 'cancelled') {
+              activityType = 'invoice_cancelled'
+              description = `Factura ${updated.invoiceNumber} cancelada`
+            }
+
+            if (description) {
+              get().addActivity({
+                type: activityType,
+                description,
+                relatedEntityId: id,
+                userId,
+                userName,
+              })
+            }
+          }
+        }
+      },
+
+      deleteInvoice: (id) => {
+        const invoice = get().invoices.find((i) => i.id === id)
+        if (invoice) {
+          // Desvincular pagos primero
+          get().unlinkPaymentsFromInvoice(id)
+        }
+
+        set((state) => ({ invoices: state.invoices.filter((i) => i.id !== id) }))
+        deleteFirestoreDoc('invoices', id)
+      },
+
+      unlinkPaymentsFromInvoice: async (invoiceId) => {
+        const invoice = get().invoices.find((i) => i.id === invoiceId)
+        if (!invoice) return
+
+        const clubId = getClubId()
+        if (!clubId) return
+
+        // Actualizar payments eliminando invoiceId
+        for (const paymentId of invoice.paymentIds) {
+          // Buscar en payments
+          const payment = get().payments.find((p) => p.id === paymentId)
+          if (payment) {
+            get().updatePayment(paymentId, { invoiceId: undefined })
+            continue
+          }
+
+          // Buscar en eventPayments
+          const eventPayment = get().eventPayments.find((p) => p.id === paymentId)
+          if (eventPayment) {
+            get().updateEventPayment(paymentId, { invoiceId: undefined })
+            continue
+          }
+
+          // Buscar en privateLessonPayments
+          const lessonPayment = get().privateLessonPayments.find((p) => p.id === paymentId)
+          if (lessonPayment) {
+            get().updatePrivateLessonPayment(paymentId, { invoiceId: undefined })
+          }
+        }
       },
 
       addActivity: (activityData) => {
