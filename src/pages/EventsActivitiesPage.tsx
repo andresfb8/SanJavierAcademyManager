@@ -352,6 +352,7 @@ export default function EventsActivitiesPage() {
       attendeePlayerIds: [...evPlayerIds, ...evGuestIds],
       attendeePlayerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...evGuestNames],
       price: eventPrice,
+      vatRate: 21,
       maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined,
       guestNames: evGuestNames.length > 0 ? evGuestNames : undefined,

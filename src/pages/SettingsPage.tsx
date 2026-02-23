@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
 import { COURT_TYPES, COURT_SURFACES, BILLING_FREQUENCIES, MONTHS } from '@/constants'
-import type { CourtType, CourtSurface, BillingFrequency } from '@/types'
+import type { CourtType, CourtSurface, BillingFrequency, VatRate } from '@/types'
 import {
   Save,
   Plus,
@@ -60,7 +60,7 @@ export default function SettingsPage() {
   const [tariffForm, setTariffForm] = useState({
     name: '', price: 0, billingFrequency: 'monthly' as BillingFrequency,
     installmentMonths: [] as number[], installmentPrices: {} as Record<number, number>,
-    description: '', isActive: true,
+    description: '', vatRate: 0 as VatRate, isActive: true,
   })
   const [deleteTariffId, setDeleteTariffId] = useState<string | null>(null)
 
@@ -117,6 +117,7 @@ export default function SettingsPage() {
       installmentMonths: tariffForm.billingFrequency === 'installments' ? tariffForm.installmentMonths : undefined,
       installmentPrices: hasCustomPrices ? cleanPrices : undefined,
       description: tariffForm.description || undefined,
+      vatRate: tariffForm.vatRate,
       isActive: tariffForm.isActive,
     }
     if (editingTariffId) {
@@ -129,7 +130,7 @@ export default function SettingsPage() {
   }
 
   const resetTariffForm = () => {
-    setTariffForm({ name: '', price: 0, billingFrequency: 'monthly', installmentMonths: [], installmentPrices: {}, description: '', isActive: true })
+    setTariffForm({ name: '', price: 0, billingFrequency: 'monthly', installmentMonths: [], installmentPrices: {}, description: '', vatRate: 0, isActive: true })
     setEditingTariffId(null)
   }
 
@@ -141,7 +142,7 @@ export default function SettingsPage() {
       billingFrequency: tariff.billingFrequency,
       installmentMonths: tariff.installmentMonths || [],
       installmentPrices: tariff.installmentPrices ? { ...tariff.installmentPrices } : {},
-      description: tariff.description || '', isActive: tariff.isActive,
+      description: tariff.description || '', vatRate: tariff.vatRate, isActive: tariff.isActive,
     })
     setEditingTariffId(id)
     setShowTariffDialog(true)

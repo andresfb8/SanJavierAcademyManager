@@ -326,7 +326,7 @@ export default function AgendaPage() {
       coachIds: evCoachIds, coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
       attendeePlayerIds: [...evPlayerIds, ...evGuestIds],
       attendeePlayerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...evGuestNames],
-      price: eventPrice, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
+      price: eventPrice, vatRate: 21, maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined, isActive: true,
     })
     // Crear pagos para jugadores reales
