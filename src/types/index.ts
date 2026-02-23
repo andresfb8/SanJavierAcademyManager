@@ -14,6 +14,10 @@ export interface Club {
   closingTime: string
   seasonStart: Date
   seasonEnd: Date
+  // SEPA Direct Debit configuration
+  iban?: string        // IBAN del club para domiciliación SEPA
+  bic?: string         // BIC/SWIFT del banco del club
+  creditorId?: string  // Identificador de acreedor SEPA (ES + sufijo + NIF)
   createdAt: Date
 }
 

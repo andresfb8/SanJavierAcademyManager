@@ -28,6 +28,8 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
+import { prepareSepaPayments, generateSepaXml } from '@/lib/sepa-utils'
+import type { SepaClubConfig } from '@/lib/sepa-utils'
 import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
 import type { PaymentMethod, PaymentCategory } from '@/types'
 import type { NormalizedPayment } from '@/lib/payment-utils'
@@ -82,7 +84,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, eventPayments, privateLessonPayments, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -472,6 +474,60 @@ export default function PaymentsPage() {
     }
   }
 
+  const handleExportSepaXML = () => {
+    // Verificar configuración SEPA del club
+    if (!club?.iban || !club?.creditorId) {
+      alert('Por favor configura el IBAN y el Creditor ID SEPA en Configuración antes de exportar')
+      return
+    }
+
+    // Filtrar pagos pendientes del mes actual (de los pagos originales, no normalizados)
+    const monthlyPayments = payments.filter(
+      (p) => p.billingMonth === selectedMonth && p.billingYear === selectedYear && p.status === 'pendiente'
+    )
+
+    if (monthlyPayments.length === 0) {
+      alert('No hay pagos pendientes para exportar este mes')
+      return
+    }
+
+    // Preparar configuración SEPA
+    const sepaConfig: SepaClubConfig = {
+      iban: club.iban,
+      bic: club.bic,
+      creditorId: club.creditorId,
+    }
+
+    try {
+      // Preparar datos SEPA
+      const sepaData = prepareSepaPayments(monthlyPayments, players, club, sepaConfig)
+
+      if (sepaData.payments.length === 0) {
+        alert('No hay pagos con IBAN válido para domiciliar')
+        return
+      }
+
+      // Generar XML SEPA
+      const xml = generateSepaXml(sepaData)
+
+      // Descargar archivo
+      const blob = new Blob([xml], { type: 'application/xml' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `sepa_${selectedMonth}_${selectedYear}.xml`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      alert(`Archivo SEPA generado: ${sepaData.payments.length} recibos`)
+    } catch (error) {
+      console.error('Error al generar SEPA XML:', error)
+      alert('Error al generar archivo SEPA: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+    }
+  }
+
   const openManualPaymentDialog = () => {
     setManualPlayerId(activePlayers[0]?.id ?? '')
     setManualConcept('')
@@ -524,6 +580,10 @@ export default function PaymentsPage() {
             </Button>
             {viewMode === 'mensual' && (
               <>
+                <Button variant="outline" size="sm" onClick={handleExportSepaXML} title="Exportar XML para domiciliación SEPA">
+                  <Download className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">XML SEPA</span>
+                </Button>
                 <Button variant="outline" size="sm" onClick={openManualPaymentDialog}>
                   <Plus className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Nuevo pago</span>

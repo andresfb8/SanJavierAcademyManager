@@ -39,6 +39,9 @@ export default function SettingsPage() {
     email: club?.email || '',
     openingTime: club?.openingTime || '08:00',
     closingTime: club?.closingTime || '22:00',
+    iban: club?.iban || '',
+    bic: club?.bic || '',
+    creditorId: club?.creditorId || '',
   })
   const [clubSaved, setClubSaved] = useState(false)
 
@@ -191,6 +194,41 @@ export default function SettingsPage() {
                     <Input type="time" value={clubForm.closingTime} onChange={(e) => setClubForm({ ...clubForm, closingTime: e.target.value })} />
                   </div>
                 </div>
+
+                {/* SEPA Direct Debit Configuration */}
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-sm font-medium mb-4">Configuración SEPA (Domiciliación Bancaria)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>IBAN del club</Label>
+                      <Input
+                        placeholder="ES91 2100 0418 4502 0005 1332"
+                        value={clubForm.iban}
+                        onChange={(e) => setClubForm({ ...clubForm, iban: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">Cuenta desde la que se cobrarán las domiciliaciones</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>BIC/SWIFT (opcional)</Label>
+                      <Input
+                        placeholder="CAIXESBBXXX"
+                        value={clubForm.bic}
+                        onChange={(e) => setClubForm({ ...clubForm, bic: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">Código del banco</p>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Identificador de Acreedor SEPA</Label>
+                      <Input
+                        placeholder="ES12ZZZ12345678"
+                        value={clubForm.creditorId}
+                        onChange={(e) => setClubForm({ ...clubForm, creditorId: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">Identificador único proporcionado por tu banco para domiciliaciones SEPA</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mt-6">
                   <Button onClick={handleSaveClub}>
                     <Save className="h-4 w-4 mr-1" />
