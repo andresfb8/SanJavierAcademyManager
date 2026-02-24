@@ -17,9 +17,10 @@ import {
   PLAYER_STATUSES,
   DOMINANT_HANDS,
   PLAYER_POSITIONS,
+  CLOTHING_SIZES,
   GUARDIAN_RELATIONSHIPS,
 } from '@/constants'
-import type { Player, PlayerLevel, PlayerStatus, DominantHand, PlayerPosition, GuardianRelationship } from '@/types'
+import type { Player, PlayerLevel, PlayerStatus, DominantHand, PlayerPosition, GuardianRelationship, ClothingSize } from '@/types'
 
 interface PlayerFormData {
   firstName: string
@@ -34,6 +35,7 @@ interface PlayerFormData {
   level: PlayerLevel
   dominantHand: DominantHand
   position: PlayerPosition
+  clothingSize: ClothingSize | ''
   licenseNumber: string
   previousExperience: string
   medicalNotes: string
@@ -60,6 +62,7 @@ const defaultForm: PlayerFormData = {
   firstName: '', lastName: '', dni: '', birthDate: '',
   email: '', phone: '', address: '', city: 'San Javier', postalCode: '30730',
   level: 'iniciacion', dominantHand: 'derecha', position: 'ambos',
+  clothingSize: '',
   licenseNumber: '', previousExperience: '', medicalNotes: '',
   bankAccountHolder: '', iban: '',
   status: 'activo', notes: '',
@@ -89,6 +92,7 @@ function PlayerFormDialog({ open, onOpenChange, player, onSubmit }: PlayerFormDi
         level: player.level,
         dominantHand: player.dominantHand,
         position: player.position,
+        clothingSize: player.clothingSize || '',
         licenseNumber: player.licenseNumber || '',
         previousExperience: player.previousExperience || '',
         medicalNotes: player.medicalNotes || '',
@@ -195,6 +199,17 @@ function PlayerFormDialog({ open, onOpenChange, player, onSubmit }: PlayerFormDi
                   options={PLAYER_POSITIONS.map((p) => ({ value: p.value, label: p.label }))}
                   value={form.position}
                   onChange={(e) => setForm({ ...form, position: e.target.value as PlayerPosition })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Talla de ropa</Label>
+                <Select
+                  options={[
+                    { value: '', label: 'Sin especificar' },
+                    ...CLOTHING_SIZES.map((s) => ({ value: s.value, label: s.label })),
+                  ]}
+                  value={form.clothingSize}
+                  onChange={(e) => setForm({ ...form, clothingSize: e.target.value as ClothingSize | '' })}
                 />
               </div>
               <div className="space-y-2">

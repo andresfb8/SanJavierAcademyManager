@@ -24,6 +24,7 @@ interface ImportedPlayer {
   postalCode: string
   level: string
   status: string
+  clothingSize?: string
 }
 
 interface ImportPlayersDialogProps {
@@ -61,6 +62,9 @@ const columnMappings: Record<string, string> = {
   'cp': 'postalCode',
   'nivel': 'level',
   'estado': 'status',
+  'talla': 'clothingSize',
+  'talla de ropa': 'clothingSize',
+  'talla ropa': 'clothingSize',
 }
 
 function normalizeHeader(header: string): string {
@@ -202,6 +206,7 @@ function ImportPlayersDialog({ open, onOpenChange, onImport }: ImportPlayersDial
           postalCode: '',
           level: '',
           status: '',
+          clothingSize: '',
         }
 
         for (const [originalHeader, fieldName] of Object.entries(headerMap)) {

@@ -1,4 +1,4 @@
-import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, PaymentCategory, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus, StaffRole, InvoiceStatus, InvoiceSeries } from '@/types'
+import type { PlayerLevel, PlayerStatus, AttendanceStatus, PaymentStatus, PaymentMethod, PaymentCategory, UserRole, CourtType, CourtSurface, BillingFrequency, GuardianRelationship, DominantHand, PlayerPosition, EventType, InvitationStatus, StaffRole, InvoiceStatus, InvoiceSeries, ClothingSize } from '@/types'
 
 // --- Niveles ---
 export const PLAYER_LEVELS: { value: PlayerLevel; label: string; color: string }[] = [
@@ -113,6 +113,24 @@ export const PLAYER_POSITIONS: { value: PlayerPosition; label: string }[] = [
   { value: 'drive', label: 'Drive' },
   { value: 'reves', label: 'Revés' },
   { value: 'ambos', label: 'Ambos' },
+]
+
+// --- Tallas de ropa ---
+export const CLOTHING_SIZES: { value: ClothingSize; label: string }[] = [
+  { value: '4', label: '4 (Niño)' },
+  { value: '6', label: '6 (Niño)' },
+  { value: '8', label: '8 (Niño)' },
+  { value: '10', label: '10 (Niño)' },
+  { value: '12', label: '12 (Niño)' },
+  { value: '14', label: '14 (Niño)' },
+  { value: '16', label: '16 (Niño)' },
+  { value: 'XS', label: 'XS' },
+  { value: 'S', label: 'S' },
+  { value: 'M', label: 'M' },
+  { value: 'L', label: 'L' },
+  { value: 'XL', label: 'XL' },
+  { value: 'XXL', label: 'XXL' },
+  { value: '3XL', label: '3XL' },
 ]
 
 // --- Días de la semana ---

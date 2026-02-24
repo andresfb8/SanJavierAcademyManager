@@ -91,6 +91,7 @@ export type PlayerStatus = 'activo' | 'lista_espera' | 'baja'
 export type DominantHand = 'derecha' | 'izquierda'
 export type PlayerPosition = 'drive' | 'reves' | 'ambos'
 export type GuardianRelationship = 'padre' | 'madre' | 'tutor'
+export type ClothingSize = '4' | '6' | '8' | '10' | '12' | '14' | '16' | 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | '3XL'
 
 export interface Guardian {
   firstName: string
@@ -118,6 +119,7 @@ export interface Player {
   level: PlayerLevel
   dominantHand: DominantHand
   position: PlayerPosition
+  clothingSize?: ClothingSize
   licenseNumber?: string
   previousExperience?: string
   medicalNotes?: string
