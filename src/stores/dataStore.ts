@@ -583,6 +583,10 @@ export const useDataStore = create<DataState>()(
 
             if (snap.exists() && snap.data().status === 'completed') {
               needsPartialReceipt = true
+            } else if (!snap.exists() && now.getDate() > 1) {
+              // Si no existe facturación masiva (ej. el sistema estaba vacío o es un mes sin recibos)
+              // pero estamos después del día 1, debemos pedir el recibo parcial para esta nueva inscripción.
+              needsPartialReceipt = true
             }
           }
 
