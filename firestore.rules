@@ -207,6 +207,26 @@ service cloud.firestore {
       allow delete: if isAdmin() && belongsToClub();
     }
 
+    // ─── Tariffs Collection ─────────────────────────────────────────────
+
+    match /tariffs/{tariffId} {
+      // director/coordinador: full access within their club.
+      allow read: if isAuthenticated() && belongsToClub();
+      allow create: if isAdmin() && incomingBelongsToClub();
+      allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
+    // ─── Courts Collection ──────────────────────────────────────────────
+
+    match /courts/{courtId} {
+      // director/coordinador: full access within their club.
+      allow read: if isAuthenticated() && belongsToClub();
+      allow create: if isAdmin() && incomingBelongsToClub();
+      allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
     // ─── Activities Collection ──────────────────────────────────────────
 
     match /activities/{activityId} {
@@ -232,7 +252,7 @@ service cloud.firestore {
     match /invitations/{invitationId} {
       // Allow unauthenticated read for activation page
       // Allow authenticated admin read within their club
-      allow read: if true || (isAuthenticated() && belongsToClub() && isAdmin());
+      allow read: if true;
 
       allow create: if hasRole('director') && incomingBelongsToClub();
 

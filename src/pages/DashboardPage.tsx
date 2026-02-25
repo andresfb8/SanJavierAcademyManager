@@ -21,6 +21,7 @@ import {
   Clock,
   TrendingUp,
   CalendarDays,
+  CalendarCheck,
   Activity,
   Settings as SettingsIcon,
   ChevronDown,
@@ -77,8 +78,9 @@ const CHART_COLORS = {
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
+  const isCoach = user?.role === 'entrenador'
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
-  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, cleanupOrphanedPayments } = useDataStore()
+  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, coaches, privateLessons, cleanupOrphanedPayments } = useDataStore()
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -102,6 +104,88 @@ export default function DashboardPage() {
   const toggleChartCollapsed = (key: string) => {
     setChartCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // ── Coach identification ──────────────────────────────────────────
+  const currentCoachId = useMemo(() => {
+    if (!isCoach || !user?.id) return null
+    return coaches.find(c => c.userId === user.id)?.id ?? null
+  }, [isCoach, user?.id, coaches])
+
+  // ── Coach-specific KPIs ───────────────────────────────────────────
+  const coachHoursThisMonth = useMemo(() => {
+    if (!currentCoachId) return 0
+
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+    let totalMinutes = 0
+
+    // Horas de grupos
+    const coachGroups = groups.filter(g => g.coachId === currentCoachId)
+    coachGroups.forEach(group => {
+      group.schedule.forEach(slot => {
+        const [startH, startM] = slot.startTime.split(':').map(Number)
+        const [endH, endM] = slot.endTime.split(':').map(Number)
+        const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM)
+        // Aproximación: 4 semanas por mes
+        const occurrences = 4
+        totalMinutes += durationMinutes * occurrences
+      })
+    })
+
+    // Horas de clases particulares del mes
+    const coachLessons = privateLessons.filter(pl => {
+      const lessonDate = pl.date instanceof Date ? pl.date : new Date(pl.date)
+      return pl.coachId === currentCoachId &&
+        lessonDate >= startOfMonth &&
+        lessonDate <= endOfMonth
+    })
+
+    coachLessons.forEach(lesson => {
+      const [startH, startM] = lesson.startTime.split(':').map(Number)
+      const [endH, endM] = lesson.endTime.split(':').map(Number)
+      const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM)
+      totalMinutes += durationMinutes
+    })
+
+    return Math.round(totalMinutes / 60 * 10) / 10
+  }, [currentCoachId, groups, privateLessons])
+
+  const coachAssignedPlayers = useMemo(() => {
+    if (!currentCoachId) return 0
+
+    const coachGroupIds = groups
+      .filter(g => g.coachId === currentCoachId)
+      .map(g => g.id)
+
+    const playerIds = new Set(
+      enrollments
+        .filter(e => coachGroupIds.includes(e.groupId))
+        .map(e => e.playerId)
+    )
+
+    return playerIds.size
+  }, [currentCoachId, groups, enrollments])
+
+  const coachTotalGroups = useMemo(() => {
+    if (!currentCoachId) return 0
+    return groups.filter(g => g.coachId === currentCoachId).length
+  }, [currentCoachId, groups])
+
+  const coachTotalPrivateLessons = useMemo(() => {
+    if (!currentCoachId) return 0
+    return privateLessons.filter(pl => pl.coachId === currentCoachId).length
+  }, [currentCoachId, privateLessons])
+
+  const coachIncompleteGroups = useMemo(() => {
+    if (!currentCoachId) return 0
+
+    return groups.filter(g =>
+      g.coachId === currentCoachId &&
+      g.currentEnrollment < g.maxCapacity
+    ).length
+  }, [currentCoachId, groups])
 
   // ── KPI calculations ──────────────────────────────────────────────
   const activePlayers = players.filter((p) => p.status === 'activo').length
@@ -166,6 +250,11 @@ export default function DashboardPage() {
   const todayGroups = groups.filter(
     (g) => g.isActive && g.schedule.some((s) => s.dayOfWeek === today)
   )
+
+  const coachClassesToday = useMemo(() => {
+    if (!currentCoachId) return 0
+    return todayGroups.filter(g => g.coachId === currentCoachId).length
+  }, [currentCoachId, todayGroups])
 
   // ── Chart data ────────────────────────────────────────────────────
   const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -256,18 +345,81 @@ export default function DashboardPage() {
       <div className="p-5 lg:p-6 space-y-6">
 
         {/* ── KPI Cards ────────────────────────────────────────── */}
+        {isCoach && !currentCoachId && (
+          <div className="col-span-full p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-amber-800">
+              No se encontró un perfil de entrenador vinculado. Contacta al administrador.
+            </p>
+          </div>
+        )}
+
         <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory -mx-5 px-5 lg:mx-0 lg:px-0 lg:pb-0 lg:grid lg:grid-cols-4 xl:grid-cols-5 gap-4 no-scrollbar">
-          {kpiConfig.activePlayers && (
-            <StatCard
-              title="Jugadores activos"
-              value={activePlayers}
-              icon={Users}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {isAdmin && kpiConfig.revenue && (
+          {isCoach ? (
+            /* KPIs para Entrenadores */
+            <>
+              <StatCard
+                title="Horas Trabajadas (Este Mes)"
+                value={`${coachHoursThisMonth}h`}
+                icon={Clock}
+                iconClassName="bg-blue-100 text-blue-600"
+                accentColor="#2563eb"
+                className="min-w-[280px] sm:min-w-0 snap-center"
+              />
+              <StatCard
+                title="Jugadores Asignados"
+                value={coachAssignedPlayers}
+                icon={Users}
+                iconClassName="bg-green-100 text-green-600"
+                accentColor="#16a34a"
+                className="min-w-[280px] sm:min-w-0 snap-center"
+              />
+              <StatCard
+                title="Grupos Totales"
+                value={coachTotalGroups}
+                icon={GraduationCap}
+                iconClassName="bg-purple-100 text-purple-600"
+                accentColor="#9333ea"
+                className="min-w-[280px] sm:min-w-0 snap-center"
+              />
+              <StatCard
+                title="Clases Particulares"
+                value={coachTotalPrivateLessons}
+                icon={CalendarDays}
+                iconClassName="bg-orange-100 text-orange-600"
+                accentColor="#ea580c"
+                className="min-w-[280px] sm:min-w-0 snap-center"
+              />
+              <StatCard
+                title="Clases Hoy"
+                value={coachClassesToday}
+                icon={CalendarCheck}
+                iconClassName="bg-indigo-100 text-indigo-600"
+                accentColor="#4f46e5"
+                className="min-w-[280px] sm:min-w-0 snap-center"
+              />
+              <StatCard
+                title="Grupos Incompletos"
+                value={coachIncompleteGroups}
+                icon={AlertCircle}
+                iconClassName="bg-amber-100 text-amber-600"
+                accentColor="#d97706"
+                className="min-w-[280px] sm:min-w-0 snap-center"
+              />
+            </>
+          ) : (
+            /* KPIs existentes para otros roles */
+            <>
+              {kpiConfig.activePlayers && (
+                <StatCard
+                  title="Jugadores activos"
+                  value={activePlayers}
+                  icon={Users}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {isAdmin && kpiConfig.revenue && (
             <StatCard
               title="Ingresos este mes"
               value={formatCurrency(currentRevenue)}
@@ -358,6 +510,8 @@ export default function DashboardPage() {
               accentColor="#0e7490"
               className="min-w-[280px] sm:min-w-0 snap-center"
             />
+          )}
+            </>
           )}
         </div>
 

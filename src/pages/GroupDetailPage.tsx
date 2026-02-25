@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
 import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
@@ -54,6 +55,7 @@ export default function GroupDetailPage() {
     () => players.filter((p) => p.status === 'activo' && !enrolledPlayerIds.has(p.id)),
     [players, enrolledPlayerIds]
   )
+
 
   // Occupancy calculations
   const occupancyPercentage = group
@@ -441,27 +443,29 @@ export default function GroupDetailPage() {
 
       {/* Add Player Dialog */}
       <Dialog open={showAddPlayer} onOpenChange={setShowAddPlayer}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg sm:max-w-lg md:max-w-xl">
           <DialogHeader>
             <DialogTitle>Añadir jugador al grupo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             {/* Select Player */}
             <div className="space-y-2">
-              <Label>Jugador *</Label>
+              <Label htmlFor="player">Jugador *</Label>
               {availablePlayers.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-2">
                   No hay jugadores activos disponibles para inscribir en este grupo.
                 </p>
               ) : (
-                <Select
+                <SearchableSelect
                   options={availablePlayers.map((p) => ({
                     value: p.id,
-                    label: `${p.firstName} ${p.lastName}`,
+                    label: `${p.lastName}, ${p.firstName}${p.dni ? ` - ${p.dni}` : ''}`,
                   }))}
-                  placeholder="Seleccionar jugador"
                   value={selectedPlayerId}
-                  onChange={(e) => setSelectedPlayerId(e.target.value)}
+                  onChange={setSelectedPlayerId}
+                  placeholder="Seleccionar jugador..."
+                  searchPlaceholder="Buscar por nombre, apellido o DNI..."
+                  emptyMessage="No se encontraron jugadores"
                 />
               )}
             </div>

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
+import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDialog'
 import { useDataStore } from '@/stores/dataStore'
 import {
@@ -1079,19 +1080,34 @@ export default function PaymentsPage() {
       </Dialog>
 
       {/* Manual Payment Dialog */}
-      <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog open={manualDialogOpen} onOpenChange={(open) => {
+        setManualDialogOpen(open)
+        if (!open) {
+          // Reset form when dialog closes
+          setManualPlayerId('')
+          setManualConcept('')
+          setManualAmount('')
+          setManualCategory('manual')
+          setManualNotes('')
+        }
+      }}>
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nuevo pago manual</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Jugador</Label>
-              <Select
-                options={activePlayers.map((p) => ({ value: p.id, label: `${p.lastName}, ${p.firstName}` }))}
+              <Label htmlFor="player">Jugador *</Label>
+              <SearchableSelect
+                options={activePlayers.map((p) => ({
+                  value: p.id,
+                  label: `${p.lastName}, ${p.firstName}${p.dni ? ` - ${p.dni}` : ''}`
+                }))}
                 value={manualPlayerId}
-                onChange={(e) => setManualPlayerId(e.target.value)}
-                placeholder="Seleccionar jugador"
+                onChange={setManualPlayerId}
+                placeholder="Seleccionar jugador..."
+                searchPlaceholder="Buscar por nombre, apellido o DNI..."
+                emptyMessage="No se encontraron jugadores"
               />
             </div>
             <div className="space-y-1.5">

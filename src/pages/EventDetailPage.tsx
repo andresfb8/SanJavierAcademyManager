@@ -611,7 +611,7 @@ export default function EventDetailPage() {
 
       {/* Dialogo de edicion */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg sm:max-w-lg md:max-w-xl">
           <DialogHeader><DialogTitle>Editar evento</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Nombre</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>

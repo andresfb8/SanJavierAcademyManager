@@ -568,7 +568,7 @@ export default function CoachesPage() {
 
       {/* Dialogo de creacion/edicion */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {editingCoach ? 'Editar miembro' : 'Nuevo miembro'}

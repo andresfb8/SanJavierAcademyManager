@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { AttendanceQuickDialog } from '@/components/attendance/AttendanceQuickDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
@@ -86,6 +87,11 @@ interface GridBlock {
   eventName?: string
   eventType?: string
   eventTypeLabel?: string
+  attendanceStats?: {
+    present: number
+    absent: number
+    justified: number
+  } | null
 }
 
 // ==========================================
@@ -94,10 +100,18 @@ interface GridBlock {
 
 export default function AgendaPage() {
   const navigate = useNavigate()
-  const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment } = useDataStore()
+  const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment, attendance } = useDataStore()
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Modal de asistencia
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false)
+  const [selectedGroupForAttendance, setSelectedGroupForAttendance] = useState<{
+    groupId: string
+    groupName: string
+    date: string
+  } | null>(null)
 
   // Formulario clase particular
   const [formDate, setFormDate] = useState(toInputDate(new Date()))
@@ -112,6 +126,7 @@ export default function AgendaPage() {
   // Invitados clase particular
   const [formGuestNames, setFormGuestNames] = useState<string[]>([])
   const [formGuestInput, setFormGuestInput] = useState('')
+  const [lessonPlayerSearch, setLessonPlayerSearch] = useState('')
 
   // Formulario evento
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
@@ -130,6 +145,7 @@ export default function AgendaPage() {
   // Invitados evento
   const [evGuestNames, setEvGuestNames] = useState<string[]>([])
   const [evGuestInput, setEvGuestInput] = useState('')
+  const [eventPlayerSearch, setEventPlayerSearch] = useState('')
 
   // Metodos de pago por jugador en detalle de leccion
   const [lessonPaymentMethods, setLessonPaymentMethods] = useState<Record<string, string>>({})
@@ -162,11 +178,27 @@ export default function AgendaPage() {
         if (slot.dayOfWeek !== selectedDayOfWeek) continue
         if (!map[group.courtId]) continue
         const levelInfo = PLAYER_LEVELS.find((l) => l.value === group.level)
+
+        // Calcular estadísticas de asistencia para esta fecha
+        const attendanceForDate = attendance.find(a => {
+          const recordDate = a.date instanceof Date
+            ? a.date.toISOString().split('T')[0]
+            : new Date(a.date).toISOString().split('T')[0]
+          return a.groupId === group.id && recordDate === toInputDate(selectedDate)
+        })
+
+        const attendanceStats = attendanceForDate ? {
+          present: attendanceForDate.records.filter(r => r.status === 'presente').length,
+          absent: attendanceForDate.records.filter(r => r.status === 'ausente').length,
+          justified: attendanceForDate.records.filter(r => r.status === 'justificado').length,
+        } : null
+
         map[group.courtId].push({
           type: 'group', id: group.id,
           startSlot: timeToSlotIndex(slot.startTime), endSlot: timeToSlotIndex(slot.endTime),
           groupName: group.name, level: group.level, levelLabel: levelInfo?.label ?? group.level,
           coachName: group.coachName, enrollment: group.currentEnrollment, maxCapacity: group.maxCapacity,
+          attendanceStats,
         })
       }
     }
@@ -217,6 +249,7 @@ export default function AgendaPage() {
     setFormCoachId(coaches.filter((c) => c.isActive)[0]?.id ?? ''); setFormPlayerIds([])
     setFormStartTime('09:00'); setFormEndTime('10:00'); setFormPrice(''); setFormNotes('')
     setFormGuestNames([]); setFormGuestInput('')
+    setLessonPlayerSearch('')
     setDialogOpen(true)
   }
 
@@ -225,6 +258,7 @@ export default function AgendaPage() {
     setEvStartTime('09:00'); setEvEndTime('12:00'); setEvCourtIds([]); setEvCoachIds([])
     setEvPlayerIds([]); setEvPrice(''); setEvDescription(''); setEvMaxCapacity('')
     setEvGuestNames([]); setEvGuestInput('')
+    setEventPlayerSearch('')
     setEventDialogOpen(true)
   }
 
@@ -423,6 +457,39 @@ export default function AgendaPage() {
     () => players.filter((p) => p.status === 'activo').sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [players]
   )
+
+  // Filtered players for lesson search
+  const filteredLessonPlayers = useMemo(() => {
+    if (!lessonPlayerSearch.trim()) return activePlayers
+
+    const search = lessonPlayerSearch.toLowerCase()
+    return activePlayers.filter((p) => {
+      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
+      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase()
+      const dni = p.dni?.toLowerCase() || ''
+
+      return fullName.includes(search) ||
+             reverseName.includes(search) ||
+             dni.includes(search)
+    })
+  }, [activePlayers, lessonPlayerSearch])
+
+  // Filtered players for event search
+  const filteredEventPlayers = useMemo(() => {
+    if (!eventPlayerSearch.trim()) return activePlayers
+
+    const search = eventPlayerSearch.toLowerCase()
+    return activePlayers.filter((p) => {
+      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
+      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase()
+      const dni = p.dni?.toLowerCase() || ''
+
+      return fullName.includes(search) ||
+             reverseName.includes(search) ||
+             dni.includes(search)
+    })
+  }, [activePlayers, eventPlayerSearch])
+
   const activeCoaches = useMemo(
     () => coaches.filter((c) => c.isActive).sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [coaches]
@@ -513,7 +580,14 @@ export default function AgendaPage() {
                               const colors = LEVEL_COLORS[startingBlock.level ?? ''] ?? LEVEL_COLORS.iniciacion
                               return (
                                 <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
-                                  <div className={`absolute inset-x-1 top-1 rounded-lg border-l-4 ${colors.bg} ${colors.border} p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow`} style={{ height: blockHeight - 8 }} onClick={() => navigate(`/clases/${startingBlock.id}/${toInputDate(selectedDate)}`)}>
+                                  <div className={`absolute inset-x-1 top-1 rounded-lg border-l-4 ${colors.bg} ${colors.border} p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow`} style={{ height: blockHeight - 8 }} onClick={() => {
+                                    setSelectedGroupForAttendance({
+                                      groupId: startingBlock.id,
+                                      groupName: startingBlock.groupName ?? '',
+                                      date: toInputDate(selectedDate)
+                                    })
+                                    setAttendanceDialogOpen(true)
+                                  }}>
                                     <div className="flex items-start justify-between gap-1">
                                       <p className={`text-sm font-semibold ${colors.text} truncate`}>{startingBlock.groupName}</p>
                                       <Badge className={`text-[10px] shrink-0 ${PLAYER_LEVELS.find((l) => l.value === startingBlock.level)?.color ?? ''}`}>{startingBlock.levelLabel}</Badge>
@@ -521,6 +595,17 @@ export default function AgendaPage() {
                                     <div className="mt-1 space-y-0.5">
                                       <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{startingBlock.coachName}</p>
                                       <p className="text-xs text-muted-foreground">{startingBlock.enrollment}/{startingBlock.maxCapacity} alumnos</p>
+                                      {startingBlock.attendanceStats ? (
+                                        <p className="text-[10px] text-muted-foreground">
+                                          Asist: <span className="text-green-600 font-medium">{startingBlock.attendanceStats.present}P</span>
+                                          <span className="text-red-600 font-medium ml-1">{startingBlock.attendanceStats.absent}A</span>
+                                          {startingBlock.attendanceStats.justified > 0 && (
+                                            <span className="text-yellow-600 font-medium ml-1">{startingBlock.attendanceStats.justified}J</span>
+                                          )}
+                                        </p>
+                                      ) : (
+                                        <p className="text-[10px] text-muted-foreground/70 italic">Sin registro</p>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -604,7 +689,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Nueva clase particular */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh]">
           <DialogHeader><DialogTitle>Nueva clase particular</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
@@ -612,8 +697,15 @@ export default function AgendaPage() {
             <div className="space-y-1.5"><Label>Entrenador</Label><Select value={formCoachId} onChange={(e) => setFormCoachId(e.target.value)} options={activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Seleccionar entrenador" /></div>
             <div className="space-y-1.5">
               <Label>Jugadores</Label>
+              {activePlayers.length > 0 && (
+                <Input
+                  placeholder="Buscar jugador por nombre, apellido o DNI..."
+                  value={lessonPlayerSearch}
+                  onChange={(e) => setLessonPlayerSearch(e.target.value)}
+                />
+              )}
               <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
-                {activePlayers.length === 0 ? <p className="text-sm text-muted-foreground text-center py-2">No hay jugadores activos</p> : activePlayers.map((player) => (
+                {activePlayers.length === 0 ? <p className="text-sm text-muted-foreground text-center py-2">No hay jugadores activos</p> : filteredLessonPlayers.map((player) => (
                   <label key={player.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
                     <Checkbox checked={formPlayerIds.includes(player.id)} onCheckedChange={() => togglePlayer(player.id)} />
                     <span>{player.lastName}, {player.firstName}</span>
@@ -622,6 +714,7 @@ export default function AgendaPage() {
                 ))}
               </div>
               {formPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{formPlayerIds.length} jugador{formPlayerIds.length !== 1 ? 'es' : ''} seleccionado{formPlayerIds.length !== 1 ? 's' : ''}</p>}
+              {lessonPlayerSearch && filteredLessonPlayers.length === 0 && <p className="text-xs text-muted-foreground">No se encontraron jugadores</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Invitados</Label>
@@ -658,7 +751,7 @@ export default function AgendaPage() {
 
       {/* Dialogo: Detalle/Edicion clase particular */}
       <Dialog open={lessonDetailOpen} onOpenChange={setLessonDetailOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh]">
           <DialogHeader><DialogTitle>{lessonEditMode ? 'Editar clase particular' : 'Clase particular'}</DialogTitle></DialogHeader>
           {selectedLesson && !lessonEditMode && (
             <div className="space-y-4">
@@ -769,9 +862,9 @@ export default function AgendaPage() {
 
       {/* Dialogo: Nuevo evento */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh]">
           <DialogHeader><DialogTitle>Nuevo evento</DialogTitle></DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-4">
             <div className="space-y-1.5"><Label>Nombre del evento</Label><Input value={evName} onChange={(e) => setEvName(e.target.value)} placeholder="Ej: Mini Torneo Navidad" /></div>
             <div className="space-y-1.5"><Label>Tipo</Label><Select value={evType} onChange={(e) => setEvType(e.target.value as EventType)} options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))} /></div>
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={evDate} onChange={(e) => setEvDate(e.target.value)} /></div>
@@ -801,14 +894,22 @@ export default function AgendaPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Asistentes</Label>
+              {activePlayers.length > 0 && (
+                <Input
+                  placeholder="Buscar jugador por nombre, apellido o DNI..."
+                  value={eventPlayerSearch}
+                  onChange={(e) => setEventPlayerSearch(e.target.value)}
+                />
+              )}
               <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
-                {activePlayers.map((player) => (
+                {filteredEventPlayers.map((player) => (
                   <label key={player.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
                     <Checkbox checked={evPlayerIds.includes(player.id)} onCheckedChange={() => toggleEvPlayer(player.id)} /><span>{player.lastName}, {player.firstName}</span>
                   </label>
                 ))}
               </div>
               {evPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{evPlayerIds.length} asistente{evPlayerIds.length !== 1 ? 's' : ''}</p>}
+              {eventPlayerSearch && filteredEventPlayers.length === 0 && <p className="text-xs text-muted-foreground">No se encontraron jugadores</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Invitados</Label>
@@ -841,6 +942,21 @@ export default function AgendaPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog: Asistencia rapida */}
+      {selectedGroupForAttendance && (
+        <AttendanceQuickDialog
+          open={attendanceDialogOpen}
+          onOpenChange={setAttendanceDialogOpen}
+          groupId={selectedGroupForAttendance.groupId}
+          groupName={selectedGroupForAttendance.groupName}
+          date={selectedGroupForAttendance.date}
+          onNavigateToDetail={() => {
+            navigate(`/clases/${selectedGroupForAttendance.groupId}/${selectedGroupForAttendance.date}`)
+            setAttendanceDialogOpen(false)
+          }}
+        />
+      )}
 
     </div>
   )

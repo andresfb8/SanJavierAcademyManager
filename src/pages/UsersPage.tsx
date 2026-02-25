@@ -36,8 +36,6 @@ export default function UsersPage() {
   const [showInviteDialog, setShowInviteDialog] = useState(false)
 
   // --- Users state ---
-  const [users, setUsers] = useState<FirestoreUser[]>([])
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   const [deactivateUserId, setDeactivateUserId] = useState<string | null>(null)
 
   // --- Filter state ---
@@ -61,48 +59,8 @@ export default function UsersPage() {
   const [emailError, setEmailError] = useState('')
 
   // --- Store ---
-  const { invitations, addInvitation, deleteInvitation, players, coaches, addCoach } = useDataStore()
+  const { invitations, addInvitation, deleteInvitation, players, coaches, addCoach, users } = useDataStore()
   const { user } = useAuthStore()
-
-  // --- Load users from Firestore ---
-  useEffect(() => {
-    async function loadUsers() {
-      if (!user?.clubId) return
-
-      setIsLoadingUsers(true)
-      try {
-        const usersQuery = query(
-          collection(db, 'users'),
-          where('clubId', '==', user.clubId)
-        )
-        const snapshot = await getDocs(usersQuery)
-        const loadedUsers: FirestoreUser[] = []
-
-        snapshot.forEach((doc) => {
-          const data = doc.data()
-          loadedUsers.push({
-            id: doc.id,
-            email: data.email || '',
-            displayName: data.displayName || '',
-            role: data.role as UserRole,
-            clubId: data.clubId || '',
-            isActive: data.isActive !== false, // Default to true if not set
-            createdAt: data.createdAt?.toDate?.() || new Date(),
-            linkedPlayerId: data.linkedPlayerId,
-            linkedPlayerIds: data.linkedPlayerIds,
-          })
-        })
-
-        setUsers(loadedUsers)
-      } catch (err) {
-        console.error('Error loading users:', err)
-      } finally {
-        setIsLoadingUsers(false)
-      }
-    }
-
-    loadUsers()
-  }, [user?.clubId])
 
   // --- Derived data ---
   const activePlayers = useMemo(
@@ -268,7 +226,11 @@ export default function UsersPage() {
       invitationData.linkedPlayerIds = [...linkedPlayerIds]
     }
 
-    addInvitation(invitationData)
+    // Usar token como id para consistencia con Firestore
+    addInvitation({
+      ...invitationData,
+      id: token,
+    } as import('@/types').Invitation)
 
     // Auto-create coach entry for staff roles
     if (inviteRole === 'entrenador' || inviteRole === 'coordinador') {
@@ -315,16 +277,11 @@ export default function UsersPage() {
   }
 
   async function handleDeleteInvitation(id: string) {
-    // Find the invitation to get its token
-    const invitation = invitations.find((inv) => inv.id === id)
-    if (!invitation) return
-
-    // Delete from local store
+    // Ya no necesitamos buscar la invitación - id ES el token
     deleteInvitation(id)
 
-    // Also delete from Firestore using the token as document ID
     try {
-      await deleteDoc(doc(db, 'invitations', invitation.token))
+      await deleteDoc(doc(db, 'invitations', id))
     } catch (err) {
       console.error('Error deleting invitation from Firestore:', err)
     }
@@ -337,13 +294,7 @@ export default function UsersPage() {
       await updateDoc(doc(db, 'users', deactivateUserId), {
         isActive: false,
       })
-
-      // Update local state
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === deactivateUserId ? { ...u, isActive: false } : u
-        )
-      )
+      // El listener en tiempo real actualizará el store automáticamente
     } catch (err) {
       console.error('Error deactivating user:', err)
     } finally {
@@ -526,13 +477,7 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingUsers ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    Cargando usuarios...
-                  </TableCell>
-                </TableRow>
-              ) : filteredUsers.length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     {users.length === 0

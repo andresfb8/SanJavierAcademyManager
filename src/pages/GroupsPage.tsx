@@ -520,7 +520,7 @@ export default function GroupsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingGroup ? 'Editar grupo' : 'Nuevo grupo'}</DialogTitle>
           </DialogHeader>

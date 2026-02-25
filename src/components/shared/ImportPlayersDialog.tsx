@@ -316,7 +316,7 @@ function ImportPlayersDialog({ open, onOpenChange, onImport }: ImportPlayersDial
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Importar jugadores</DialogTitle>
           <DialogDescription>

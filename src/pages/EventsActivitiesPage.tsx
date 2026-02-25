@@ -93,6 +93,7 @@ export default function EventsActivitiesPage() {
   const [formNotes, setFormNotes] = useState('')
   const [formGuestNames, setFormGuestNames] = useState<string[]>([])
   const [formGuestInput, setFormGuestInput] = useState('')
+  const [lessonPlayerSearch, setLessonPlayerSearch] = useState('')
 
   // New event dialog
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
@@ -109,6 +110,7 @@ export default function EventsActivitiesPage() {
   const [evMaxCapacity, setEvMaxCapacity] = useState('')
   const [evGuestNames, setEvGuestNames] = useState<string[]>([])
   const [evGuestInput, setEvGuestInput] = useState('')
+  const [eventPlayerSearch, setEventPlayerSearch] = useState('')
 
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
   const activeCoaches = useMemo(
@@ -119,6 +121,38 @@ export default function EventsActivitiesPage() {
     () => players.filter((p) => p.status === 'activo').sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [players]
   )
+
+  // Filtered players for lesson search
+  const filteredLessonPlayers = useMemo(() => {
+    if (!lessonPlayerSearch.trim()) return activePlayers
+
+    const search = lessonPlayerSearch.toLowerCase()
+    return activePlayers.filter((p) => {
+      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
+      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase()
+      const dni = p.dni?.toLowerCase() || ''
+
+      return fullName.includes(search) ||
+             reverseName.includes(search) ||
+             dni.includes(search)
+    })
+  }, [activePlayers, lessonPlayerSearch])
+
+  // Filtered players for event search
+  const filteredEventPlayers = useMemo(() => {
+    if (!eventPlayerSearch.trim()) return activePlayers
+
+    const search = eventPlayerSearch.toLowerCase()
+    return activePlayers.filter((p) => {
+      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
+      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase()
+      const dni = p.dni?.toLowerCase() || ''
+
+      return fullName.includes(search) ||
+             reverseName.includes(search) ||
+             dni.includes(search)
+    })
+  }, [activePlayers, eventPlayerSearch])
 
   // Build unified items (filtrados por coach si es entrenador)
   const unifiedItems: UnifiedItem[] = useMemo(() => {
@@ -232,6 +266,7 @@ export default function EventsActivitiesPage() {
     setFormNotes('')
     setFormGuestNames([])
     setFormGuestInput('')
+    setLessonPlayerSearch('')
     setLessonDialogOpen(true)
   }
 
@@ -253,6 +288,7 @@ export default function EventsActivitiesPage() {
     setEvMaxCapacity('')
     setEvGuestNames([])
     setEvGuestInput('')
+    setEventPlayerSearch('')
     setEventDialogOpen(true)
   }
 
@@ -592,7 +628,7 @@ export default function EventsActivitiesPage() {
 
       {/* New private lesson dialog */}
       <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh]">
           <DialogHeader><DialogTitle>Nueva clase particular</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
@@ -600,8 +636,15 @@ export default function EventsActivitiesPage() {
             <div className="space-y-1.5"><Label>Entrenador</Label><Select value={formCoachId} onChange={(e) => setFormCoachId(e.target.value)} options={activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Seleccionar entrenador" /></div>
             <div className="space-y-1.5">
               <Label>Jugadores</Label>
+              {activePlayers.length > 0 && (
+                <Input
+                  placeholder="Buscar jugador por nombre, apellido o DNI..."
+                  value={lessonPlayerSearch}
+                  onChange={(e) => setLessonPlayerSearch(e.target.value)}
+                />
+              )}
               <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
-                {activePlayers.length === 0 ? <p className="text-sm text-muted-foreground text-center py-2">No hay jugadores activos</p> : activePlayers.map((player) => (
+                {activePlayers.length === 0 ? <p className="text-sm text-muted-foreground text-center py-2">No hay jugadores activos</p> : filteredLessonPlayers.map((player) => (
                   <label key={player.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
                     <Checkbox checked={formPlayerIds.includes(player.id)} onCheckedChange={() => togglePlayer(player.id)} />
                     <span>{player.lastName}, {player.firstName}</span>
@@ -610,6 +653,7 @@ export default function EventsActivitiesPage() {
                 ))}
               </div>
               {formPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{formPlayerIds.length} jugador{formPlayerIds.length !== 1 ? 'es' : ''} seleccionado{formPlayerIds.length !== 1 ? 's' : ''}</p>}
+              {lessonPlayerSearch && filteredLessonPlayers.length === 0 && <p className="text-xs text-muted-foreground">No se encontraron jugadores</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Invitados</Label>
@@ -641,7 +685,7 @@ export default function EventsActivitiesPage() {
 
       {/* New event dialog */}
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh]">
           <DialogHeader><DialogTitle>Nuevo evento</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Nombre del evento</Label><Input value={evName} onChange={(e) => setEvName(e.target.value)} placeholder="Ej: Mini Torneo Navidad" /></div>
@@ -673,14 +717,22 @@ export default function EventsActivitiesPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Asistentes</Label>
+              {activePlayers.length > 0 && (
+                <Input
+                  placeholder="Buscar jugador por nombre, apellido o DNI..."
+                  value={eventPlayerSearch}
+                  onChange={(e) => setEventPlayerSearch(e.target.value)}
+                />
+              )}
               <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
-                {activePlayers.map((player) => (
+                {filteredEventPlayers.map((player) => (
                   <label key={player.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted cursor-pointer text-sm">
                     <Checkbox checked={evPlayerIds.includes(player.id)} onCheckedChange={() => toggleEvPlayer(player.id)} /><span>{player.lastName}, {player.firstName}</span>
                   </label>
                 ))}
               </div>
               {evPlayerIds.length > 0 && <p className="text-xs text-muted-foreground">{evPlayerIds.length} asistente{evPlayerIds.length !== 1 ? 's' : ''}</p>}
+              {eventPlayerSearch && filteredEventPlayers.length === 0 && <p className="text-xs text-muted-foreground">No se encontraron jugadores</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Invitados</Label>

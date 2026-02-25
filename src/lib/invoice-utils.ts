@@ -253,6 +253,9 @@ export async function generateInvoiceFromPayments(
     notes?: string
   }
 ): Promise<Omit<Invoice, 'id' | 'createdAt'>> {
+  // Modo manual: factura sin pagos vinculados
+  const isManualInvoice = paymentIds.length === 0
+
   // Combinar todos los pagos en un solo array
   const allPayments: AnyPayment[] = [
     ...payments,
@@ -260,10 +263,12 @@ export async function generateInvoiceFromPayments(
     ...privateLessonPayments,
   ]
 
-  // Validación inicial
-  const validationResult = canGenerateInvoice(paymentIds, allPayments)
-  if (!validationResult.canInvoice) {
-    throw new Error(validationResult.reason || 'No se puede generar la factura')
+  // Validación inicial (solo para facturas con pagos)
+  if (!isManualInvoice) {
+    const validationResult = canGenerateInvoice(paymentIds, allPayments)
+    if (!validationResult.canInvoice) {
+      throw new Error(validationResult.reason || 'No se puede generar la factura')
+    }
   }
 
   // Obtener los pagos seleccionados
@@ -333,6 +338,93 @@ export async function generateInvoiceFromPayments(
     vatBreakdown,
     status: 'draft',
     paymentIds,
+    notes: options?.notes,
+    createdBy: '', // Se asignará en el dataStore
+  }
+
+  // Validar factura final
+  const finalValidation = validateInvoiceData(invoice, club)
+  if (!finalValidation.valid) {
+    throw new Error(
+      `Datos de factura inválidos: ${finalValidation.errors.join(', ')}`
+    )
+  }
+
+  return invoice
+}
+
+// ==========================================
+// Generación de factura manual
+// ==========================================
+
+/**
+ * Genera una factura manual con líneas de concepto personalizadas
+ * Útil para crear facturas a clientes sin pagos previos o externos
+ */
+export async function generateManualInvoice(
+  lineItems: InvoiceLineItem[],
+  player: Player,
+  club: Club,
+  series: InvoiceSeries = 'FC',
+  options?: {
+    invoiceDate?: Date
+    dueDate?: Date
+    notes?: string
+  }
+): Promise<Omit<Invoice, 'id' | 'createdAt'>> {
+  // Validar que haya líneas
+  if (lineItems.length === 0) {
+    throw new Error('Debe incluir al menos una línea en la factura')
+  }
+
+  // Calcular totales
+  const subtotal = Math.round(
+    lineItems.reduce((sum, item) => sum + item.subtotal, 0) * 100
+  ) / 100
+  const totalVat = Math.round(
+    lineItems.reduce((sum, item) => sum + item.vatAmount, 0) * 100
+  ) / 100
+  const total = Math.round(
+    lineItems.reduce((sum, item) => sum + item.total, 0) * 100
+  ) / 100
+
+  // Calcular desglose de IVA
+  const vatBreakdown = calculateVATBreakdown(lineItems)
+
+  // Obtener contador actual del club para generar número
+  const year = new Date().getFullYear()
+  const currentCounter = club.invoiceCounters?.[year]?.[series] ?? 0
+  const invoiceNumber = getNextInvoiceNumber(series, currentCounter, year)
+
+  // Construir dirección del cliente
+  let customerAddress = ''
+  if (player.address) {
+    customerAddress = player.address
+    if (player.postalCode) {
+      customerAddress += `, ${player.postalCode}`
+    }
+    if (player.city) {
+      customerAddress += ` ${player.city}`
+    }
+  }
+
+  // Construir objeto Invoice
+  const invoice: Omit<Invoice, 'id' | 'createdAt'> = {
+    invoiceNumber,
+    series,
+    invoiceDate: options?.invoiceDate ?? new Date(),
+    dueDate: options?.dueDate,
+    playerId: player.id,
+    playerName: `${player.firstName} ${player.lastName}`,
+    customerNif: player.dni || undefined,
+    customerAddress: customerAddress || undefined,
+    lineItems,
+    subtotal,
+    totalVat,
+    total,
+    vatBreakdown,
+    status: 'draft',
+    paymentIds: [], // Sin pagos vinculados para facturas manuales
     notes: options?.notes,
     createdBy: '', // Se asignará en el dataStore
   }

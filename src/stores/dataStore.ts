@@ -33,6 +33,7 @@ import type {
   PlayerStatus,
   ActivityType,
   Invoice,
+  AppUser,
 } from '@/types'
 import {
   demoCourts,
@@ -65,6 +66,10 @@ import { toast } from '@/hooks/use-toast'
 function getClubId(): string | undefined {
   const user = useAuthStore.getState().user
   if (user?.clubId) return user.clubId
+
+  // Log advertencia si falta clubId
+  console.warn('[DataStore] getClubId: No clubId found. User may not be authenticated.')
+
   // Fallback en desarrollo para asegurar persistencia local
   if (import.meta.env.DEV) return 'club-001'
   return undefined
@@ -95,6 +100,7 @@ export interface DataState {
   matchReports: MatchReport[]
   coachSalaryConfigs: CoachSalaryConfig[]
   invoices: Invoice[]
+  users: AppUser[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -249,6 +255,7 @@ export const useDataStore = create<DataState>()(
       matchReports: [],
       coachSalaryConfigs: [],
       invoices: [],
+      users: [],
       updateClub: (data) => {
         set((state) => ({
           club: state.club ? { ...state.club, ...data } : null,
@@ -990,10 +997,11 @@ export const useDataStore = create<DataState>()(
       },
 
       addInvitation: (invitationData) => {
-        const newI: Invitation = { ...invitationData, id: generateId() }
+        // Usar token como ID para consistencia con Firestore
+        const newI: Invitation = { ...invitationData, id: invitationData.token }
         set((state) => ({ invitations: [...state.invitations, newI] }))
         const clubId = getClubId()
-        if (clubId) syncDoc('invitations', newI.id, newI as any, clubId)
+        if (clubId) syncDoc('invitations', invitationData.token, newI as any, clubId)
       },
 
       updateInvitation: (id, data) => {
@@ -1191,6 +1199,8 @@ export const useDataStore = create<DataState>()(
         evaluations: state.evaluations,
         matchReports: state.matchReports,
         coachSalaryConfigs: state.coachSalaryConfigs,
+        invoices: state.invoices,
+        users: state.users,
       } as DataState),
     },
   )

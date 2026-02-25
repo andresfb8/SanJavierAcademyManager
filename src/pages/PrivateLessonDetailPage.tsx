@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import {
@@ -514,20 +515,20 @@ export default function PrivateLessonDetailPage() {
               <p className="text-sm font-medium flex items-center gap-2"><UserPlus className="h-4 w-4" />Añadir participante</p>
               {/* Jugador registrado */}
               <div className="flex gap-2">
-                <select
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-                  value={addPlayerId}
-                  onChange={(e) => setAddPlayerId(e.target.value)}
-                >
-                  <option value="">Seleccionar jugador registrado...</option>
-                  {activePlayers
+                <SearchableSelect
+                  className="flex-1"
+                  options={activePlayers
                     .filter((p) => !lesson.playerIds.includes(p.id))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.lastName}, {p.firstName}
-                      </option>
-                    ))}
-                </select>
+                    .map((p) => ({
+                      value: p.id,
+                      label: `${p.lastName}, ${p.firstName}${p.dni ? ` - ${p.dni}` : ''}`
+                    }))}
+                  value={addPlayerId}
+                  onChange={setAddPlayerId}
+                  placeholder="Seleccionar jugador registrado..."
+                  searchPlaceholder="Buscar por nombre, apellido o DNI..."
+                  emptyMessage="No se encontraron jugadores disponibles"
+                />
                 <Button variant="outline" size="sm" onClick={handleAddPlayer} disabled={!addPlayerId}>
                   Añadir
                 </Button>
@@ -594,7 +595,7 @@ export default function PrivateLessonDetailPage() {
 
       {/* Dialogo de edicion */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar clase particular</DialogTitle>
           </DialogHeader>

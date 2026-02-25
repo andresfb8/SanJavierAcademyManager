@@ -16,12 +16,14 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { AlertCircle, FileText } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
 import { INVOICE_SERIES } from '@/constants'
-import { formatCurrency } from '@/lib/utils'
-import { generateInvoiceFromPayments, canGenerateInvoice } from '@/lib/invoice-utils'
-import type { InvoiceSeries, Payment, EventPayment, PrivateLessonPayment } from '@/types'
+import { formatCurrency, generateId } from '@/lib/utils'
+import { generateInvoiceFromPayments, generateManualInvoice, canGenerateInvoice } from '@/lib/invoice-utils'
+import type { InvoiceSeries, Payment, EventPayment, PrivateLessonPayment, VatRate, InvoiceLineItem } from '@/types'
 
 interface GenerateInvoiceDialogProps {
   open: boolean
@@ -48,6 +50,27 @@ export function GenerateInvoiceDialog({
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [isManualClient, setIsManualClient] = useState(false)
+  const [manualClient, setManualClient] = useState({
+    nif: '',
+    name: '',
+    address: '',
+    postalCode: '',
+    city: '',
+  })
+  const [manualLineItems, setManualLineItems] = useState<Array<{
+    id: string
+    description: string
+    quantity: number
+    unitPrice: number
+    vatRate: VatRate
+  }>>([{
+    id: generateId(),
+    description: '',
+    quantity: 1,
+    unitPrice: 0,
+    vatRate: 0
+  }])
 
   // Reset form cuando se abre el diálogo
   useEffect(() => {
@@ -58,6 +81,15 @@ export function GenerateInvoiceDialog({
       setNotes('')
       setError('')
       setIsSubmitting(false)
+      setIsManualClient(false)
+      setManualClient({ nif: '', name: '', address: '', postalCode: '', city: '' })
+      setManualLineItems([{
+        id: generateId(),
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        vatRate: 0
+      }])
     }
   }, [open, preSelectedPlayerId, preSelectedPaymentIds])
 
@@ -81,17 +113,45 @@ export function GenerateInvoiceDialog({
 
   // Calcular preview de la factura
   const preview = useMemo(() => {
+    // Si hay líneas manuales con contenido, calcular desde ahí
+    const hasManualItems = manualLineItems.length > 0 && manualLineItems.some(item => item.description.trim())
+
+    if (isManualClient || (selectedPlayerId && availablePayments.length === 0 && hasManualItems)) {
+      let subtotal = 0
+      let totalVat = 0
+      const vatBreakdown: Record<number, { base: number; amount: number }> = {}
+
+      manualLineItems.forEach(item => {
+        const lineSubtotal = item.quantity * item.unitPrice
+        const lineVat = lineSubtotal * (item.vatRate / 100)
+
+        subtotal += lineSubtotal
+        totalVat += lineVat
+
+        if (!vatBreakdown[item.vatRate]) {
+          vatBreakdown[item.vatRate] = { base: 0, amount: 0 }
+        }
+        vatBreakdown[item.vatRate].base += lineSubtotal
+        vatBreakdown[item.vatRate].amount += lineVat
+      })
+
+      return {
+        subtotal: Math.round(subtotal * 100) / 100,
+        totalVat: Math.round(totalVat * 100) / 100,
+        total: Math.round((subtotal + totalVat) * 100) / 100,
+        vatBreakdown,
+        count: manualLineItems.length
+      }
+    }
+
+    // Si hay pagos seleccionados, calcular desde pagos (código existente)
     if (selectedPaymentIds.size === 0) {
-      return { subtotal: 0, totalVat: 0, total: 0, vatBreakdown: {} }
+      return { subtotal: 0, totalVat: 0, total: 0, vatBreakdown: {}, count: 0 }
     }
 
     const selectedPayments = allPayments.filter((p) => selectedPaymentIds.has(p.id))
-
-    // Calcular totales simples (en la factura real se calcula con desglose IVA)
     const total = selectedPayments.reduce((sum, p) => sum + p.amount, 0)
 
-    // Estimación simple: asumimos que amount incluye IVA
-    // El cálculo real se hace en generateInvoiceFromPayments
     return {
       subtotal: total,
       totalVat: 0,
@@ -99,12 +159,43 @@ export function GenerateInvoiceDialog({
       vatBreakdown: {},
       count: selectedPayments.length,
     }
-  }, [selectedPaymentIds, allPayments])
+  }, [isManualClient, selectedPlayerId, availablePayments, manualLineItems, selectedPaymentIds, allPayments])
 
   // Validación
   const validationResult = useMemo(() => {
-    if (!selectedPlayerId) {
-      return { canInvoice: false, reason: 'Debe seleccionar un cliente' }
+    if (isManualClient) {
+      // Validar cliente manual
+      if (!manualClient.nif || !manualClient.name || !manualClient.address ||
+          !manualClient.postalCode || !manualClient.city) {
+        return { canInvoice: false, reason: 'Complete todos los datos del cliente' }
+      }
+
+      // Validar líneas
+      if (manualLineItems.length === 0 || manualLineItems.every(item => !item.description.trim())) {
+        return { canInvoice: false, reason: 'Debe agregar al menos una línea con concepto' }
+      }
+
+      if (manualLineItems.some(item => item.unitPrice <= 0)) {
+        return { canInvoice: false, reason: 'Todas las líneas deben tener un precio mayor a 0' }
+      }
+    } else {
+      // Validación existente para jugadores registrados
+      if (!selectedPlayerId) {
+        return { canInvoice: false, reason: 'Debe seleccionar un cliente' }
+      }
+
+      // Si no hay pagos disponibles, debe tener líneas manuales
+      if (availablePayments.length === 0) {
+        if (manualLineItems.length === 0 || manualLineItems.every(item => !item.description.trim())) {
+          return { canInvoice: false, reason: 'Debe agregar líneas de factura o seleccionar pagos existentes' }
+        }
+
+        if (manualLineItems.some(item => item.unitPrice <= 0)) {
+          return { canInvoice: false, reason: 'Todas las líneas deben tener un precio mayor a 0' }
+        }
+      } else if (selectedPaymentIds.size === 0 && (manualLineItems.length === 0 || manualLineItems.every(item => !item.description.trim()))) {
+        return { canInvoice: false, reason: 'Debe seleccionar pagos o agregar líneas manuales' }
+      }
     }
 
     if (!club?.nif || !club?.legalName || !club?.fiscalAddress) {
@@ -114,8 +205,12 @@ export function GenerateInvoiceDialog({
       }
     }
 
-    return canGenerateInvoice(Array.from(selectedPaymentIds), allPayments)
-  }, [selectedPlayerId, selectedPaymentIds, allPayments, club])
+    if (!isManualClient && selectedPaymentIds.size > 0) {
+      return canGenerateInvoice(Array.from(selectedPaymentIds), allPayments)
+    }
+
+    return { canInvoice: true, reason: '' }
+  }, [isManualClient, manualClient, selectedPlayerId, availablePayments, selectedPaymentIds, manualLineItems, club, allPayments])
 
   const handleTogglePayment = (paymentId: string) => {
     setSelectedPaymentIds((prev) => {
@@ -147,25 +242,80 @@ export function GenerateInvoiceDialog({
       return
     }
 
-    const player = players.find((p) => p.id === selectedPlayerId)
-    if (!player || !club) {
-      setError('Datos incompletos')
+    if (!club) {
+      setError('Datos del club incompletos')
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      const invoiceData = await generateInvoiceFromPayments(
-        Array.from(selectedPaymentIds),
-        payments,
-        eventPayments,
-        privateLessonPayments,
-        player,
-        club,
-        selectedSeries,
-        { notes }
-      )
+      let invoiceData
+
+      const hasManualItems = manualLineItems.length > 0 && manualLineItems.some(item => item.description.trim())
+
+      if (isManualClient || (selectedPlayerId && hasManualItems && selectedPaymentIds.size === 0)) {
+        // Crear factura con líneas manuales
+        const player = isManualClient
+          ? {
+              id: 'manual-' + Date.now(),
+              firstName: manualClient.name.split(' ')[0] || manualClient.name,
+              lastName: manualClient.name.split(' ').slice(1).join(' ') || '',
+              dni: manualClient.nif,
+              address: manualClient.address,
+              postalCode: manualClient.postalCode,
+              city: manualClient.city,
+            }
+          : players.find((p) => p.id === selectedPlayerId)
+
+        if (!player) {
+          setError('Cliente no encontrado')
+          setIsSubmitting(false)
+          return
+        }
+
+        // Crear line items desde manualLineItems
+        const lineItems: InvoiceLineItem[] = manualLineItems
+          .filter(item => item.description.trim()) // Solo incluir líneas con descripción
+          .map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            vatRate: item.vatRate,
+            subtotal: item.quantity * item.unitPrice,
+            vatAmount: (item.quantity * item.unitPrice) * (item.vatRate / 100),
+            total: (item.quantity * item.unitPrice) * (1 + item.vatRate / 100),
+            paymentId: undefined,
+            paymentType: undefined
+          }))
+
+        invoiceData = await generateManualInvoice(
+          lineItems,
+          player as any,
+          club,
+          selectedSeries,
+          { notes }
+        )
+      } else {
+        // Flujo existente para facturas desde pagos
+        const player = players.find((p) => p.id === selectedPlayerId)
+        if (!player) {
+          setError('Jugador no encontrado')
+          setIsSubmitting(false)
+          return
+        }
+
+        invoiceData = await generateInvoiceFromPayments(
+          Array.from(selectedPaymentIds),
+          payments,
+          eventPayments,
+          privateLessonPayments,
+          player,
+          club,
+          selectedSeries,
+          { notes }
+        )
+      }
 
       await addInvoice(invoiceData)
       onOpenChange(false)
@@ -177,19 +327,14 @@ export function GenerateInvoiceDialog({
     }
   }
 
-  // Jugadores activos con pagos pendientes de facturar
-  const playersWithPayments = useMemo(() => {
-    const playerIds = new Set(
-      allPayments
-        .filter((p) => p.status === 'pagado' && !p.invoiceId)
-        .map((p) => p.playerId)
-    )
-    return players.filter((p) => playerIds.has(p.id))
-  }, [players, allPayments])
+  // Todos los jugadores activos (para permitir facturas manuales a cualquier jugador)
+  const allActivePlayers = useMemo(() => {
+    return players.filter((p) => p.status === 'activo')
+  }, [players])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -198,42 +343,277 @@ export function GenerateInvoiceDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Selector de Cliente y Serie */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="player">Cliente *</Label>
-              <Select
-                id="player"
-                value={selectedPlayerId}
-                onChange={(e) => {
-                  setSelectedPlayerId(e.target.value)
+          {/* Toggle: Cliente Registrado vs Cliente Puntual */}
+          <div className="flex items-center gap-4 mb-4">
+            <Label>Tipo de cliente:</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={!isManualClient ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setIsManualClient(false)
+                  setManualClient({ nif: '', name: '', address: '', postalCode: '', city: '' })
+                  setError('')
+                }}
+              >
+                Cliente registrado
+              </Button>
+              <Button
+                type="button"
+                variant={isManualClient ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setIsManualClient(true)
+                  setSelectedPlayerId('')
                   setSelectedPaymentIds(new Set())
                   setError('')
                 }}
-                disabled={!!preSelectedPlayerId}
-                options={[
-                  { value: '', label: 'Seleccionar cliente...' },
-                  ...playersWithPayments.map((player) => ({
-                    value: player.id,
-                    label: `${player.firstName} ${player.lastName}${player.dni ? ` - ${player.dni}` : ''}`,
-                  })),
-                ]}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="series">Serie *</Label>
-              <Select
-                id="series"
-                value={selectedSeries}
-                onChange={(e) => setSelectedSeries(e.target.value as InvoiceSeries)}
-                options={INVOICE_SERIES.map((s) => ({ value: s.value, label: s.label }))}
-              />
+              >
+                Cliente puntual
+              </Button>
             </div>
           </div>
 
+          {!isManualClient ? (
+            <>
+              {/* Selector de Cliente y Serie - Modo Registrado */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="player">Cliente *</Label>
+                  <SearchableSelect
+                    options={allActivePlayers.map((player) => ({
+                      value: player.id,
+                      label: `${player.lastName}, ${player.firstName}${player.dni ? ` - ${player.dni}` : ''}`,
+                    }))}
+                    value={selectedPlayerId}
+                    onChange={(value) => {
+                      setSelectedPlayerId(value)
+                      setSelectedPaymentIds(new Set())
+                      setError('')
+                    }}
+                    disabled={!!preSelectedPlayerId}
+                    placeholder="Seleccionar cliente..."
+                    searchPlaceholder="Buscar por nombre, apellido o DNI..."
+                    emptyMessage="No se encontraron clientes"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="series">Serie *</Label>
+                  <Select
+                    id="series"
+                    value={selectedSeries}
+                    onChange={(e) => setSelectedSeries(e.target.value as InvoiceSeries)}
+                    options={INVOICE_SERIES.map((s) => ({ value: s.value, label: s.label }))}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Formulario de Cliente Manual */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="series">Serie *</Label>
+                    <Select
+                      id="series"
+                      value={selectedSeries}
+                      onChange={(e) => setSelectedSeries(e.target.value as InvoiceSeries)}
+                      options={INVOICE_SERIES.map((s) => ({ value: s.value, label: s.label }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-4 space-y-4">
+                  <h4 className="font-semibold text-sm">Datos del cliente</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="manual-nif">NIF/CIF *</Label>
+                      <Input
+                        id="manual-nif"
+                        value={manualClient.nif}
+                        onChange={(e) => setManualClient({...manualClient, nif: e.target.value})}
+                        placeholder="12345678A"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="manual-name">Nombre completo / Razón social *</Label>
+                      <Input
+                        id="manual-name"
+                        value={manualClient.name}
+                        onChange={(e) => setManualClient({...manualClient, name: e.target.value})}
+                        placeholder="Juan Pérez / Empresa SL"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label htmlFor="manual-address">Dirección *</Label>
+                      <Input
+                        id="manual-address"
+                        value={manualClient.address}
+                        onChange={(e) => setManualClient({...manualClient, address: e.target.value})}
+                        placeholder="Calle Principal 123"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="manual-postal">Código postal *</Label>
+                      <Input
+                        id="manual-postal"
+                        value={manualClient.postalCode}
+                        onChange={(e) => setManualClient({...manualClient, postalCode: e.target.value})}
+                        placeholder="30730"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="manual-city">Ciudad *</Label>
+                      <Input
+                        id="manual-city"
+                        value={manualClient.city}
+                        onChange={(e) => setManualClient({...manualClient, city: e.target.value})}
+                        placeholder="San Javier"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Líneas Manuales de Factura */}
+          {(isManualClient || (selectedPlayerId && availablePayments.length === 0)) && (
+            <div className="space-y-4 border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm">Líneas de factura</h4>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setManualLineItems([...manualLineItems, {
+                      id: generateId(),
+                      description: '',
+                      quantity: 1,
+                      unitPrice: 0,
+                      vatRate: 0
+                    }])
+                  }}
+                >
+                  + Agregar línea
+                </Button>
+              </div>
+
+              {manualLineItems.map((item, index) => (
+                <div key={item.id} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    <Label htmlFor={`desc-${item.id}`}>Concepto *</Label>
+                    <Input
+                      id={`desc-${item.id}`}
+                      value={item.description}
+                      onChange={(e) => {
+                        const newItems = [...manualLineItems]
+                        newItems[index].description = e.target.value
+                        setManualLineItems(newItems)
+                      }}
+                      placeholder="Ej: Clase de pádel"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label htmlFor={`qty-${item.id}`}>Cant.</Label>
+                    <Input
+                      id={`qty-${item.id}`}
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newItems = [...manualLineItems]
+                        newItems[index].quantity = parseInt(e.target.value) || 1
+                        setManualLineItems(newItems)
+                      }}
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label htmlFor={`price-${item.id}`}>Precio</Label>
+                    <Input
+                      id={`price-${item.id}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unitPrice}
+                      onChange={(e) => {
+                        const newItems = [...manualLineItems]
+                        newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                        setManualLineItems(newItems)
+                      }}
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label htmlFor={`vat-${item.id}`}>IVA %</Label>
+                    <Select
+                      id={`vat-${item.id}`}
+                      value={item.vatRate.toString()}
+                      onChange={(e) => {
+                        const newItems = [...manualLineItems]
+                        newItems[index].vatRate = parseInt(e.target.value) as VatRate
+                        setManualLineItems(newItems)
+                      }}
+                      options={[
+                        { value: '0', label: '0%' },
+                        { value: '10', label: '10%' },
+                        { value: '21', label: '21%' }
+                      ]}
+                    />
+                  </div>
+
+                  <div className="col-span-1 flex justify-center">
+                    {manualLineItems.length > 1 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setManualLineItems(manualLineItems.filter((_, i) => i !== index))
+                        }}
+                      >
+                        🗑️
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Preview de líneas manuales */}
+              {preview.total > 0 && (
+                <div className="rounded-lg border bg-muted/30 p-4 mt-4">
+                  <h4 className="font-semibold mb-3">Preview de Factura</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal (base):</span>
+                      <span className="font-medium">{formatCurrency(preview.subtotal)}</span>
+                    </div>
+                    {Object.entries(preview.vatBreakdown).map(([rate, data]) => (
+                      <div key={rate} className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">IVA {rate}%:</span>
+                        <span>{formatCurrency(data.amount)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="font-semibold">TOTAL:</span>
+                      <span className="font-bold text-lg">
+                        {formatCurrency(preview.total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tabla de Pagos Disponibles */}
-          {selectedPlayerId && (
+          {!isManualClient && selectedPlayerId && (
             <>
               <div>
                 <div className="flex items-center justify-between mb-2">

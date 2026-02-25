@@ -119,7 +119,7 @@ function PlayerFormDialog({ open, onOpenChange, player, onSubmit }: PlayerFormDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{player ? 'Editar jugador' : 'Nuevo jugador'}</DialogTitle>
         </DialogHeader>

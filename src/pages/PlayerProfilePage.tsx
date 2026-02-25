@@ -395,6 +395,7 @@ export default function PlayerProfilePage() {
                   <InfoRow label="Direcci\u00f3n" value={player.address} icon={MapPin} />
                   <InfoRow label="Ciudad" value={player.city} />
                   <InfoRow label="C\u00f3digo postal" value={player.postalCode} />
+                  <InfoRow label="Talla de ropa" value={player.clothingSize || '\u2014'} />
                 </CardContent>
               </Card>
 
