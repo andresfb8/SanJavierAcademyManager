@@ -30,6 +30,7 @@ import {
   TableIcon,
   Plus,
   Receipt,
+  RotateCcw,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
@@ -89,7 +90,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, eventPayments, privateLessonPayments, invoices, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, invoices, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -440,17 +441,31 @@ export default function PaymentsPage() {
         header: () => <span className="sr-only">Acciones</span>,
         cell: ({ row }) => {
           const payment = row.original
-          if (payment.status !== 'pendiente') return null
-          return (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openMarkPaidDialog(payment)}
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Marcar pagado
-            </Button>
-          )
+          if (payment.status === 'pendiente') {
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openMarkPaidDialog(payment)}
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Marcar pagado
+              </Button>
+            )
+          } else if (payment.status === 'pagado') {
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRevertPaidStatus(payment)}
+                title="Deshacer pago y marcar como pendiente"
+              >
+                <RotateCcw className="h-4 w-4 md:mr-1" />
+                <span className="hidden md:inline">Deshacer</span>
+              </Button>
+            )
+          }
+          return null
         },
         meta: { className: 'text-right' },
         enableSorting: false,
@@ -486,6 +501,12 @@ export default function PaymentsPage() {
     }
     setPaymentToMark(null)
     setSelectedMethod('transferencia')
+  }
+
+  const handleRevertPaidStatus = (payment: NormalizedPayment) => {
+    if (window.confirm(`¿Estás seguro de deshacer el cobro de ${formatCurrency(payment.amount)} por ${payment.concept}? Volverá a estar pendiente y podrás borrarlo o editarlo si corresponde.`)) {
+      revertPaymentPaidStatus(payment.id, payment.source ?? 'cuota')
+    }
   }
 
   const handleGenerateReceipts = async () => {
@@ -772,8 +793,8 @@ export default function PaymentsPage() {
               <button
                 type="button"
                 className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'mensual'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
                   }`}
                 onClick={() => setViewMode('mensual')}
               >
@@ -783,8 +804,8 @@ export default function PaymentsPage() {
               <button
                 type="button"
                 className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'anual'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
                   }`}
                 onClick={() => setViewMode('anual')}
               >

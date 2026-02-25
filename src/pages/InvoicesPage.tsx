@@ -31,6 +31,8 @@ import {
   TrendingUp,
   DollarSign,
   ClipboardList,
+  Receipt,
+  RotateCcw,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { INVOICE_STATUSES, INVOICE_SERIES } from '@/constants'
@@ -290,6 +292,7 @@ export default function InvoicesPage() {
 
                       const canIssue = invoice.status === 'draft'
                       const canMarkPaid = invoice.status === 'issued'
+                      const canRevertPaid = invoice.status === 'paid'
                       const canCancel = invoice.status === 'draft' || invoice.status === 'issued'
                       const canDelete = invoice.status === 'draft'
                       const canGenerateCorrective = invoice.status === 'issued' || invoice.status === 'paid'
@@ -348,6 +351,12 @@ export default function InvoicesPage() {
                                   <DropdownMenuItem onClick={() => handleChangeStatus(invoice, 'paid')}>
                                     <CheckCircle2 className="h-4 w-4 mr-2" />
                                     Marcar pagada
+                                  </DropdownMenuItem>
+                                )}
+                                {canRevertPaid && (
+                                  <DropdownMenuItem onClick={() => handleChangeStatus(invoice, 'issued')}>
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                    Deshacer (Marcar pendiente)
                                   </DropdownMenuItem>
                                 )}
                                 {canGenerateCorrective && (

@@ -148,6 +148,7 @@ export interface DataState {
   markPaymentPaid: (id: string, method: PaymentMethod) => void
   markEventPaymentPaid: (id: string, method: PaymentMethod) => void
   markPrivateLessonPaymentPaid: (id: string, method: PaymentMethod) => void
+  revertPaymentPaidStatus: (id: string, source: 'cuota' | 'evento' | 'clase_particular' | 'manual' | 'otro') => void
   cancelPayment: (id: string) => void
   generateMonthlyReceipts: (month: number, year: number) => Promise<number>
   checkAndAutoGenerateReceipts: () => Promise<void>
@@ -792,6 +793,33 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         const updated = get().payments.find((p) => p.id === id)
         if (clubId && updated) syncDoc('payments', id, updated as any, clubId)
+      },
+
+      revertPaymentPaidStatus: (id, source) => {
+        let collectionName: 'payments' | 'eventPayments' | 'privateLessonPayments' = 'payments'
+        if (source === 'evento') collectionName = 'eventPayments'
+        if (source === 'clase_particular') collectionName = 'privateLessonPayments'
+
+        set((state) => {
+          if (collectionName === 'payments') {
+            return { payments: state.payments.map((p) => p.id === id ? { ...p, status: 'pendiente', paidDate: undefined, paymentMethod: undefined, registeredBy: undefined } : p) }
+          } else if (collectionName === 'eventPayments') {
+            return { eventPayments: state.eventPayments.map((p) => p.id === id ? { ...p, status: 'pendiente', paidDate: undefined, paymentMethod: undefined, registeredBy: undefined } : p) }
+          } else {
+            return { privateLessonPayments: state.privateLessonPayments.map((p) => p.id === id ? { ...p, status: 'pendiente', paidDate: undefined, paymentMethod: undefined, registeredBy: undefined } : p) }
+          }
+        })
+
+        const clubId = getClubId()
+        if (clubId) {
+          // Send nulls to explicitly clear fields in Firestore
+          syncDoc(collectionName, id, {
+            status: 'pendiente',
+            paidDate: null,
+            paymentMethod: null,
+            registeredBy: null
+          } as any, clubId)
+        }
       },
 
       generateMonthlyReceipts: async (month, year) => {
