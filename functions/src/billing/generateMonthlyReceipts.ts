@@ -130,7 +130,7 @@ async function processClub(
   let skipped = 0;
 
   // Pre-fetch all groups for this club into a map for fast lookup
-  const groupsSnap = await db.collection(`clubs/${clubId}/groups`).get();
+  const groupsSnap = await db.collection("groups").where("clubId", "==", clubId).get();
   const groupsMap = new Map<string, Group>();
   for (const doc of groupsSnap.docs) {
     groupsMap.set(doc.id, { id: doc.id, ...doc.data() } as Group);
@@ -138,7 +138,8 @@ async function processClub(
 
   // Fetch all active enrollments
   const enrollmentsSnap = await db
-    .collection(`clubs/${clubId}/enrollments`)
+    .collection("enrollments")
+    .where("clubId", "==", clubId)
     .where("isActive", "==", true)
     .get();
 
@@ -187,7 +188,8 @@ async function processClub(
     // enrollment + month + year combination
     // -----------------------------------------------------------------------
     const existingPayment = await db
-      .collection(`clubs/${clubId}/payments`)
+      .collection("payments")
+      .where("clubId", "==", clubId)
       .where("enrollmentId", "==", enrollment.id)
       .where("billingMonth", "==", billingMonth)
       .where("billingYear", "==", billingYear)
@@ -206,11 +208,10 @@ async function processClub(
     const concept = `Cuota ${monthName} ${billingYear} - ${group.name}`;
 
     // Create the payment document
-    const paymentRef = db
-      .collection(`clubs/${clubId}/payments`)
-      .doc();
+    const paymentRef = db.collection("payments").doc();
 
     batch.set(paymentRef, {
+      clubId,
       playerId: enrollment.playerId,
       playerName: enrollment.playerName,
       groupId: enrollment.groupId,

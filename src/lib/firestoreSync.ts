@@ -355,6 +355,20 @@ export async function generateMonthlyReceiptsAtomic(
 
   // Paso 2: Generar recibos con validación de duplicados
   try {
+    // Pre-cargar grupos para obtener precio y frecuencia de facturación
+    const groupsSnap = await getDocs(
+      query(collection(db, 'groups'), where('clubId', '==', clubId))
+    )
+    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; installmentMonths?: number[] }>()
+    for (const groupDoc of groupsSnap.docs) {
+      const g = groupDoc.data()
+      groupsMap.set(groupDoc.id, {
+        defaultTariffPrice: g.defaultTariffPrice ?? 0,
+        billingFrequency: g.billingFrequency ?? 'monthly',
+        installmentMonths: g.installmentMonths,
+      })
+    }
+
     const enrollmentsSnap = await getDocs(
       query(collection(db, 'enrollments'), where('clubId', '==', clubId), where('isActive', '==', true))
     )
@@ -365,6 +379,21 @@ export async function generateMonthlyReceiptsAtomic(
 
     for (const enrollDoc of enrollmentsSnap.docs) {
       const enrollment = enrollDoc.data()
+
+      // Obtener datos del grupo para precio y frecuencia
+      const group = groupsMap.get(enrollment.groupId)
+      if (!group) {
+        console.warn(`[generateReceipts] Group ${enrollment.groupId} not found for enrollment ${enrollDoc.id}, skipping`)
+        continue
+      }
+
+      // Respetar frecuencia de facturación: si es por plazos, solo generar en los meses configurados
+      if (group.billingFrequency === 'installments') {
+        const installmentMonths = group.installmentMonths ?? []
+        if (!installmentMonths.includes(month)) {
+          continue // Mes no es un plazo de este grupo
+        }
+      }
 
       // Verificación server-side de duplicado
       const existingPayment = await getDocs(
@@ -382,6 +411,9 @@ export async function generateMonthlyReceiptsAtomic(
         continue // Ya existe
       }
 
+      // Calcular importe: customPrice tiene prioridad; si no, usar el precio por defecto del grupo
+      const amount = enrollment.customPrice ?? group.defaultTariffPrice
+
       // Crear pago
       const paymentId = generateId()
       const dueDate = new Date(year, month - 1, 5) // Día 5 del mes
@@ -395,7 +427,7 @@ export async function generateMonthlyReceiptsAtomic(
         groupId: enrollment.groupId,
         groupName: enrollment.groupName,
         concept: `Cuota ${enrollment.groupName} (${month}/${year})`,
-        amount: enrollment.customPrice || 0,
+        amount,
         status: 'pendiente',
         category: 'cuota',
         billingMonth: month,

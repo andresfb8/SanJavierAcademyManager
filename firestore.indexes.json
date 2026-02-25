@@ -18,6 +18,16 @@
       ]
     },
     {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clubId", "order": "ASCENDING" },
+        { "fieldPath": "enrollmentId", "order": "ASCENDING" },
+        { "fieldPath": "billingMonth", "order": "ASCENDING" },
+        { "fieldPath": "billingYear", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "attendance",
       "queryScope": "COLLECTION",
       "fields": [
