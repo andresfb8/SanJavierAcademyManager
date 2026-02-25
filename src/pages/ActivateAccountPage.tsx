@@ -86,15 +86,15 @@ export default function ActivateAccountPage() {
     }
 
     if (!password) {
-      newErrors.password = 'La contrasena es obligatoria'
+      newErrors.pwd = 'La contrasena es obligatoria'
     } else if (password.length < 6) {
-      newErrors.password = 'La contrasena debe tener al menos 6 caracteres'
+      newErrors.pwd = 'La contrasena debe tener al menos 6 caracteres'
     }
 
     if (!confirmPassword) {
-      newErrors.confirmPassword = 'Debes confirmar la contrasena'
+      newErrors.confirmPwd = 'Debes confirmar la contrasena'
     } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Las contrasenas no coinciden'
+      newErrors.confirmPwd = 'Las contrasenas no coinciden'
     }
 
     setErrors(newErrors)
@@ -178,11 +178,11 @@ export default function ActivateAccountPage() {
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code
       if (code === 'auth/email-already-in-use') {
-        setErrors({ password: 'Ya existe una cuenta con este email. Intenta iniciar sesion directamente.' })
+        setErrors({ pwd: 'Ya existe una cuenta con este email. Intenta iniciar sesion directamente.' })
       } else if (code === 'auth/weak-password') {
-        setErrors({ password: 'La contrasena es demasiado debil. Usa al menos 6 caracteres.' })
+        setErrors({ pwd: 'La contrasena es demasiado debil. Usa al menos 6 caracteres.' })
       } else {
-        setErrors({ password: 'Error al crear la cuenta. Intentalo de nuevo.' })
+        setErrors({ pwd: 'Error al crear la cuenta. Intentalo de nuevo.' })
       }
     } finally {
       setIsSubmitting(false)
@@ -334,10 +334,10 @@ export default function ActivateAccountPage() {
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value)
-                    if (errors.password) {
+                    if (errors.pwd) {
                       setErrors((prev) => {
                         const next = { ...prev }
-                        delete next.password
+                        delete next.pwd
                         return next
                       })
                     }
@@ -356,8 +356,8 @@ export default function ActivateAccountPage() {
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password}</p>
+              {errors.pwd && (
+                <p className="text-sm text-destructive">{errors.pwd}</p>
               )}
             </div>
 
@@ -372,10 +372,10 @@ export default function ActivateAccountPage() {
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value)
-                    if (errors.confirmPassword) {
+                    if (errors.confirmPwd) {
                       setErrors((prev) => {
                         const next = { ...prev }
-                        delete next.confirmPassword
+                        delete next.confirmPwd
                         return next
                       })
                     }
@@ -394,8 +394,8 @@ export default function ActivateAccountPage() {
                   )}
                 </button>
               </div>
-              {errors.confirmPassword && (
-                <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+              {errors.confirmPwd && (
+                <p className="text-sm text-destructive">{errors.confirmPwd}</p>
               )}
             </div>
 

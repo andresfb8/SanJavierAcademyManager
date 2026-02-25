@@ -3,13 +3,13 @@ import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCHK_Al4Sh6bqjiTXLuY84QO3A-rUR-oW8',
-  authDomain: 'san-javieracademy-manager.firebaseapp.com',
-  projectId: 'san-javieracademy-manager',
-  storageBucket: 'san-javieracademy-manager.firebasestorage.app',
-  messagingSenderId: '557815904781',
-  appId: '1:557815904781:web:ab141e4f43a74cf67cf344',
-  measurementId: 'G-T91CZRVVNM',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'MISSING_API_KEY',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'san-javieracademy-manager.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'san-javieracademy-manager',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'san-javieracademy-manager.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '557815904781',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:557815904781:web:ab141e4f43a74cf67cf344',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-T91CZRVVNM',
 }
 
 const app = initializeApp(firebaseConfig)
