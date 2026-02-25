@@ -48,6 +48,7 @@ export function GenerateInvoiceDialog({
     new Set(preSelectedPaymentIds)
   )
   const [notes, setNotes] = useState('')
+  const [invoiceStatus, setInvoiceStatus] = useState<'issued' | 'paid'>('issued')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [isManualClient, setIsManualClient] = useState(false)
@@ -79,6 +80,7 @@ export function GenerateInvoiceDialog({
       setSelectedSeries('FC')
       setSelectedPaymentIds(new Set(preSelectedPaymentIds))
       setNotes('')
+      setInvoiceStatus('issued')
       setError('')
       setIsSubmitting(false)
       setIsManualClient(false)
@@ -116,7 +118,7 @@ export function GenerateInvoiceDialog({
     // Si hay líneas manuales con contenido, calcular desde ahí
     const hasManualItems = manualLineItems.length > 0 && manualLineItems.some(item => item.description.trim())
 
-    if (isManualClient || (selectedPlayerId && availablePayments.length === 0 && hasManualItems)) {
+    if (isManualClient || (selectedPlayerId && selectedPaymentIds.size === 0 && hasManualItems)) {
       let subtotal = 0
       let totalVat = 0
       const vatBreakdown: Record<number, { base: number; amount: number }> = {}
@@ -166,7 +168,7 @@ export function GenerateInvoiceDialog({
     if (isManualClient) {
       // Validar cliente manual
       if (!manualClient.nif || !manualClient.name || !manualClient.address ||
-          !manualClient.postalCode || !manualClient.city) {
+        !manualClient.postalCode || !manualClient.city) {
         return { canInvoice: false, reason: 'Complete todos los datos del cliente' }
       }
 
@@ -184,17 +186,14 @@ export function GenerateInvoiceDialog({
         return { canInvoice: false, reason: 'Debe seleccionar un cliente' }
       }
 
-      // Si no hay pagos disponibles, debe tener líneas manuales
-      if (availablePayments.length === 0) {
+      if (selectedPaymentIds.size === 0) {
         if (manualLineItems.length === 0 || manualLineItems.every(item => !item.description.trim())) {
-          return { canInvoice: false, reason: 'Debe agregar líneas de factura o seleccionar pagos existentes' }
+          return { canInvoice: false, reason: 'Debe agregar líneas de factura manuales o seleccionar pagos existentes' }
         }
 
         if (manualLineItems.some(item => item.unitPrice <= 0)) {
           return { canInvoice: false, reason: 'Todas las líneas deben tener un precio mayor a 0' }
         }
-      } else if (selectedPaymentIds.size === 0 && (manualLineItems.length === 0 || manualLineItems.every(item => !item.description.trim()))) {
-        return { canInvoice: false, reason: 'Debe seleccionar pagos o agregar líneas manuales' }
       }
     }
 
@@ -251,6 +250,7 @@ export function GenerateInvoiceDialog({
 
     try {
       let invoiceData
+      let newPayments: Payment[] | undefined = undefined
 
       const hasManualItems = manualLineItems.length > 0 && manualLineItems.some(item => item.description.trim())
 
@@ -258,14 +258,14 @@ export function GenerateInvoiceDialog({
         // Crear factura con líneas manuales
         const player = isManualClient
           ? {
-              id: 'manual-' + Date.now(),
-              firstName: manualClient.name.split(' ')[0] || manualClient.name,
-              lastName: manualClient.name.split(' ').slice(1).join(' ') || '',
-              dni: manualClient.nif,
-              address: manualClient.address,
-              postalCode: manualClient.postalCode,
-              city: manualClient.city,
-            }
+            id: 'manual-' + Date.now(),
+            firstName: manualClient.name.split(' ')[0] || manualClient.name,
+            lastName: manualClient.name.split(' ').slice(1).join(' ') || '',
+            dni: manualClient.nif,
+            address: manualClient.address,
+            postalCode: manualClient.postalCode,
+            city: manualClient.city,
+          }
           : players.find((p) => p.id === selectedPlayerId)
 
         if (!player) {
@@ -294,8 +294,27 @@ export function GenerateInvoiceDialog({
           player as any,
           club,
           selectedSeries,
-          { notes }
+          { notes, status: invoiceStatus }
         )
+
+        // Crear Payment en background para contabilidad
+        const now = new Date()
+        const firstDescription = lineItems[0]?.description || 'Factura libre'
+        newPayments = [{
+          id: generateId(),
+          playerId: player.id,
+          playerName: `${player.firstName} ${player.lastName}`,
+          concept: lineItems.length > 1 ? `Varios conceptos (incl. ${firstDescription})` : firstDescription,
+          category: 'manual',
+          amount: invoiceData.total,
+          status: invoiceStatus === 'paid' ? 'pagado' : 'pendiente',
+          billingMonth: now.getMonth() + 1,
+          billingYear: now.getFullYear(),
+          dueDate: new Date(now),
+          paidDate: invoiceStatus === 'paid' ? new Date(now) : undefined,
+          autogenerated: false,
+          createdAt: now
+        }]
       } else {
         // Flujo existente para facturas desde pagos
         const player = players.find((p) => p.id === selectedPlayerId)
@@ -313,11 +332,11 @@ export function GenerateInvoiceDialog({
           player,
           club,
           selectedSeries,
-          { notes }
+          { notes, status: invoiceStatus }
         )
       }
 
-      await addInvoice(invoiceData)
+      await addInvoice(invoiceData, newPayments)
       onOpenChange(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido'
@@ -434,7 +453,7 @@ export function GenerateInvoiceDialog({
                       <Input
                         id="manual-nif"
                         value={manualClient.nif}
-                        onChange={(e) => setManualClient({...manualClient, nif: e.target.value})}
+                        onChange={(e) => setManualClient({ ...manualClient, nif: e.target.value })}
                         placeholder="12345678A"
                       />
                     </div>
@@ -443,7 +462,7 @@ export function GenerateInvoiceDialog({
                       <Input
                         id="manual-name"
                         value={manualClient.name}
-                        onChange={(e) => setManualClient({...manualClient, name: e.target.value})}
+                        onChange={(e) => setManualClient({ ...manualClient, name: e.target.value })}
                         placeholder="Juan Pérez / Empresa SL"
                       />
                     </div>
@@ -452,7 +471,7 @@ export function GenerateInvoiceDialog({
                       <Input
                         id="manual-address"
                         value={manualClient.address}
-                        onChange={(e) => setManualClient({...manualClient, address: e.target.value})}
+                        onChange={(e) => setManualClient({ ...manualClient, address: e.target.value })}
                         placeholder="Calle Principal 123"
                       />
                     </div>
@@ -461,7 +480,7 @@ export function GenerateInvoiceDialog({
                       <Input
                         id="manual-postal"
                         value={manualClient.postalCode}
-                        onChange={(e) => setManualClient({...manualClient, postalCode: e.target.value})}
+                        onChange={(e) => setManualClient({ ...manualClient, postalCode: e.target.value })}
                         placeholder="30730"
                       />
                     </div>
@@ -470,7 +489,7 @@ export function GenerateInvoiceDialog({
                       <Input
                         id="manual-city"
                         value={manualClient.city}
-                        onChange={(e) => setManualClient({...manualClient, city: e.target.value})}
+                        onChange={(e) => setManualClient({ ...manualClient, city: e.target.value })}
                         placeholder="San Javier"
                       />
                     </div>
@@ -481,7 +500,7 @@ export function GenerateInvoiceDialog({
           )}
 
           {/* Líneas Manuales de Factura */}
-          {(isManualClient || (selectedPlayerId && availablePayments.length === 0)) && (
+          {(isManualClient || (selectedPlayerId && selectedPaymentIds.size === 0)) && (
             <div className="space-y-4 border rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-sm">Líneas de factura</h4>
@@ -730,16 +749,30 @@ export function GenerateInvoiceDialog({
             </>
           )}
 
-          {/* Notas Opcionales */}
-          <div>
-            <Label htmlFor="notes">Observaciones (opcional)</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notas adicionales para la factura..."
-              rows={3}
-            />
+          {/* Opciones de la factura */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="status">Estado de la factura</Label>
+              <Select
+                id="status"
+                value={invoiceStatus}
+                onChange={(e) => setInvoiceStatus(e.target.value as 'issued' | 'paid')}
+                options={[
+                  { value: 'issued', label: 'Emitida (Pendiente de cobro)' },
+                  { value: 'paid', label: 'Pagada (Cobrada)' },
+                ]}
+              />
+            </div>
+            <div>
+              <Label htmlFor="notes">Observaciones (opcional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notas adicionales para la factura..."
+                rows={2}
+              />
+            </div>
           </div>
 
           {/* Mensajes de Error */}

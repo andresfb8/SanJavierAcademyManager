@@ -251,6 +251,7 @@ export async function generateInvoiceFromPayments(
     invoiceDate?: Date
     dueDate?: Date
     notes?: string
+    status?: 'draft' | 'issued' | 'paid'
   }
 ): Promise<Omit<Invoice, 'id' | 'createdAt'>> {
   // Modo manual: factura sin pagos vinculados
@@ -336,7 +337,7 @@ export async function generateInvoiceFromPayments(
     totalVat,
     total,
     vatBreakdown,
-    status: 'draft',
+    status: options?.status ?? 'issued',
     paymentIds,
     notes: options?.notes,
     createdBy: '', // Se asignará en el dataStore
@@ -370,6 +371,7 @@ export async function generateManualInvoice(
     invoiceDate?: Date
     dueDate?: Date
     notes?: string
+    status?: 'draft' | 'issued' | 'paid'
   }
 ): Promise<Omit<Invoice, 'id' | 'createdAt'>> {
   // Validar que haya líneas
@@ -423,7 +425,7 @@ export async function generateManualInvoice(
     totalVat,
     total,
     vatBreakdown,
-    status: 'draft',
+    status: options?.status ?? 'issued',
     paymentIds: [], // Sin pagos vinculados para facturas manuales
     notes: options?.notes,
     createdBy: '', // Se asignará en el dataStore

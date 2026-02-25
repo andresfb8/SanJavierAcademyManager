@@ -155,7 +155,7 @@ export interface DataState {
   deleteAllPayments: () => Promise<void>
 
   // --- Invoices ---
-  addInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<void>
+  addInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>, newPayments?: Payment[]) => Promise<void>
   updateInvoice: (id: string, data: Partial<Invoice>) => void
   deleteInvoice: (id: string) => void
   unlinkPaymentsFromInvoice: (invoiceId: string) => Promise<void>
@@ -898,7 +898,7 @@ export const useDataStore = create<DataState>()(
 
       // --- Invoices ---
 
-      addInvoice: async (invoiceData) => {
+      addInvoice: async (invoiceData, newPayments?: Payment[]) => {
         const { userId, userName } = getCurrentUser()
         const newInvoice: Invoice = {
           ...invoiceData,
@@ -908,7 +908,13 @@ export const useDataStore = create<DataState>()(
         }
 
         // Optimistic update
-        set((state) => ({ invoices: [...state.invoices, newInvoice] }))
+        set((state) => ({
+          invoices: [...state.invoices, newInvoice],
+          // Si hay nuevos pagos manuales, los añadimos al estado optimista también
+          ...(newPayments && newPayments.length > 0
+            ? { payments: [...state.payments, ...newPayments.map(p => ({ ...p, invoiceId: newInvoice.id }))] }
+            : {})
+        }))
 
         const clubId = getClubId()
         if (!clubId) {
@@ -916,8 +922,8 @@ export const useDataStore = create<DataState>()(
         }
 
         try {
-          // Transacción atómica: crear invoice + actualizar payments + incrementar contador
-          await createInvoiceAtomic(newInvoice, invoiceData.paymentIds, clubId)
+          // Transacción atómica: crear invoice + actualizar (o insertar nuevos) payments + incrementar contador
+          await createInvoiceAtomic(newInvoice, invoiceData.paymentIds, clubId, newPayments)
 
           // Actualizar contador local para evitar números duplicados en la misma sesión
           // (el onSnapshot lo reconciliará desde Firestore eventualmente)

@@ -22,7 +22,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { toast } from '@/hooks/use-toast'
-import type { Invoice } from '@/types'
+import type { Invoice, Payment } from '@/types'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -492,7 +492,8 @@ export async function generateMonthlyReceiptsAtomic(
 export async function createInvoiceAtomic(
   invoice: Invoice,
   paymentIds: string[],
-  clubId: string
+  clubId: string,
+  newPayments?: Payment[]
 ): Promise<void> {
   return runTransaction(db, async (transaction) => {
     // Paso 1: Verificar que ningún pago tenga invoiceId
@@ -522,6 +523,14 @@ export async function createInvoiceAtomic(
 
       if (!found) {
         throw new Error(`Pago ${paymentId} no encontrado`)
+      }
+    }
+
+    // Paso 1.5: Insertar nuevos pagos manuales vinculados a esta factura
+    if (newPayments && newPayments.length > 0) {
+      for (const payment of newPayments) {
+        const paymentRef = doc(db, 'payments', payment.id)
+        transaction.set(paymentRef, toFirestore({ ...payment, invoiceId: invoice.id, clubId }))
       }
     }
 
