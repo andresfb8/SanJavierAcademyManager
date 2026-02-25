@@ -1,7 +1,7 @@
 // ==========================================
 // San Javier Academy Manager - Real-time Sync
 // ==========================================
-// Suscripción en tiempo real a las 17 colecciones Firestore con onSnapshot.
+// Suscripción en tiempo real a las 19 colecciones Firestore con onSnapshot.
 // Cuando cualquier dispositivo escribe un cambio, todos los listeners activos
 // reciben la actualización automáticamente y actualizan el store de Zustand.
 
@@ -28,11 +28,12 @@ const COLLECTIONS = [
   { name: 'evaluations', stateKey: 'evaluations' },
   { name: 'matchReports', stateKey: 'matchReports' },
   { name: 'coachSalaryConfigs', stateKey: 'coachSalaryConfigs' },
+  { name: 'invoices', stateKey: 'invoices' },
   { name: 'users', stateKey: 'users' },
 ] as const
 
 /**
- * Suscribe a las 17 colecciones del club en tiempo real.
+ * Suscribe a las 19 colecciones del club en tiempo real.
  *
  * - Cada snapshot actualiza la colección correspondiente en el store de Zustand.
  * - `onFirstLoad` se llama UNA SOLA VEZ cuando todos los listeners han recibido

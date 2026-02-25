@@ -260,6 +260,11 @@ export const useDataStore = create<DataState>()(
         set((state) => ({
           club: state.club ? { ...state.club, ...data } : null,
         }))
+        const clubId = getClubId()
+        const updated = get().club
+        if (clubId && updated) {
+          syncDoc('clubs', clubId, { ...updated, ...data } as any, clubId)
+        }
       },
 
       addCourt: (courtData) => {

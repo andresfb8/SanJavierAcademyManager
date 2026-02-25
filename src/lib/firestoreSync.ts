@@ -548,9 +548,9 @@ export async function createInvoiceAtomic(
     const year = new Date().getFullYear()
     const counterPath = `invoiceCounters.${year}.${invoice.series}`
 
-    transaction.update(clubRef, {
+    transaction.set(clubRef, {
       [counterPath]: increment(1),
-    })
+    }, { merge: true })
   }).catch((error) => {
     console.error('[Firestore] createInvoiceAtomic failed:', error)
     throw error
