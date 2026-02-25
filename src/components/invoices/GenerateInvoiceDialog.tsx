@@ -638,7 +638,7 @@ export function GenerateInvoiceDialog({
             <>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label>Pagos a incluir en la factura *</Label>
+                  <Label>Pagos a incluir en la factura</Label>
                   {availablePayments.length > 0 && (
                     <Button
                       type="button"
@@ -777,11 +777,11 @@ export function GenerateInvoiceDialog({
             </div>
           </div>
 
-          {/* Mensajes de Error */}
-          {error && (
+          {/* Mensajes de Error de Validación o Sumisión */}
+          {(error || (!validationResult.canInvoice && validationResult.reason)) && (
             <div className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <p>{error}</p>
+              <p>{error || validationResult.reason}</p>
             </div>
           )}
         </div>
