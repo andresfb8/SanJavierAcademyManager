@@ -403,6 +403,7 @@ export async function generateMonthlyReceiptsAtomic(
       const existingPayment = await getDocs(
         query(
           collection(db, 'payments'),
+          where('clubId', '==', clubId),
           where('enrollmentId', '==', enrollDoc.id),
           where('billingMonth', '==', month),
           where('billingYear', '==', year),

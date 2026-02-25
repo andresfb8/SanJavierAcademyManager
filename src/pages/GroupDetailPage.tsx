@@ -57,7 +57,12 @@ export default function GroupDetailPage() {
     [players, enrolledPlayerIds]
   )
 
-
+  // ===================
+  // STATE - Bajas
+  // ===================
+  const [unenrollmentDate, setUnenrollmentDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  )
   // Occupancy calculations
   const occupancyPercentage = group
     ? Math.round((group.currentEnrollment / group.maxCapacity) * 100)
@@ -158,8 +163,9 @@ export default function GroupDetailPage() {
   // Handle removing a player (deactivate enrollment)
   const handleRemovePlayer = () => {
     if (removeEnrollmentId) {
-      deactivateEnrollment(removeEnrollmentId)
+      deactivateEnrollment(removeEnrollmentId, new Date(unenrollmentDate + 'T00:00:00'))
       setRemoveEnrollmentId(null)
+      setUnenrollmentDate(new Date().toISOString().split('T')[0])
     }
   }
 
@@ -594,15 +600,37 @@ export default function GroupDetailPage() {
       </Dialog>
 
       {/* Remove Player Confirm Dialog */}
-      <ConfirmDialog
-        open={!!removeEnrollmentId}
-        onOpenChange={() => setRemoveEnrollmentId(null)}
-        title="Eliminar inscripción"
-        description="El jugador será eliminado de este grupo. Esta acción desactivará su inscripción y liberará una plaza."
-        variant="destructive"
-        confirmLabel="Eliminar del grupo"
-        onConfirm={handleRemovePlayer}
-      />
+      <Dialog open={!!removeEnrollmentId} onOpenChange={(open) => !open && setRemoveEnrollmentId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar inscripción</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              El jugador será dado de baja de este grupo. Esta acción desactivará su inscripción y liberará una plaza.
+            </p>
+            <div className="space-y-2">
+              <Label>Fecha efectiva de la baja</Label>
+              <Input
+                type="date"
+                value={unenrollmentDate}
+                onChange={(e) => setUnenrollmentDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Si la fecha seleccionada es del día 1 al 5 del mes en curso, el recibo pendiente de este mes se borrará automáticamente.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveEnrollmentId(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleRemovePlayer}>
+              Eliminar del grupo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Partial Receipt Dialog */}
       <Dialog open={!!partialReceiptData} onOpenChange={(open) => !open && setPartialReceiptData(null)}>

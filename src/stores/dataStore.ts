@@ -137,7 +137,7 @@ export interface DataState {
   addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<{ needsPartialReceipt: boolean; enrollmentId: string }>
   updateEnrollment: (id: string, data: Partial<Enrollment>) => void
   deleteEnrollment: (id: string) => void
-  deactivateEnrollment: (id: string) => Promise<void>
+  deactivateEnrollment: (id: string, effectiveDate?: Date) => Promise<void>
 
   // --- Payments ---
   generatePartialReceipt: (enrollmentId: string, amount: number) => Promise<void>
@@ -686,7 +686,7 @@ export const useDataStore = create<DataState>()(
         })
       },
 
-      deactivateEnrollment: async (id) => {
+      deactivateEnrollment: async (id: string, effectiveDate?: Date) => {
         const enrollment = get().enrollments.find((e) => e.id === id)
         if (!enrollment || !enrollment.isActive) return
 
@@ -696,14 +696,41 @@ export const useDataStore = create<DataState>()(
           return
         }
 
+        const dateToUse = effectiveDate || new Date()
+        const unenrollDay = dateToUse.getDate()
+        const unenrollMonth = dateToUse.getMonth() + 1
+        const unenrollYear = dateToUse.getFullYear()
+
         try {
+          // Conditional Receipt Deletion (<= 5)
+          if (unenrollDay <= 5) {
+            // Find PENDING payments for this user, this group, this month
+            const paymentsToDelete = get().payments.filter(p =>
+              p.enrollmentId === id &&
+              p.status === 'pendiente' &&
+              p.billingMonth === unenrollMonth &&
+              p.billingYear === unenrollYear
+            )
+
+            if (paymentsToDelete.length > 0) {
+              set((state) => ({
+                payments: state.payments.filter(p => !paymentsToDelete.some(dp => dp.id === p.id))
+              }))
+              // Delete from firestore in parallel
+              await Promise.all(
+                paymentsToDelete.map(p => deleteFirestoreDoc('payments', p.id))
+              )
+              console.info(`[deactivateEnrollment] Deleted ${paymentsToDelete.length} pending receipts for month ${unenrollMonth}`)
+            }
+          }
+
           // Transacción atómica para actualizar enrollment y contador de grupo
           await updateEnrollmentStatus(id, enrollment.groupId, false, clubId)
 
           // Update local state (listeners confirmarán desde Firestore)
           set((state) => ({
             enrollments: state.enrollments.map((e) =>
-              e.id === id ? { ...e, isActive: false, unenrollmentDate: new Date() } : e
+              e.id === id ? { ...e, isActive: false, unenrollmentDate: dateToUse } : e
             ),
             groups: state.groups.map((g) =>
               g.id === enrollment.groupId
@@ -715,7 +742,7 @@ export const useDataStore = create<DataState>()(
           const { userId, userName } = getCurrentUser()
           get().addActivity({
             type: 'enrollment_deleted',
-            description: `${enrollment.playerName} dado de baja del grupo ${enrollment.groupName}`,
+            description: `${enrollment.playerName} dado de baja del grupo ${enrollment.groupName} (Efectiva: ${dateToUse.toLocaleDateString()})`,
             relatedEntityId: id,
             userId,
             userName,
@@ -729,7 +756,6 @@ export const useDataStore = create<DataState>()(
           throw error
         }
       },
-
       addPayment: (paymentData) => {
         const newPayment: Payment = { ...paymentData, id: generateId(), createdAt: new Date() }
         set((state) => ({ payments: [...state.payments, newPayment] }))
@@ -1344,10 +1370,10 @@ export const useDataStore = create<DataState>()(
           const list = coll === 'payments' ? payments : coll === 'eventPayments' ? eventPayments : privateLessonPayments
           for (const item of list) await deleteFirestoreDoc(coll, item.id)
         }
-      },
+      }
     }),
     {
-      name: 'sjam-data-store',
+      name: 'san-javier-academy-config',
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name)
@@ -1369,20 +1395,37 @@ export const useDataStore = create<DataState>()(
         coaches: state.coaches,
         groups: state.groups,
         enrollments: state.enrollments,
-        payments: state.payments,
+        payments: state.payments.map(p => ({
+          ...p,
+          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+          dueDate: p.dueDate instanceof Date ? p.dueDate.toISOString() : p.dueDate,
+          paidDate: p.paidDate instanceof Date ? p.paidDate.toISOString() : p.paidDate,
+        })),
         attendance: state.attendance,
         activities: state.activities,
         privateLessons: state.privateLessons,
         invitations: state.invitations,
         events: state.events,
-        eventPayments: state.eventPayments,
-        privateLessonPayments: state.privateLessonPayments,
+        eventPayments: state.eventPayments.map(p => ({
+          ...p,
+          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+          paidDate: p.paidDate instanceof Date ? p.paidDate.toISOString() : p.paidDate,
+        })),
+        privateLessonPayments: state.privateLessonPayments.map(p => ({
+          ...p,
+          createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+          paidDate: p.paidDate instanceof Date ? p.paidDate.toISOString() : p.paidDate,
+        })),
         evaluations: state.evaluations,
         matchReports: state.matchReports,
         coachSalaryConfigs: state.coachSalaryConfigs,
-        invoices: state.invoices,
+        invoices: state.invoices.map(i => ({
+          ...i,
+          createdAt: i.createdAt instanceof Date ? i.createdAt.toISOString() : i.createdAt,
+          dueDate: i.dueDate instanceof Date ? i.dueDate.toISOString() : i.dueDate,
+        })),
         users: state.users,
-      } as DataState),
-    },
+      } as unknown as DataState)
+    }
   )
 )
