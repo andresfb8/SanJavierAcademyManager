@@ -4,9 +4,12 @@
 // Carga todas las colecciones desde Firestore al hacer login.
 // Reemplaza los datos del store de Zustand (Firestore es la fuente de verdad).
 
-import { loadCollection, syncDoc } from './firestoreSync'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from './firebase'
+import { loadCollection, syncDoc, fromFirestore } from './firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
 import type {
+  Club,
   Court,
   Tariff,
   Player,
@@ -84,6 +87,21 @@ export async function loadAllData(clubId: string): Promise<void> {
     matchReports,
     coachSalaryConfigs,
   })
+
+  // Cargar el documento del club desde Firestore (contiene NIF, razón social, etc.)
+  try {
+    const clubDocRef = doc(db, 'clubs', clubId)
+    const clubDocSnap = await getDoc(clubDocRef)
+    if (clubDocSnap.exists()) {
+      const clubData = fromFirestore(clubDocSnap.data() as Record<string, unknown>)
+      const currentClub = useDataStore.getState().club
+      useDataStore.setState({
+        club: { ...currentClub, ...clubData, id: clubId } as Club,
+      })
+    }
+  } catch {
+    // Si el documento no existe todavía, mantener los datos locales
+  }
 }
 
 // Migra datos existentes de localStorage → Firestore (se ejecuta una sola vez).
