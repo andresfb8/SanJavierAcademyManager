@@ -31,6 +31,7 @@ import {
   Plus,
   Receipt,
   RotateCcw,
+  Trash2,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
@@ -90,7 +91,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, eventPayments, privateLessonPayments, invoices, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { payments, groups, players, eventPayments, privateLessonPayments, invoices, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, deletePayment, deleteEventPayment, deletePrivateLessonPayment, generateMonthlyReceipts, addManualPayment } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')
@@ -443,14 +444,25 @@ export default function PaymentsPage() {
           const payment = row.original
           if (payment.status === 'pendiente') {
             return (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openMarkPaidDialog(payment)}
-              >
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Marcar pagado
-              </Button>
+              <div className="flex items-center gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openMarkPaidDialog(payment)}
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Marcar pagado
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => handleDeletePayment(payment)}
+                  title="Eliminar recibo"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             )
           } else if (payment.status === 'pagado') {
             return (
@@ -506,6 +518,18 @@ export default function PaymentsPage() {
   const handleRevertPaidStatus = (payment: NormalizedPayment) => {
     if (window.confirm(`¿Estás seguro de deshacer el cobro de ${formatCurrency(payment.amount)} por ${payment.concept}? Volverá a estar pendiente y podrás borrarlo o editarlo si corresponde.`)) {
       revertPaymentPaidStatus(payment.id, payment.source ?? 'cuota')
+    }
+  }
+
+  const handleDeletePayment = (payment: NormalizedPayment) => {
+    if (window.confirm(`¿Estás seguro de eliminar el recibo de ${formatCurrency(payment.amount)} por ${payment.concept}? Esta acción no se puede deshacer.`)) {
+      if (payment.source === 'evento') {
+        deleteEventPayment(payment.id)
+      } else if (payment.source === 'clase_particular') {
+        deletePrivateLessonPayment(payment.id)
+      } else {
+        deletePayment(payment.id)
+      }
     }
   }
 

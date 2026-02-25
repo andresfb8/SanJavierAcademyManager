@@ -60,7 +60,7 @@ import {
   generateMonthlyReceiptsAtomic,
   createInvoiceAtomic,
 } from '@/lib/firestoreSync'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, getDocs, query, collection, where, limit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 
@@ -145,6 +145,8 @@ export interface DataState {
   addManualPayment: (data: { playerId: string; playerName: string; concept: string; amount: number; category?: PaymentCategory; notes?: string }) => void
   updatePayment: (id: string, data: Partial<Payment>) => void
   deletePayment: (id: string) => void
+  deleteEventPayment: (id: string) => void
+  deletePrivateLessonPayment: (id: string) => void
   markPaymentPaid: (id: string, method: PaymentMethod) => void
   markEventPaymentPaid: (id: string, method: PaymentMethod) => void
   markPrivateLessonPaymentPaid: (id: string, method: PaymentMethod) => void
@@ -584,10 +586,21 @@ export const useDataStore = create<DataState>()(
 
             if (snap.exists() && snap.data().status === 'completed') {
               needsPartialReceipt = true
-            } else if (!snap.exists() && now.getDate() > 1) {
-              // Si no existe facturación masiva (ej. el sistema estaba vacío o es un mes sin recibos)
-              // pero estamos después del día 1, debemos pedir el recibo parcial para esta nueva inscripción.
-              needsPartialReceipt = true
+            } else {
+              // Backup check: if there are already payments for this group/month,
+              // it's very likely receipts were already generated.
+              const existingPayments = await getDocs(
+                query(
+                  collection(db, 'payments'),
+                  where('groupId', '==', enrollmentData.groupId),
+                  where('billingMonth', '==', currentMonth),
+                  where('billingYear', '==', currentYear),
+                  limit(1)
+                )
+              )
+              if (!existingPayments.empty || (now.getDate() > 1 && !snap.exists())) {
+                needsPartialReceipt = true
+              }
             }
           }
 
@@ -747,6 +760,16 @@ export const useDataStore = create<DataState>()(
       deletePayment: (id) => {
         set((state) => ({ payments: state.payments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('payments', id)
+      },
+
+      deleteEventPayment: (id) => {
+        set((state) => ({ eventPayments: state.eventPayments.filter((p) => p.id !== id) }))
+        deleteFirestoreDoc('eventPayments', id)
+      },
+
+      deletePrivateLessonPayment: (id) => {
+        set((state) => ({ privateLessonPayments: state.privateLessonPayments.filter((p) => p.id !== id) }))
+        deleteFirestoreDoc('privateLessonPayments', id)
       },
 
       markPaymentPaid: (id, method) => {
