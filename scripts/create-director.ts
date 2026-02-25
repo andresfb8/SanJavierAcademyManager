@@ -7,20 +7,24 @@ import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase
 import { getFirestore, doc, setDoc } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCHK_Al4Sh6bqjiTXLuY84QO3A-rUR-oW8',
-  authDomain: 'san-javieracademy-manager.firebaseapp.com',
-  projectId: 'san-javieracademy-manager',
-  storageBucket: 'san-javieracademy-manager.firebasestorage.app',
-  messagingSenderId: '557815904781',
-  appId: '1:557815904781:web:ab141e4f43a74cf67cf344',
+  apiKey: process.env.VITE_FIREBASE_API_KEY || 'MISSING_API_KEY',
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || 'san-javieracademy-manager.firebaseapp.com',
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'san-javieracademy-manager',
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || 'san-javieracademy-manager.firebasestorage.app',
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '557815904781',
+  appId: process.env.VITE_FIREBASE_APP_ID || '1:557815904781:web:ab141e4f43a74cf67cf344',
   measurementId: 'G-T91CZRVVNM',
 }
 
 const EMAIL = 'andresfernandez@clubdepadelsanjavier.es'
-const PASSWORD = '123456'
+const PASSWORD = process.env.ADMIN_PASSWORD || '123456' // In production, this must be provided via env
 const DISPLAY_NAME = 'Andrés Fernández'
 
 async function main() {
+  if (firebaseConfig.apiKey === 'MISSING_API_KEY') {
+    console.warn('⚠️ WARNING: VITE_FIREBASE_API_KEY is missing. Providing a dummy key for the script to run, but auth might fail if it relies on the real key.')
+  }
+
   console.log('Inicializando Firebase...')
   const app = initializeApp(firebaseConfig)
   const auth = getAuth(app)
