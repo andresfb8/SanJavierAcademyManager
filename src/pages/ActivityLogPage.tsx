@@ -55,6 +55,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   invoice_issued: 'Factura emitida',
   invoice_paid: 'Factura pagada',
   invoice_cancelled: 'Factura cancelada',
+  system_action: 'Accion del sistema',
 }
 
 // --- Colores por tipo de actividad ---

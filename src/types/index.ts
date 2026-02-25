@@ -312,6 +312,7 @@ export type ActivityType =
   | 'invoice_issued'
   | 'invoice_paid'
   | 'invoice_cancelled'
+  | 'system_action'
 
 
 export interface Activity {

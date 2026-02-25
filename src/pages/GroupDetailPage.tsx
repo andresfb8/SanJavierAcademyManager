@@ -28,6 +28,7 @@ export default function GroupDetailPage() {
   // Dialog state
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [removeEnrollmentId, setRemoveEnrollmentId] = useState<string | null>(null)
+  const [partialReceiptData, setPartialReceiptData] = useState<{ enrollmentId: string, amount: string } | null>(null)
 
   // Add player form state
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
@@ -101,7 +102,7 @@ export default function GroupDetailPage() {
     return selectedTariffPrice
   }, [discountMode, discountPercentage, customPrice, selectedTariffPrice])
 
-  const handleAddPlayer = () => {
+  const handleAddPlayer = async () => {
     if (!group || !selectedPlayerId || !selectedTariffId) return
 
     const player = players.find((p) => p.id === selectedPlayerId)
@@ -121,7 +122,7 @@ export default function GroupDetailPage() {
       }
     }
 
-    addEnrollment({
+    const { needsPartialReceipt, enrollmentId } = await addEnrollment({
       playerId: player.id,
       playerName: `${player.firstName} ${player.lastName}`,
       groupId: group.id,
@@ -135,6 +136,23 @@ export default function GroupDetailPage() {
 
     setShowAddPlayer(false)
     resetAddForm()
+
+    if (needsPartialReceipt) {
+      setPartialReceiptData({
+        enrollmentId,
+        amount: (finalCustomPrice ?? tariff.price).toString()
+      })
+    }
+  }
+
+  const handleGeneratePartialReceipt = async () => {
+    if (!partialReceiptData) return
+    try {
+      await useDataStore.getState().generatePartialReceipt(partialReceiptData.enrollmentId, parseFloat(partialReceiptData.amount))
+      setPartialReceiptData(null)
+    } catch (e) {
+      // Error is handled by dataStore
+    }
   }
 
   // Handle removing a player (deactivate enrollment)
@@ -585,6 +603,38 @@ export default function GroupDetailPage() {
         confirmLabel="Eliminar del grupo"
         onConfirm={handleRemovePlayer}
       />
+
+      {/* Partial Receipt Dialog */}
+      <Dialog open={!!partialReceiptData} onOpenChange={(open) => !open && setPartialReceiptData(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generar recibo parcial</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Los recibos de este mes ya han sido generados para este grupo. ¿Deseas generar un recibo parcial para esta nueva inscripción?
+            </p>
+            <div className="space-y-2">
+              <Label>Importe del recibo (€)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={partialReceiptData?.amount || ''}
+                onChange={(e) => setPartialReceiptData(prev => prev ? { ...prev, amount: e.target.value } : null)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPartialReceiptData(null)}>
+              Omitir
+            </Button>
+            <Button onClick={handleGeneratePartialReceipt} disabled={!partialReceiptData?.amount}>
+              Generar recibo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
