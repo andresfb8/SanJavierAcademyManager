@@ -592,6 +592,7 @@ export const useDataStore = create<DataState>()(
               const existingPayments = await getDocs(
                 query(
                   collection(db, 'payments'),
+                  where('clubId', '==', clubId),
                   where('groupId', '==', enrollmentData.groupId),
                   where('billingMonth', '==', currentMonth),
                   where('billingYear', '==', currentYear),
