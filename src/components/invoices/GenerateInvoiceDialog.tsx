@@ -34,10 +34,12 @@ interface GenerateInvoiceDialogProps {
 
 type AnyPayment = Payment | EventPayment | PrivateLessonPayment
 
+const EMPTY_PAYMENTS_ARRAY: string[] = []
+
 export function GenerateInvoiceDialog({
   open,
   onOpenChange,
-  preSelectedPaymentIds = [],
+  preSelectedPaymentIds = EMPTY_PAYMENTS_ARRAY,
   preSelectedPlayerId,
 }: GenerateInvoiceDialogProps) {
   const { players, payments, eventPayments, privateLessonPayments, club, addInvoice } = useDataStore()
