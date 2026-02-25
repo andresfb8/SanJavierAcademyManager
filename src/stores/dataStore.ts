@@ -818,6 +818,23 @@ export const useDataStore = create<DataState>()(
           // Transacción atómica: crear invoice + actualizar payments + incrementar contador
           await createInvoiceAtomic(newInvoice, invoiceData.paymentIds, clubId)
 
+          // Actualizar contador local para evitar números duplicados en la misma sesión
+          // (el onSnapshot lo reconciliará desde Firestore eventualmente)
+          const invoiceYear = new Date().getFullYear()
+          const invoiceSeries = invoiceData.series
+          set((state) => ({
+            club: state.club ? {
+              ...state.club,
+              invoiceCounters: {
+                ...state.club.invoiceCounters,
+                [invoiceYear]: {
+                  ...state.club.invoiceCounters?.[invoiceYear],
+                  [invoiceSeries]: (state.club.invoiceCounters?.[invoiceYear]?.[invoiceSeries as 'FC' | 'FR'] ?? 0) + 1,
+                },
+              },
+            } : null,
+          }))
+
           // Activity log
           get().addActivity({
             type: 'invoice_created',
