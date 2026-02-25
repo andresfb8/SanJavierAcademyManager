@@ -48,7 +48,11 @@ export function toFirestore(data: Record<string, unknown>): Record<string, unkno
     } else if (value instanceof Date) {
       result[key] = Timestamp.fromDate(value)
     } else if (Array.isArray(value)) {
-      result[key] = value.map((v) => (v instanceof Date ? Timestamp.fromDate(v) : v))
+      result[key] = value.map((v) => {
+        if (v instanceof Date) return Timestamp.fromDate(v)
+        if (v !== null && typeof v === 'object') return toFirestore(v as Record<string, unknown>)
+        return v
+      })
     } else if (value !== null && typeof value === 'object') {
       // Recursively clean nested objects (e.g. guardian, which has optional string fields)
       result[key] = toFirestore(value as Record<string, unknown>)

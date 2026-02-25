@@ -953,8 +953,13 @@ export const useDataStore = create<DataState>()(
 
           toast.success(`Factura ${newInvoice.invoiceNumber} creada correctamente`)
         } catch (error) {
-          // Rollback optimistic update
-          set((state) => ({ invoices: state.invoices.filter((i) => i.id !== newInvoice.id) }))
+          // Rollback optimistic update completo
+          set((state) => ({
+            invoices: state.invoices.filter((i) => i.id !== newInvoice.id),
+            ...(newPayments && newPayments.length > 0
+              ? { payments: state.payments.filter((p) => !newPayments.some((np) => np.id === p.id)) }
+              : {})
+          }))
 
           const message = error instanceof Error ? error.message : 'Error desconocido'
           console.error('[addInvoice] Failed:', message)
