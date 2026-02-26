@@ -411,5 +411,35 @@ service cloud.firestore {
       // Solo director puede eliminar (cleanup de records antiguos)
       allow delete: if hasRole('director') && belongsToClub();
     }
+
+    // ─── Methodology Parameters Collection ──────────────────────────────
+    // Global catalog of teaching parameters.
+    // director/coordinador: full CRUD (though typically they only manage their own club's data,
+    // parameters without a clubId might be truly global in a multi-tenant system. 
+    // Assuming for now they belong to the system, but managed by admins).
+    // entrenador: read only.
+    match /methodology_parameters/{paramId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || hasRole('entrenador')
+      );
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ─── Training Plans Collection ──────────────────────────────────────
+    // Training plans created by coaches for specific groups.
+    match /training_plans/{planId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        (hasRole('entrenador') && resource.data.coachId == request.auth.uid) ||
+        // If we want players/tutors to see the plan for their group, we'd need a way to check group membership here.
+        // For MVP, restrict to admins and the creating coach.
+        isAdmin() // Simplification for now, assuming only coaches and admins need access.
+      );
+      allow create: if isAuthenticated() && (isAdmin() || hasRole('entrenador'));
+      allow update, delete: if isAuthenticated() && (
+        isAdmin() || 
+        (hasRole('entrenador') && resource.data.coachId == request.auth.uid)
+      );
+    }
   }
 }

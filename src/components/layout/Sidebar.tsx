@@ -54,6 +54,7 @@ const navGroups: NavGroup[] = [
       { name: 'Eventos y Actividades', href: '/eventos', icon: CalendarPlus },
       { name: 'Personal', href: '/entrenadores', icon: UserCog, requiredModule: 'coaches' },
       { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
+      { name: 'Metodología', href: '/methodology', icon: BookOpen, requiredModule: 'settings' },
       { name: 'Planificación', href: '/planificacion', icon: BookOpen, requiredModule: 'settings' },
     ],
   },

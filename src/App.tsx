@@ -16,6 +16,7 @@ import CoachesPage from '@/pages/CoachesPage'
 import AgendaPage from '@/pages/AgendaPage'
 import SettingsPage from '@/pages/SettingsPage'
 import PlanningPage from '@/pages/PlanningPage'
+import MethodologyPage from '@/pages/MethodologyPage'
 import UsersPage from '@/pages/UsersPage'
 import ActivateAccountPage from '@/pages/ActivateAccountPage'
 import EventsActivitiesPage from '@/pages/EventsActivitiesPage'
@@ -110,6 +111,7 @@ export default function App() {
           <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
           <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
           <Route path="/planificacion" element={<PlanningPage />} />
+          <Route path="/methodology" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
