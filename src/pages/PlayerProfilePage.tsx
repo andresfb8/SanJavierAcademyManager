@@ -103,7 +103,7 @@ export default function PlayerProfilePage() {
   // All enrollments for groups tab
   const playerEnrollments = useMemo(() => {
     if (!player) return []
-    return enrollments.filter((e) => e.playerId === player.id)
+    return enrollments.filter((e) => e.playerId === player.id && e.isActive)
   }, [enrollments, player])
 
   // Attendance records where this player appears
@@ -337,7 +337,7 @@ export default function PlayerProfilePage() {
                   <Calendar className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Cr&eacute;ditos de recuperaci&oacute;n</p>
+                  <p className="text-xs text-muted-foreground">Créditos de recuperación</p>
                   <p className="text-lg font-bold">{player.recoveryCredits}</p>
                 </div>
               </div>
@@ -366,7 +366,7 @@ export default function PlayerProfilePage() {
         <Tabs defaultValue="personal">
           <TabsList>
             <TabsTrigger value="personal">Datos Personales</TabsTrigger>
-            <TabsTrigger value="facturacion">Facturaci&oacute;n</TabsTrigger>
+            <TabsTrigger value="facturacion">Facturación</TabsTrigger>
             <TabsTrigger value="asistencia">Asistencia</TabsTrigger>
             <TabsTrigger value="grupos">Grupos</TabsTrigger>
             <TabsTrigger value="informes">Informes</TabsTrigger>
@@ -380,21 +380,21 @@ export default function PlayerProfilePage() {
               {/* Datos personales */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Informaci&oacute;n personal</CardTitle>
+                  <CardTitle className="text-base">Información personal</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1">
                   <InfoRow label="Nombre completo" value={`${player.firstName} ${player.lastName}`} />
                   <InfoRow label="DNI" value={player.dni} />
                   <InfoRow
                     label="Fecha de nacimiento"
-                    value={`${formatDate(player.birthDate)} (${calculateAge(player.birthDate)} a\u00f1os)`}
+                    value={`${formatDate(player.birthDate)} (${calculateAge(player.birthDate)} años)`}
                     icon={Calendar}
                   />
                   <InfoRow label="Email" value={player.email} icon={Mail} />
-                  <InfoRow label="Tel\u00e9fono" value={player.phone} icon={Phone} />
-                  <InfoRow label="Direcci\u00f3n" value={player.address} icon={MapPin} />
+                  <InfoRow label="Teléfono" value={player.phone} icon={Phone} />
+                  <InfoRow label="Dirección" value={player.address} icon={MapPin} />
                   <InfoRow label="Ciudad" value={player.city} />
-                  <InfoRow label="C\u00f3digo postal" value={player.postalCode} />
+                  <InfoRow label="Código postal" value={player.postalCode} />
                   <InfoRow label="Talla de ropa" value={player.clothingSize || '\u2014'} />
                 </CardContent>
               </Card>
@@ -402,14 +402,14 @@ export default function PlayerProfilePage() {
               {/* Datos deportivos */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Informaci&oacute;n deportiva</CardTitle>
+                  <CardTitle className="text-base">Información deportiva</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1">
                   <InfoRow label="Nivel" value={<StatusBadge status={player.level} />} />
                   <InfoRow label="Mano dominante" value={handLabels[player.dominantHand] || player.dominantHand} />
-                  <InfoRow label="Posici\u00f3n" value={positionLabels[player.position] || player.position} />
+                  <InfoRow label="Posición" value={positionLabels[player.position] || player.position} />
                   <InfoRow label="Experiencia previa" value={player.previousExperience || '—'} />
-                  <InfoRow label="Notas m\u00e9dicas" value={player.medicalNotes || '—'} icon={AlertCircle} />
+                  <InfoRow label="Notas médicas" value={player.medicalNotes || '—'} icon={AlertCircle} />
                 </CardContent>
               </Card>
 
@@ -429,7 +429,7 @@ export default function PlayerProfilePage() {
                       value={`${player.guardian.firstName} ${player.guardian.lastName}`}
                     />
                     <InfoRow label="DNI" value={player.guardian.dni} />
-                    <InfoRow label="Tel\u00e9fono" value={player.guardian.phone} icon={Phone} />
+                    <InfoRow label="Teléfono" value={player.guardian.phone} icon={Phone} />
                     <InfoRow label="Email" value={player.guardian.email} icon={Mail} />
                   </CardContent>
                 </Card>
@@ -473,7 +473,7 @@ export default function PlayerProfilePage() {
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground">Estado</th>
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Fecha vencimiento</th>
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Fecha pago</th>
-                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">M&eacute;todo</th>
+                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Método</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -617,11 +617,10 @@ export default function PlayerProfilePage() {
                               <td className="p-3 text-center">
                                 <Badge
                                   variant="outline"
-                                  className={`text-xs font-bold ${
-                                    movement.balance > 0
-                                      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                      : 'bg-gray-50 text-gray-500 border-gray-200'
-                                  }`}
+                                  className={`text-xs font-bold ${movement.balance > 0
+                                    ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                    : 'bg-gray-50 text-gray-500 border-gray-200'
+                                    }`}
                                 >
                                   {movement.balance}
                                 </Badge>
@@ -680,7 +679,7 @@ export default function PlayerProfilePage() {
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Inscrito: {formatDate(enrollment.enrollmentDate)}
-                              {enrollment.unenrollmentDate && ` \u2014 Baja: ${formatDate(enrollment.unenrollmentDate)}`}
+                              {enrollment.unenrollmentDate && ` — Baja: ${formatDate(enrollment.unenrollmentDate)}`}
                             </p>
                           </div>
                           <Button
