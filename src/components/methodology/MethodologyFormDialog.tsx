@@ -81,13 +81,12 @@ const MethodologyFormDialog: React.FC<MethodologyFormDialogProps> = ({
             const parameterData = {
                 name: name.trim(),
                 category,
-                level, // Using single level for simplicity in MVP, but schema supports array
-                description: description.trim() || undefined,
-                videoUrl: videoUrl.trim() || undefined,
-                documentUrl: documentUrl.trim() || undefined,
+                level: [level], // Guardamos como array para que array-contains funcione
                 tags: tagsList,
                 isGlobal: true, // Only admins should be creating here
-                // If updating, we don't overwrite createdBy. If creating, we set it.
+                ...(description.trim() ? { description: description.trim() } : {}),
+                ...(videoUrl.trim() ? { videoUrl: videoUrl.trim() } : {}),
+                ...(documentUrl.trim() ? { documentUrl: documentUrl.trim() } : {}),
             };
 
             if (parameter?.id) {
@@ -101,6 +100,7 @@ const MethodologyFormDialog: React.FC<MethodologyFormDialogProps> = ({
 
             onSave();
         } catch (err: any) {
+            console.error("Error in MethodologyFormDialog handleSubmit:", err);
             setError(err.message || 'Error al guardar el parámetro');
         } finally {
             setLoading(false);

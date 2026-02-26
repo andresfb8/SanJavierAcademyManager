@@ -92,7 +92,7 @@ export const createParameter = async (
         return docRef.id
     } catch (error) {
         console.error("Error creating parameter:", error)
-        throw new Error("No se pudo crear el parámetro.")
+        throw new Error(error instanceof Error ? error.message : "No se pudo crear el parámetro.")
     }
 }
 
@@ -108,7 +108,7 @@ export const updateParameter = async (
         })
     } catch (error) {
         console.error("Error updating parameter:", error)
-        throw new Error("No se pudo actualizar el parámetro.")
+        throw new Error(error instanceof Error ? error.message : "No se pudo actualizar el parámetro.")
     }
 }
 
