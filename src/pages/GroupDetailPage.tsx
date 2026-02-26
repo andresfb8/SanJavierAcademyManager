@@ -11,9 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { GroupTrainingPlanTab } from '@/components/groups/GroupTrainingPlanTab'
 import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown } from 'lucide-react'
+import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
 import { DAYS_OF_WEEK, PLAYER_LEVELS } from '@/constants'
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
@@ -261,208 +263,227 @@ export default function GroupDetailPage() {
         }
       />
 
-      <div className="p-6 space-y-6">
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Ocupación */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Ocupación
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-2xl font-bold">{group.currentEnrollment}</span>
-                  <span className="text-sm text-muted-foreground">/ {group.maxCapacity} plazas</span>
-                </div>
-                <Progress
-                  value={group.currentEnrollment}
-                  max={group.maxCapacity}
-                  className="h-2"
-                  indicatorClassName={occupancyColor}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {group.maxCapacity - group.currentEnrollment > 0
-                    ? `${group.maxCapacity - group.currentEnrollment} plaza${group.maxCapacity - group.currentEnrollment !== 1 ? 's' : ''} disponible${group.maxCapacity - group.currentEnrollment !== 1 ? 's' : ''}`
-                    : 'Grupo completo'
-                  }
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Entrenador */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Entrenador
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-lg font-semibold">{group.coachName}</p>
-              <StatusBadge status={group.level} className="mt-1" />
-            </CardContent>
-          </Card>
-
-          {/* Pista */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Pista
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-lg font-semibold">{group.courtName}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {group.isActive ? 'Grupo activo' : 'Grupo inactivo'}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Tarifa */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Tarifa
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{formatCurrency(group.defaultTariffPrice)}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {defaultTariff ? defaultTariff.name : 'Tarifa por defecto'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Schedule Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Horario
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {group.schedule.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin horario definido</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {group.schedule.map((slot, index) => (
-                  <Badge key={index} variant="secondary" className="text-sm py-1 px-3">
-                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                    {getDayLabel(slot.dayOfWeek)} {slot.startTime} - {slot.endTime}
-                  </Badge>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-4 mt-4 text-sm text-muted-foreground">
-              <span>Inicio: {formatDate(new Date(group.startDate))}</span>
-              <span>Fin: {formatDate(new Date(group.endDate))}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Enrolled Players Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+      <div className="p-6">
+        <Tabs defaultValue="informacion" className="space-y-6">
+          <TabsList className="bg-muted/50 p-1">
+            <TabsTrigger value="informacion" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Jugadores inscritos ({groupEnrollments.length})
-            </CardTitle>
-            <Button size="sm" onClick={() => { resetAddForm(); setShowAddPlayer(true) }}>
-              <UserPlus className="h-4 w-4 mr-1" />
-              Añadir
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {groupEnrollments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 space-y-3">
-                <Users className="h-10 w-10 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No hay jugadores inscritos en este grupo</p>
-                <Button variant="outline" size="sm" onClick={() => { resetAddForm(); setShowAddPlayer(true) }}>
+              General y Alumnos
+            </TabsTrigger>
+            <TabsTrigger value="planificacion" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Planificación
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="informacion" className="space-y-6 mt-0">
+            {/* Info Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Ocupación */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Ocupación
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-2xl font-bold">{group.currentEnrollment}</span>
+                      <span className="text-sm text-muted-foreground">/ {group.maxCapacity} plazas</span>
+                    </div>
+                    <Progress
+                      value={group.currentEnrollment}
+                      max={group.maxCapacity}
+                      className="h-2"
+                      indicatorClassName={occupancyColor}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {group.maxCapacity - group.currentEnrollment > 0
+                        ? `${group.maxCapacity - group.currentEnrollment} plaza${group.maxCapacity - group.currentEnrollment !== 1 ? 's' : ''} disponible${group.maxCapacity - group.currentEnrollment !== 1 ? 's' : ''}`
+                        : 'Grupo completo'
+                      }
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Entrenador */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Entrenador
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold">{group.coachName}</p>
+                  <StatusBadge status={group.level} className="mt-1" />
+                </CardContent>
+              </Card>
+
+              {/* Pista */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Pista
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold">{group.courtName}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {group.isActive ? 'Grupo activo' : 'Grupo inactivo'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Tarifa */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Tarifa
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{formatCurrency(group.defaultTariffPrice)}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {defaultTariff ? defaultTariff.name : 'Tarifa por defecto'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Schedule Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Horario
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {group.schedule.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin horario definido</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {group.schedule.map((slot, index) => (
+                      <Badge key={index} variant="secondary" className="text-sm py-1 px-3">
+                        <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                        {getDayLabel(slot.dayOfWeek)} {slot.startTime} - {slot.endTime}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-4 mt-4 text-sm text-muted-foreground">
+                  <span>Inicio: {formatDate(new Date(group.startDate))}</span>
+                  <span>Fin: {formatDate(new Date(group.endDate))}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Enrolled Players Section */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Jugadores inscritos ({groupEnrollments.length})
+                </CardTitle>
+                <Button size="sm" onClick={() => { resetAddForm(); setShowAddPlayer(true) }}>
                   <UserPlus className="h-4 w-4 mr-1" />
-                  Añadir jugador
+                  Añadir
                 </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground">Jugador</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Tarifa</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden sm:table-cell">Precio</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Fecha inscripción</th>
-                      <th className="p-3 text-right text-sm font-medium text-muted-foreground w-20">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupEnrollments.map((enrollment) => {
-                      const player = players.find((p) => p.id === enrollment.playerId)
-                      const price = enrollment.customPrice ?? group.defaultTariffPrice
-                      return (
-                        <tr
-                          key={enrollment.id}
-                          className="border-b hover:bg-muted/30 transition-colors"
-                        >
-                          <td className="p-3">
-                            <button
-                              className="flex items-center gap-3 text-left hover:underline"
-                              onClick={() => navigate(`/jugadores/${enrollment.playerId}`)}
-                            >
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
-                                {enrollment.playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">{enrollment.playerName}</p>
-                                {player && (
-                                  <StatusBadge status={player.status} className="mt-0.5" />
-                                )}
-                              </div>
-                            </button>
-                          </td>
-                          <td className="p-3 hidden md:table-cell">
-                            <span className="text-sm">{enrollment.tariffName}</span>
-                          </td>
-                          <td className="p-3 hidden sm:table-cell">
-                            <span className="text-sm font-medium">
-                              {formatCurrency(price)}
-                            </span>
-                            {enrollment.customPrice !== undefined && (
-                              <span className="ml-1.5 text-xs text-muted-foreground">(personalizado)</span>
-                            )}
-                          </td>
-                          <td className="p-3 hidden lg:table-cell">
-                            <span className="text-sm text-muted-foreground">
-                              {formatDate(new Date(enrollment.enrollmentDate))}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setRemoveEnrollmentId(enrollment.id)}
-                            >
-                              <UserMinus className="h-4 w-4" />
-                            </Button>
-                          </td>
+              </CardHeader>
+              <CardContent>
+                {groupEnrollments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                    <Users className="h-10 w-10 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">No hay jugadores inscritos en este grupo</p>
+                    <Button variant="outline" size="sm" onClick={() => { resetAddForm(); setShowAddPlayer(true) }}>
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      Añadir jugador
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="p-3 text-left text-sm font-medium text-muted-foreground">Jugador</th>
+                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Tarifa</th>
+                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden sm:table-cell">Precio</th>
+                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Fecha inscripción</th>
+                          <th className="p-3 text-right text-sm font-medium text-muted-foreground w-20">Acciones</th>
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      </thead>
+                      <tbody>
+                        {groupEnrollments.map((enrollment) => {
+                          const player = players.find((p) => p.id === enrollment.playerId)
+                          const price = enrollment.customPrice ?? group.defaultTariffPrice
+                          return (
+                            <tr
+                              key={enrollment.id}
+                              className="border-b hover:bg-muted/30 transition-colors"
+                            >
+                              <td className="p-3">
+                                <button
+                                  className="flex items-center gap-3 text-left hover:underline"
+                                  onClick={() => navigate(`/jugadores/${enrollment.playerId}`)}
+                                >
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium shrink-0">
+                                    {enrollment.playerName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm">{enrollment.playerName}</p>
+                                    {player && (
+                                      <StatusBadge status={player.status} className="mt-0.5" />
+                                    )}
+                                  </div>
+                                </button>
+                              </td>
+                              <td className="p-3 hidden md:table-cell">
+                                <span className="text-sm">{enrollment.tariffName}</span>
+                              </td>
+                              <td className="p-3 hidden sm:table-cell">
+                                <span className="text-sm font-medium">
+                                  {formatCurrency(price)}
+                                </span>
+                                {enrollment.customPrice !== undefined && (
+                                  <span className="ml-1.5 text-xs text-muted-foreground">(personalizado)</span>
+                                )}
+                              </td>
+                              <td className="p-3 hidden lg:table-cell">
+                                <span className="text-sm text-muted-foreground">
+                                  {formatDate(new Date(enrollment.enrollmentDate))}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setRemoveEnrollmentId(enrollment.id)}
+                                >
+                                  <UserMinus className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="planificacion" className="mt-0">
+            <GroupTrainingPlanTab groupId={group.id} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Add Player Dialog */}

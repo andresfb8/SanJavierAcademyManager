@@ -6,11 +6,11 @@ Crear la funcionalidad de "Planes de Entrenamiento" que sirva de puente entre el
 
 ## Tasks
 
-- [ ] Task 1: Crear Servicio `training-plan-service.ts` para CRUD de planes asociados a grupos.
-- [ ] Task 2: Añadir nueva pestaña de "Planificación" dentro de la vista de Detalles de Grupo (`GroupDetailPage`).
-- [ ] Task 3: Crear componente de listado dual (Buscador Global a la izq, Plan del Grupo a la der).
-- [ ] Task 4: Crear selector interactivo de "Pelotitas" (1, 2, 3) para indicar la prioridad del concepto metodológico en ese grupo.
+- [x] Task 1: Crear Servicio `training-plan-service.ts` para CRUD de planes asociados a grupos.
+- [x] Task 2: Añadir nueva pestaña de "Planificación" dentro de la vista de Detalles de Grupo (`GroupDetailPage`).
+- [x] Task 3: Crear componente de listado dual (Buscador Global a la izq, Plan del Grupo a la der).
+- [x] Task 4: Crear selector interactivo de "Pelotitas" (1, 2, 3) para indicar la prioridad del concepto metodológico en ese grupo.
 
 ## Done When
 
-- [ ] Un entrenador/director puede entrar a un Grupo, ver el plan actual, añadir parámetros del catálogo y asignarles un peso de 1 a 3.
+- [x] Un entrenador/director puede entrar a un Grupo, ver el plan actual, añadir parámetros del catálogo y asignarles un peso de 1 a 3.
