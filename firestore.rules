@@ -425,21 +425,17 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
     
-    // ─── Training Plans Collection ──────────────────────────────────────
-    // Training plans created by coaches for specific groups.
-    match /training_plans/{planId} {
-      allow read: if isAuthenticated() && (
-        isAdmin() || 
-        (hasRole('entrenador') && resource.data.coachId == request.auth.uid) ||
-        // If we want players/tutors to see the plan for their group, we'd need a way to check group membership here.
-        // For MVP, restrict to admins and the creating coach.
-        isAdmin() // Simplification for now, assuming only coaches and admins need access.
-      );
-      allow create: if isAuthenticated() && (isAdmin() || hasRole('entrenador'));
-      allow update, delete: if isAuthenticated() && (
-        isAdmin() || 
-        (hasRole('entrenador') && resource.data.coachId == request.auth.uid)
-      );
+    // ─── Global Planning Module ─────────────────────────────────────────
+    // Training templates created by admins.
+    match /training_templates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Assignments of templates to specific groups
+    match /group_plan_assignments/{assignmentId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
   }
 }

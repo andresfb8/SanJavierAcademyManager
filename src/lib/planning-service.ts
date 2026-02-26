@@ -27,11 +27,10 @@ export const getTrainingTemplates = async (): Promise<TrainingTemplate[]> => {
     try {
         const q = query(
             collection(db, TEMPLATES_COLLECTION),
-            where('isGlobal', '==', true),
-            orderBy('createdAt', 'desc')
+            where('isGlobal', '==', true)
         )
         const querySnapshot = await getDocs(q)
-        return querySnapshot.docs.map(doc => {
+        const templates = querySnapshot.docs.map(doc => {
             const data = doc.data()
             return {
                 id: doc.id,
@@ -40,6 +39,13 @@ export const getTrainingTemplates = async (): Promise<TrainingTemplate[]> => {
                 updatedAt: data.updatedAt?.toDate(),
             } as TrainingTemplate
         })
+
+        // Sort client-side to avoid needing a composite index
+        return templates.sort((a, b) => {
+            const tA = a.createdAt?.getTime() || 0;
+            const tB = b.createdAt?.getTime() || 0;
+            return tB - tA;
+        });
     } catch (error) {
         console.error("Error fetching training templates:", error)
         throw new Error("No se pudieron cargar las plantillas de entrenamiento.")
@@ -151,21 +157,31 @@ export const getActiveAssignmentForGroup = async (groupId: string): Promise<Grou
     try {
         const q = query(
             collection(db, ASSIGNMENTS_COLLECTION),
-            where('groupId', '==', groupId),
-            where('isActive', '==', true),
-            orderBy('createdAt', 'desc')
+            where('groupId', '==', groupId)
         )
         const querySnapshot = await getDocs(q)
 
-        if (!querySnapshot.empty) {
-            const docSnap = querySnapshot.docs[0] // take the latest active
-            const data = docSnap.data()
+        const assignments = querySnapshot.docs.map(doc => {
+            const data = doc.data()
             return {
-                id: docSnap.id,
+                id: doc.id,
                 ...data,
                 startDate: data.startDate?.toDate(),
                 createdAt: data.createdAt?.toDate(),
             } as GroupPlanAssignment
+        })
+
+        // Filter active and sort client-side to avoid composite index
+        const activeAssignments = assignments
+            .filter(a => a.isActive)
+            .sort((a, b) => {
+                const tA = a.createdAt?.getTime() || 0;
+                const tB = b.createdAt?.getTime() || 0;
+                return tB - tA;
+            });
+
+        if (activeAssignments.length > 0) {
+            return activeAssignments[0] // take the latest active
         }
         return null
     } catch (error) {
