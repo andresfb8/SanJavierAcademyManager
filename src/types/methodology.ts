@@ -36,3 +36,39 @@ export interface TrainingPlan {
     createdAt: Date
     updatedAt: Date
 }
+
+// Fase 2: Plantillas Globales
+export interface TrainingSession {
+    dayNumber: number; // 1, 2, 3... (dentro de esa semana)
+    parameters: ParameterWeight[];
+}
+
+export interface TrainingWeek {
+    weekNumber: number; // 1, 2, 3...
+    sessions: TrainingSession[];
+    focus?: string;
+}
+
+export interface TrainingTemplate {
+    id: string;
+    name: string;
+    description?: string;
+    level: ParameterLevel | ParameterLevel[];
+    weeksCount: number; // Duración en semanas (ej: 4)
+    daysPerWeek: number; // Frecuencia semanal esperada (ej: 2)
+    weeks: TrainingWeek[]; // El contenido de cada semana
+    createdBy: string; // userId del Director/Coor que lo creó
+    isGlobal: boolean; // Si la plantilla está disponible para todos los del club
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface GroupPlanAssignment {
+    id: string;
+    groupId: string;
+    templateId: string;
+    assignedBy: string; // userId
+    startDate: Date; // Fecha a partir de la cual empieza el "Día 1" de la "Semana 1"
+    isActive: boolean;
+    createdAt: Date;
+}

@@ -20,6 +20,7 @@ import {
   CalendarPlus,
   History,
   Receipt,
+  Map,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
@@ -55,7 +56,7 @@ const navGroups: NavGroup[] = [
       { name: 'Personal', href: '/entrenadores', icon: UserCog, requiredModule: 'coaches' },
       { name: 'Informes', href: '/informes', icon: FileText, requiredModule: 'informes' },
       { name: 'Metodología', href: '/methodology', icon: BookOpen, requiredModule: 'settings' },
-      { name: 'Planificación', href: '/planificacion', icon: BookOpen, requiredModule: 'settings' },
+      { name: 'Planificación', href: '/planificacion', icon: Map, requiredModule: 'settings' },
     ],
   },
   {

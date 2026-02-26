@@ -110,7 +110,7 @@ export default function App() {
           <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
           <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
           <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
-          <Route path="/planificacion" element={<PlanningPage />} />
+          <Route path="/planificacion" element={<RoleRoute module="settings"><PlanningPage /></RoleRoute>} />
           <Route path="/methodology" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
