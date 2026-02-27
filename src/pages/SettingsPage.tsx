@@ -23,7 +23,9 @@ import {
   CreditCard,
   Building,
   Clock,
+  CalendarHeart
 } from 'lucide-react'
+import { HolidaysManager } from '@/components/settings/HolidaysManager'
 
 export default function SettingsPage() {
   const {
@@ -172,6 +174,7 @@ export default function SettingsPage() {
         <Tabs defaultValue="club">
           <TabsList>
             <TabsTrigger value="club">Datos del club</TabsTrigger>
+            <TabsTrigger value="holidays">Días Festivos</TabsTrigger>
             <TabsTrigger value="courts">Pistas</TabsTrigger>
             <TabsTrigger value="tariffs">Tarifas</TabsTrigger>
           </TabsList>
@@ -385,6 +388,11 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Holidays settings */}
+          <TabsContent value="holidays">
+            <HolidaysManager />
           </TabsContent>
 
           {/* Courts */}

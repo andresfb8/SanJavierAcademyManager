@@ -130,11 +130,19 @@ export const assignTemplateToGroups = async (
     try {
         const batch = writeBatch(db)
 
-        // For each group, we create a new active assignment. 
-        // We could first find existing active ones and deactivate them, but for this MVP,
-        // we assume the latest active one is the current one.
+        for (const groupId of groupIds) {
+            // Find existing active assignments and deactivate them
+            const activeAssignmentsQuery = query(
+                collection(db, ASSIGNMENTS_COLLECTION),
+                where('groupId', '==', groupId),
+                where('isActive', '==', true)
+            )
+            const activeDocs = await getDocs(activeAssignmentsQuery)
+            activeDocs.forEach(d => {
+                batch.update(doc(db, ASSIGNMENTS_COLLECTION, d.id), { isActive: false })
+            })
 
-        groupIds.forEach(groupId => {
+            // Create new active assignment
             const assignmentRef = doc(collection(db, ASSIGNMENTS_COLLECTION))
             batch.set(assignmentRef, {
                 groupId,
@@ -144,12 +152,25 @@ export const assignTemplateToGroups = async (
                 isActive: true,
                 createdAt: serverTimestamp()
             })
-        })
+        }
 
         await batch.commit()
     } catch (error) {
         console.error("Error assigning template to groups:", error)
         throw new Error("No se pudo asignar la plantilla a los grupos.")
+    }
+}
+
+export const unassignTemplateFromGroup = async (assignmentId: string): Promise<void> => {
+    try {
+        const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignmentId)
+        await updateDoc(docRef, {
+            isActive: false,
+            updatedAt: serverTimestamp()
+        })
+    } catch (error) {
+        console.error("Error unassigning template:", error)
+        throw new Error("No se pudo desvincular la plantilla del grupo.")
     }
 }
 

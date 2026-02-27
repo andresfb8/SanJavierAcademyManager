@@ -72,3 +72,20 @@ export interface GroupPlanAssignment {
     isActive: boolean;
     createdAt: Date;
 }
+
+export interface GroupSessionRecord {
+    id: string;
+    groupId: string;
+    assignmentId: string; // Link a la asignación de la plantilla
+    weekNumber: number;
+    dayNumber: number;
+    plannedDate: Date; // La fecha en la que originalmente tocaba o toca
+    status: 'completed' | 'skipped' | 'pending';
+    rescheduledDates?: Date[]; // Fechas en las que esta sesión tocaba pero fue desplazada
+    feedback?: {
+        rating?: number; // 1-5 estrellas opcional
+        notes?: string;
+    };
+    completedAt?: Date;
+    completedBy?: string; // userId del entrenador
+}

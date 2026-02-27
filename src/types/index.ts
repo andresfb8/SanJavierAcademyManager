@@ -41,6 +41,14 @@ export interface Club {
   createdAt: Date
 }
 
+// --- Configuración Global ---
+export interface Holiday {
+  id: string
+  date: Date
+  description?: string
+  createdAt: Date
+}
+
 // --- Pista ---
 export type CourtType = 'indoor' | 'outdoor'
 export type CourtSurface = 'cristal' | 'muro' | 'cesped'

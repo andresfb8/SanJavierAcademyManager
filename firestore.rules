@@ -437,5 +437,17 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
+
+    // Records for each group session completed/skipped
+    match /group_session_records/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (isAdmin() || hasRole('entrenador'));
+    }
+
+    // Settings for Holidays
+    match /settings_holidays/{holidayId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

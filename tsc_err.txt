@@ -1,0 +1,5 @@
+﻿src/components/groups/GroupTrainingPlanTab.tsx(70,17): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'Omit<GroupSessionRecord, "id" | "status" | "completedAt"> & { completedBy: string; }'.
+src/components/groups/GroupTrainingPlanTab.tsx(72,35): error TS2339: Property 'uid' does not exist on type 'AppUser'.
+src/components/groups/GroupTrainingPlanTab.tsx(92,17): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'Omit<GroupSessionRecord, "id" | "status" | "completedAt" | "feedback"> & { completedBy: string; }'.
+src/components/groups/GroupTrainingPlanTab.tsx(94,35): error TS2339: Property 'uid' does not exist on type 'AppUser'.
+src/components/groups/GroupTrainingPlanTab.tsx(120,35): error TS2339: Property 'uid' does not exist on type 'AppUser'.
