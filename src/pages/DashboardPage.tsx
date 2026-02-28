@@ -420,97 +420,97 @@ export default function DashboardPage() {
                 />
               )}
               {isAdmin && kpiConfig.revenue && (
-            <StatCard
-              title="Ingresos este mes"
-              value={formatCurrency(currentRevenue)}
-              icon={DollarSign}
-              trend={{ value: revenueDiff, label: 'vs mes anterior' }}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {isAdmin && kpiConfig.pendingPayments && (
-            <StatCard
-              title="Pagos pendientes"
-              value={formatCurrency(currentPending)}
-              icon={AlertCircle}
-              trend={{ value: pendingDiff, label: 'vs mes anterior' }}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {kpiConfig.activeGroups && (
-            <StatCard
-              title="Grupos activos"
-              value={activeGroups}
-              icon={GraduationCap}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {isAdmin && kpiConfig.collectionRate && (
-            <StatCard
-              title="Ratio de cobro"
-              value={`${collectionRate}%`}
-              icon={TrendingUp}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {kpiConfig.todayClasses && (
-            <StatCard
-              title="Clases hoy"
-              value={todayGroups.length}
-              icon={CalendarDays}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {kpiConfig.totalEnrolled && (
-            <StatCard
-              title="Alumnos inscritos"
-              value={enrollments.filter((e) => e.isActive).length}
-              icon={Activity}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {kpiConfig.waitingList && (
-            <StatCard
-              title="Lista de espera"
-              value={players.filter((p) => p.status === 'lista_espera').length}
-              icon={Clock}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {kpiConfig.rotationIndex && (
-            <StatCard
-              title="Índice de rotación"
-              value={`${rotationIndex}%`}
-              icon={RefreshCw}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
-          {kpiConfig.churnRate && (
-            <StatCard
-              title="Ratio de abandono"
-              value={`${churnRate}%`}
-              icon={UserMinus}
-              iconClassName="bg-primary/10 text-primary"
-              accentColor="#0e7490"
-              className="min-w-[280px] sm:min-w-0 snap-center"
-            />
-          )}
+                <StatCard
+                  title="Ingresos este mes"
+                  value={formatCurrency(currentRevenue)}
+                  icon={DollarSign}
+                  trend={{ value: revenueDiff, label: 'vs mes anterior' }}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {isAdmin && kpiConfig.pendingPayments && (
+                <StatCard
+                  title="Pagos pendientes"
+                  value={formatCurrency(currentPending)}
+                  icon={AlertCircle}
+                  trend={{ value: pendingDiff, label: 'vs mes anterior' }}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {kpiConfig.activeGroups && (
+                <StatCard
+                  title="Grupos activos"
+                  value={activeGroups}
+                  icon={GraduationCap}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {isAdmin && kpiConfig.collectionRate && (
+                <StatCard
+                  title="Ratio de cobro"
+                  value={`${collectionRate}%`}
+                  icon={TrendingUp}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {kpiConfig.todayClasses && (
+                <StatCard
+                  title="Clases hoy"
+                  value={todayGroups.length}
+                  icon={CalendarDays}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {kpiConfig.totalEnrolled && (
+                <StatCard
+                  title="Alumnos inscritos"
+                  value={enrollments.filter((e) => e.isActive).length}
+                  icon={Activity}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {kpiConfig.waitingList && (
+                <StatCard
+                  title="Lista de espera"
+                  value={players.filter((p) => p.status === 'lista_espera').length}
+                  icon={Clock}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {kpiConfig.rotationIndex && (
+                <StatCard
+                  title="Índice de rotación"
+                  value={`${rotationIndex}%`}
+                  icon={RefreshCw}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
+              {kpiConfig.churnRate && (
+                <StatCard
+                  title="Ratio de abandono"
+                  value={`${churnRate}%`}
+                  icon={UserMinus}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] sm:min-w-0 snap-center"
+                />
+              )}
             </>
           )}
         </div>

@@ -54,6 +54,7 @@ export default function ActivateAccountPage() {
             status: data.status,
             token: data.token,
             createdBy: data.createdBy,
+            coachId: data.coachId,
             createdAt: data.createdAt?.toDate?.() || data.createdAt,
             expiresAt: data.expiresAt?.toDate?.() || data.expiresAt,
             linkedPlayerId: data.linkedPlayerId,
@@ -133,14 +134,31 @@ export default function ActivateAccountPage() {
       }
       await setDoc(doc(db, 'users', credential.user.uid), userDoc)
 
-      // 4. Also add as coach in the local store if role is entrenador or coordinador
-      const { addCoach, coaches } = useDataStore.getState()
+      // 4. Also add/update coach in the local store if role is entrenador or coordinador
+      const { addCoach, updateCoach, coaches } = useDataStore.getState()
       if (invitation.role === 'entrenador' || invitation.role === 'coordinador') {
-        const alreadyExists = coaches.some((c) => c.email.toLowerCase() === invitation.email.toLowerCase())
-        if (!alreadyExists) {
-          const nameParts = name.trim().split(' ')
-          const firstName = nameParts[0] || ''
-          const lastName = nameParts.slice(1).join(' ') || ''
+        const nameParts = name.trim().split(' ')
+        const firstName = nameParts[0] || ''
+        const lastName = nameParts.slice(1).join(' ') || ''
+
+        // Try to find the coach by ID first (new robust method), then by email (fallback)
+        let existingCoach = null
+        if (invitation.coachId) {
+          existingCoach = coaches.find((c) => c.id === invitation.coachId)
+        }
+        if (!existingCoach) {
+          existingCoach = coaches.find((c) => c.email.toLowerCase() === invitation.email.toLowerCase())
+        }
+
+        if (existingCoach) {
+          // Verify and link existing coach
+          updateCoach(existingCoach.id, {
+            userId: credential.user.uid,
+            firstName,
+            lastName,
+          })
+        } else {
+          // Fallback: Create new coach if it really doesn't exist
           addCoach({
             firstName,
             lastName,
@@ -151,6 +169,7 @@ export default function ActivateAccountPage() {
             isActive: true,
             specialization: invitation.role === 'coordinador' ? 'Coordinador' : undefined,
             userId: credential.user.uid,
+            staffRole: invitation.role,
           })
         }
       }

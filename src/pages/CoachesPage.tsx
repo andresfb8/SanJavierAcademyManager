@@ -249,6 +249,7 @@ export default function CoachesPage() {
       status: 'pendiente',
       token,
       createdBy: 'system',
+      coachId: coach.id,
       createdAt: now,
       expiresAt,
     })

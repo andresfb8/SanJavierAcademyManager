@@ -346,6 +346,7 @@ export interface Invitation {
   status: InvitationStatus
   token: string
   createdBy: string
+  coachId?: string
   createdAt: Date
   expiresAt: Date
   acceptedAt?: Date
