@@ -13,7 +13,7 @@
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "firebase": "^12.9.0",
     "jspdf": "^4.1.0",
     "lucide-react": "^0.563.0",
@@ -24,7 +24,6 @@
     "recharts": "^3.7.0",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },

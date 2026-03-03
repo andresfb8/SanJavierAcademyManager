@@ -13,6 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore } from '@/stores/authStore'
 import {
   ArrowLeft,
   Users,
@@ -52,6 +53,13 @@ export default function EventDetailPage() {
     updateEventPayment,
     markEventPaymentPaid,
   } = useDataStore()
+
+  const { user } = useAuthStore()
+  const isEntrenador = user?.role === 'entrenador'
+  const currentCoachId = useMemo(() => {
+    if (!isEntrenador || !user?.id) return null
+    return coaches.find(c => c.userId === user.id)?.id ?? null
+  }, [isEntrenador, user?.id, coaches])
 
   // Estado para anadir asistente
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
@@ -114,6 +122,8 @@ export default function EventDetailPage() {
         .reduce((sum, ep) => sum + ep.amount, 0),
     [thisEventPayments]
   )
+
+  const isCoachWithoutAccess = isEntrenador && (!event || !event.coachIds.includes(currentCoachId ?? ''))
 
   // ===================
   // HANDLERS
@@ -299,14 +309,18 @@ export default function EventDetailPage() {
         subtitle={`${eventTypeInfo?.label ?? event.type} · ${formatDate(new Date(event.date))}`}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={openEditDialog}>
-              <Edit2 className="h-4 w-4 mr-1" />
-              Editar
-            </Button>
-            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="h-4 w-4 mr-1" />
-              Eliminar
-            </Button>
+            {!isCoachWithoutAccess && (
+              <>
+                <Button variant="outline" size="sm" onClick={openEditDialog}>
+                  <Edit2 className="h-4 w-4 mr-1" />
+                  Editar
+                </Button>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Eliminar
+                </Button>
+              </>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate('/agenda')}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Volver
@@ -405,58 +419,62 @@ export default function EventDetailPage() {
           </CardHeader>
           <CardContent>
             {/* Anadir asistente */}
-            <div className="flex items-end gap-3 mb-3 pb-3 border-b">
-              <div className="flex-1">
-                <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                  Anadir asistente
-                </label>
-                {availablePlayers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">
-                    No hay jugadores disponibles para anadir.
-                  </p>
-                ) : (
-                  <Select
-                    options={availablePlayers.map((p) => ({
-                      value: p.id,
-                      label: `${p.firstName} ${p.lastName}`,
-                    }))}
-                    placeholder="Seleccionar jugador..."
-                    value={selectedPlayerId}
-                    onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  />
-                )}
+            {!isCoachWithoutAccess && (
+              <div className="flex items-end gap-3 mb-3 pb-3 border-b">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                    Anadir asistente
+                  </label>
+                  {availablePlayers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      No hay jugadores disponibles para anadir.
+                    </p>
+                  ) : (
+                    <Select
+                      options={availablePlayers.map((p) => ({
+                        value: p.id,
+                        label: `${p.firstName} ${p.lastName}`,
+                      }))}
+                      placeholder="Seleccionar jugador..."
+                      value={selectedPlayerId}
+                      onChange={(e) => setSelectedPlayerId(e.target.value)}
+                    />
+                  )}
+                </div>
+                <Button
+                  onClick={handleAddAttendee}
+                  disabled={!selectedPlayerId || availablePlayers.length === 0}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  Añadir
+                </Button>
               </div>
-              <Button
-                onClick={handleAddAttendee}
-                disabled={!selectedPlayerId || availablePlayers.length === 0}
-              >
-                <UserPlus className="h-4 w-4 mr-1" />
-                Añadir
-              </Button>
-            </div>
+            )}
 
             {/* Anadir invitado por nombre */}
-            <div className="flex items-end gap-3 mb-4 pb-4 border-b">
-              <div className="flex-1">
-                <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                  Añadir invitado (por nombre)
-                </label>
-                <Input
-                  placeholder="Nombre del invitado..."
-                  value={guestNameInput}
-                  onChange={(e) => setGuestNameInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() } }}
-                />
+            {!isCoachWithoutAccess && (
+              <div className="flex items-end gap-3 mb-4 pb-4 border-b">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                    Añadir invitado (por nombre)
+                  </label>
+                  <Input
+                    placeholder="Nombre del invitado..."
+                    value={guestNameInput}
+                    onChange={(e) => setGuestNameInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() } }}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleAddGuest}
+                  disabled={!guestNameInput.trim()}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  Invitado
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                onClick={handleAddGuest}
-                disabled={!guestNameInput.trim()}
-              >
-                <UserPlus className="h-4 w-4 mr-1" />
-                Invitado
-              </Button>
-            </div>
+            )}
 
             {/* Tabla de asistentes */}
             {event.attendeePlayerIds.length === 0 ? (
@@ -471,7 +489,7 @@ export default function EventDetailPage() {
                     <TableHead>Jugador</TableHead>
                     <TableHead>Estado pago</TableHead>
                     <TableHead>Importe</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    {!isCoachWithoutAccess && <TableHead className="text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -513,44 +531,46 @@ export default function EventDetailPage() {
                             {formatCurrency(payment?.amount ?? event.price)}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {!isPaid && payment && (
-                              <div className="flex items-center gap-1">
-                                <Select
-                                  className="w-36 h-8 text-xs"
-                                  options={PAYMENT_METHODS.map((m) => ({
-                                    value: m.value,
-                                    label: m.label,
-                                  }))}
-                                  value={paymentMethods[payment.id] || 'efectivo'}
-                                  onChange={(e) =>
-                                    setPaymentMethods((prev) => ({
-                                      ...prev,
-                                      [payment.id]: e.target.value,
-                                    }))
-                                  }
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleMarkPaid(payment.id)}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Pagado
-                                </Button>
-                              </div>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => handleRemoveAttendee(playerId)}
-                            >
-                              <UserMinus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        {!isCoachWithoutAccess && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {!isPaid && payment && (
+                                <div className="flex items-center gap-1">
+                                  <Select
+                                    className="w-36 h-8 text-xs"
+                                    options={PAYMENT_METHODS.map((m) => ({
+                                      value: m.value,
+                                      label: m.label,
+                                    }))}
+                                    value={paymentMethods[payment.id] || 'efectivo'}
+                                    onChange={(e) =>
+                                      setPaymentMethods((prev) => ({
+                                        ...prev,
+                                        [payment.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleMarkPaid(payment.id)}
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    Pagado
+                                  </Button>
+                                </div>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleRemoveAttendee(playerId)}
+                              >
+                                <UserMinus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     )
                   })}

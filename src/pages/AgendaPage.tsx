@@ -12,7 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { AttendanceQuickDialog } from '@/components/attendance/AttendanceQuickDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
+import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro, Calendar as CalendarIcon } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import type { PrivateLesson, EventType } from '@/types'
@@ -92,6 +93,7 @@ interface GridBlock {
     absent: number
     justified: number
   } | null
+  coachId?: string
 }
 
 // ==========================================
@@ -100,7 +102,14 @@ interface GridBlock {
 
 export default function AgendaPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const isEntrenador = user?.role === 'entrenador'
   const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment, attendance } = useDataStore()
+
+  const currentCoachId = useMemo(() => {
+    if (!isEntrenador || !user?.id) return null
+    return coaches.find(c => c.userId === user.id)?.id ?? null
+  }, [isEntrenador, user?.id, coaches])
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -208,6 +217,7 @@ export default function AgendaPage() {
           groupName: group.name, level: group.level, levelLabel: levelInfo?.label ?? group.level,
           coachName: group.coachName, enrollment: group.currentEnrollment, maxCapacity: group.maxCapacity,
           attendanceStats,
+          coachId: group.coachId,
         })
       }
     }
@@ -221,6 +231,7 @@ export default function AgendaPage() {
         type: 'private', id: lesson.id,
         startSlot: timeToSlotIndex(lesson.startTime), endSlot: timeToSlotIndex(lesson.endTime),
         coachName: lesson.coachName, playerNames: lesson.playerNames, price: lesson.price, notes: lesson.notes,
+        coachId: lesson.coachId,
       })
     }
 
@@ -255,7 +266,8 @@ export default function AgendaPage() {
 
   function openNewLessonDialog() {
     setFormDate(toInputDate(selectedDate)); setFormCourtId(activeCourts[0]?.id ?? '')
-    setFormCoachId(coaches.filter((c) => c.isActive)[0]?.id ?? ''); setFormPlayerIds([])
+    const selectedC = (isEntrenador && currentCoachId) ? currentCoachId : (activeCoaches[0]?.id ?? '')
+    setFormCoachId(selectedC); setFormPlayerIds([])
     setFormStartTime('09:00'); setFormEndTime('10:00'); setFormPrice(''); setFormNotes('')
     setFormGuestNames([]); setFormGuestInput('')
     setLessonPlayerSearch('')
@@ -512,10 +524,12 @@ export default function AgendaPage() {
         subtitle="Vista diaria de pistas y horarios"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={openNewEventDialog} className="gap-1" size="sm">
-              <CalendarPlus className="h-4 w-4" />
-              <span className="hidden sm:inline">Nuevo evento</span>
-            </Button>
+            {!isEntrenador && (
+              <Button variant="outline" onClick={openNewEventDialog} className="gap-1" size="sm">
+                <CalendarPlus className="h-4 w-4" />
+                <span className="hidden sm:inline">Nuevo evento</span>
+              </Button>
+            )}
             <Button onClick={openNewLessonDialog} className="gap-1" size="sm">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Nueva clase particular</span>
@@ -531,10 +545,26 @@ export default function AgendaPage() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="icon" onClick={goToPreviousDay}><ChevronLeft className="h-4 w-4" /></Button>
+
+                <div className="relative flex items-center">
+                  <CalendarIcon className="absolute left-3 text-muted-foreground h-4 w-4 pointer-events-none" />
+                  <Input
+                    type="date"
+                    className="pl-9 h-9 w-[150px] sm:w-[170px] text-sm cursor-pointer"
+                    value={toInputDate(selectedDate)}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const newDate = new Date(e.target.value + 'T00:00:00')
+                        setSelectedDate(newDate)
+                      }
+                    }}
+                  />
+                </div>
+
                 <Button variant="outline" size="icon" onClick={goToNextDay}><ChevronRight className="h-4 w-4" /></Button>
                 {!isToday && <Button variant="outline" size="sm" onClick={goToToday}>Hoy</Button>}
               </div>
-              <div className="text-center">
+              <div className="hidden sm:block text-center">
                 <h2 className="text-base sm:text-lg font-semibold capitalize">{formatDateLong(selectedDate)}</h2>
                 <p className="text-sm text-muted-foreground">{dayLabel}</p>
               </div>
@@ -589,7 +619,8 @@ export default function AgendaPage() {
                               const colors = LEVEL_COLORS[startingBlock.level ?? ''] ?? LEVEL_COLORS.iniciacion
                               return (
                                 <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
-                                  <div className={`absolute inset-x-1 top-1 rounded-lg border-l-4 ${colors.bg} ${colors.border} p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow`} style={{ height: blockHeight - 8 }} onClick={() => {
+                                  <div className={`absolute inset-x-1 top-1 rounded-lg border-l-4 ${colors.bg} ${colors.border} p-2 overflow-hidden z-[1] shadow-sm ${(!isEntrenador || startingBlock.coachId === currentCoachId) ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} transition-shadow`} style={{ height: blockHeight - 8 }} onClick={() => {
+                                    if (isEntrenador && startingBlock.coachId !== currentCoachId) return
                                     setSelectedGroupForAttendance({
                                       groupId: startingBlock.id,
                                       groupName: startingBlock.groupName ?? '',
@@ -645,7 +676,7 @@ export default function AgendaPage() {
                               const totalCount = lessonPmts.length
                               return (
                                 <div key={`${court.id}-${time}`} className={`${isFullHour ? 'border-t' : 'border-t border-dashed'} relative`} style={{ height: SLOT_HEIGHT }}>
-                                  <div className="absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow" style={{ height: blockHeight - 8 }} onClick={() => openLessonDetail(startingBlock.id)}>
+                                  <div className={`absolute inset-x-1 top-1 rounded-lg border-l-4 bg-amber-50 border-amber-400 p-2 overflow-hidden z-[1] shadow-sm cursor-pointer hover:shadow-md transition-shadow`} style={{ height: blockHeight - 8 }} onClick={() => openLessonDetail(startingBlock.id)}>
                                     <p className="text-sm font-semibold text-amber-800">Clase Particular</p>
                                     <div className="mt-1 space-y-0.5">
                                       <p className="text-xs text-muted-foreground truncate">{startingBlock.playerNames?.join(', ')}</p>
@@ -671,7 +702,8 @@ export default function AgendaPage() {
                                 const endH = Math.min(h + 1, END_HOUR)
                                 setFormEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
                                 setFormDate(toInputDate(selectedDate)); setFormCourtId(court.id)
-                                setFormCoachId(activeCoaches[0]?.id ?? ''); setFormPlayerIds([]); setFormPrice(''); setFormNotes('')
+                                const selectedC = (isEntrenador && currentCoachId) ? currentCoachId : (activeCoaches[0]?.id ?? '')
+                                setFormCoachId(selectedC); setFormPlayerIds([]); setFormPrice(''); setFormNotes('')
                                 setFormGuestNames([]); setFormGuestInput('')
                                 setDialogOpen(true)
                               }}
@@ -703,7 +735,7 @@ export default function AgendaPage() {
           <div className="space-y-4">
             <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Pista</Label><Select value={formCourtId} onChange={(e) => setFormCourtId(e.target.value)} options={activeCourts.map((c) => ({ value: c.id, label: c.name }))} placeholder="Seleccionar pista" /></div>
-            <div className="space-y-1.5"><Label>Entrenador</Label><Select value={formCoachId} onChange={(e) => setFormCoachId(e.target.value)} options={activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Seleccionar entrenador" /></div>
+            <div className="space-y-1.5"><Label>Entrenador</Label><Select value={formCoachId} onChange={(e) => setFormCoachId(e.target.value)} options={activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))} placeholder="Seleccionar entrenador" disabled={isEntrenador} /></div>
             <div className="space-y-1.5">
               <Label>Jugadores</Label>
               {activePlayers.length > 0 && (
@@ -805,15 +837,10 @@ export default function AgendaPage() {
                           {isPaid ? (
                             <Badge className="bg-green-100 text-green-800 shrink-0">Pagado</Badge>
                           ) : (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Select
-                                className="w-32 h-8 text-xs"
-                                options={PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label }))}
-                                value={lessonPaymentMethods[payment.id] || 'efectivo'}
-                                onChange={(e) => setLessonPaymentMethods((prev) => ({ ...prev, [payment.id]: e.target.value }))}
-                              />
-                              <Button variant="outline" size="sm" onClick={() => handleMarkLessonPlayerPaid(payment.id)}>
-                                <Euro className="h-3.5 w-3.5 mr-1" />Pagado
+                            <div className="flex items-center gap-2">
+                              <Select value={lessonPaymentMethods[payment.id] || 'efectivo'} onChange={(e) => setLessonPaymentMethods({ ...lessonPaymentMethods, [payment.id]: e.target.value })} options={[{ value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' }, { value: 'tarjeta', label: 'Tarjeta' }]} className="h-8 w-[130px] text-xs" disabled={isEntrenador && selectedLesson.coachId !== currentCoachId} />
+                              <Button size="sm" variant="outline" className="h-8" onClick={() => handleMarkLessonPlayerPaid(payment.id)} disabled={isEntrenador && selectedLesson.coachId !== currentCoachId}>
+                                Cobrar
                               </Button>
                             </div>
                           )}
@@ -826,16 +853,16 @@ export default function AgendaPage() {
                 )}
               </div>
 
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                <div className="flex gap-2 ml-auto">
-                  <Button variant="outline" size="sm" onClick={() => setLessonEditMode(true)}>
-                    <Edit2 className="h-4 w-4 mr-1" />Editar
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => setDeleteLessonDialogOpen(true)}>
-                    <Trash2 className="h-4 w-4 mr-1" />Eliminar
-                  </Button>
-                </div>
-              </DialogFooter>
+              {/* Botones de accion */}
+              <div className="flex gap-2 justify-end">
+                {(!isEntrenador || selectedLesson?.coachId === currentCoachId) && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setLessonEditMode(true)} className="flex items-center gap-1"><Edit2 className="h-4 w-4" /> Editar clase</Button>
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteLessonDialogOpen(true)} className="flex items-center gap-1"><Trash2 className="h-4 w-4" /> Eliminar</Button>
+                  </>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setLessonDetailOpen(false)}>Cerrar</Button>
+              </div>
             </div>
           )}
           {lessonEditMode && (

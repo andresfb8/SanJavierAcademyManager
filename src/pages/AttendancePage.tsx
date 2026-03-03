@@ -28,7 +28,7 @@ import {
   Download,
 } from 'lucide-react'
 import { formatDate, generateId } from '@/lib/utils'
-import * as XLSX from 'xlsx'
+import { downloadXlsx } from '@/lib/excel'
 import type { AttendanceEntry, AttendanceStatus } from '@/types'
 
 // ==========================================
@@ -361,23 +361,8 @@ export default function AttendancePage() {
     })
 
     // Generate Excel
-    const worksheet = XLSX.utils.json_to_sheet(rows)
-
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 12 }, // Fecha
-      { wch: 25 }, // Grupo
-      { wch: 25 }, // Jugador
-      { wch: 14 }, // Estado
-      { wch: 14 }, // Recuperacion
-      { wch: 30 }, // Notas
-    ]
-
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Asistencia')
-
     const fileName = `asistencia_export_${exportDateFrom}_${exportDateTo}.xlsx`
-    XLSX.writeFile(workbook, fileName)
+    downloadXlsx(rows, 'Asistencia', fileName)
 
     setShowExportDialog(false)
   }
@@ -567,11 +552,10 @@ export default function AttendancePage() {
                             onClick={() =>
                               handleStatusChange(entry.playerId, 'presente')
                             }
-                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
-                              entry.status === 'presente'
+                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'presente'
                                 ? 'bg-green-100 text-green-700 border-green-300 shadow-sm'
                                 : 'bg-background text-muted-foreground border-border hover:bg-green-50 hover:text-green-600'
-                            }`}
+                              }`}
                           >
                             <CheckCircle className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Presente</span>
@@ -581,11 +565,10 @@ export default function AttendancePage() {
                             onClick={() =>
                               handleStatusChange(entry.playerId, 'ausente')
                             }
-                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
-                              entry.status === 'ausente'
+                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'ausente'
                                 ? 'bg-red-100 text-red-700 border-red-300 shadow-sm'
                                 : 'bg-background text-muted-foreground border-border hover:bg-red-50 hover:text-red-600'
-                            }`}
+                              }`}
                           >
                             <XCircle className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Ausente</span>
@@ -595,11 +578,10 @@ export default function AttendancePage() {
                             onClick={() =>
                               handleStatusChange(entry.playerId, 'justificado')
                             }
-                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
-                              entry.status === 'justificado'
+                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'justificado'
                                 ? 'bg-yellow-100 text-yellow-700 border-yellow-300 shadow-sm'
                                 : 'bg-background text-muted-foreground border-border hover:bg-yellow-50 hover:text-yellow-600'
-                            }`}
+                              }`}
                           >
                             <AlertCircle className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Justificado</span>
@@ -676,52 +658,52 @@ export default function AttendancePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
-                  <div className="space-y-2 min-w-[400px]">
-                    {/* Cabecera */}
-                    <div className="grid grid-cols-5 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-                      <div>Fecha</div>
-                      <div className="text-center">Presentes</div>
-                      <div className="text-center">Ausentes</div>
-                      <div className="text-center">Justificados</div>
-                      <div className="text-center">Total</div>
+                    <div className="space-y-2 min-w-[400px]">
+                      {/* Cabecera */}
+                      <div className="grid grid-cols-5 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
+                        <div>Fecha</div>
+                        <div className="text-center">Presentes</div>
+                        <div className="text-center">Ausentes</div>
+                        <div className="text-center">Justificados</div>
+                        <div className="text-center">Total</div>
+                      </div>
+
+                      {recentRecords.map((record) => {
+                        const rPresent = record.records.filter(
+                          (r) => r.status === 'presente'
+                        ).length
+                        const rAbsent = record.records.filter(
+                          (r) => r.status === 'ausente'
+                        ).length
+                        const rJustified = record.records.filter(
+                          (r) => r.status === 'justificado'
+                        ).length
+                        const rTotal = record.records.length
+
+                        return (
+                          <div
+                            key={record.id}
+                            className="grid grid-cols-5 gap-4 items-center px-4 py-2.5 rounded-md border hover:bg-accent/30 transition-colors"
+                          >
+                            <div className="text-sm font-medium">
+                              {formatDate(new Date(record.date))}
+                            </div>
+                            <div className="text-center">
+                              <Badge variant="success">{rPresent}</Badge>
+                            </div>
+                            <div className="text-center">
+                              <Badge variant="destructive">{rAbsent}</Badge>
+                            </div>
+                            <div className="text-center">
+                              <Badge variant="warning">{rJustified}</Badge>
+                            </div>
+                            <div className="text-center text-sm text-muted-foreground">
+                              {rTotal}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-
-                    {recentRecords.map((record) => {
-                      const rPresent = record.records.filter(
-                        (r) => r.status === 'presente'
-                      ).length
-                      const rAbsent = record.records.filter(
-                        (r) => r.status === 'ausente'
-                      ).length
-                      const rJustified = record.records.filter(
-                        (r) => r.status === 'justificado'
-                      ).length
-                      const rTotal = record.records.length
-
-                      return (
-                        <div
-                          key={record.id}
-                          className="grid grid-cols-5 gap-4 items-center px-4 py-2.5 rounded-md border hover:bg-accent/30 transition-colors"
-                        >
-                          <div className="text-sm font-medium">
-                            {formatDate(new Date(record.date))}
-                          </div>
-                          <div className="text-center">
-                            <Badge variant="success">{rPresent}</Badge>
-                          </div>
-                          <div className="text-center">
-                            <Badge variant="destructive">{rAbsent}</Badge>
-                          </div>
-                          <div className="text-center">
-                            <Badge variant="warning">{rJustified}</Badge>
-                          </div>
-                          <div className="text-center text-sm text-muted-foreground">
-                            {rTotal}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
                   </div>
                 </CardContent>
               </Card>

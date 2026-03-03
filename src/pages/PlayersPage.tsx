@@ -23,7 +23,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
-import * as XLSX from 'xlsx'
+import { downloadXlsx } from '@/lib/excel'
 import type { Player, PlayerLevel, PlayerStatus } from '@/types'
 import {
   Plus, Search, Upload, Download, Users, Mail, Phone,
@@ -173,10 +173,8 @@ export default function PlayersPage() {
       'Tutor Email': p.isMinor ? p.guardian?.email || '' : '',
       'Parentesco': p.isMinor ? p.guardian?.relationship || '' : '',
     }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Jugadores')
-    XLSX.writeFile(wb, `jugadores_${new Date().toISOString().split('T')[0]}.xlsx`)
+    const fileName = `jugadores_${new Date().toISOString().split('T')[0]}.xlsx`
+    downloadXlsx(data, 'Jugadores', fileName)
   }
 
   const columns = useMemo<ColumnDef<Player>[]>(() => [

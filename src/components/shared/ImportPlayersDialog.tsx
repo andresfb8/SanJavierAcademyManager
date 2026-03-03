@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, X } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { parseExcelSerialDate } from '@/lib/excel'
+import ExcelJS from 'exceljs'
 
 interface ImportedPlayer {
   firstName: string
@@ -90,16 +91,8 @@ function mapColumnHeader(header: string): string | null {
 function parseDate(value: unknown): string {
   if (!value) return ''
 
-  // If xlsx parsed it as a number (Excel serial date)
   if (typeof value === 'number') {
-    const date = XLSX.SSF.parse_date_code(value)
-    if (date) {
-      const y = date.y
-      const m = String(date.m).padStart(2, '0')
-      const d = String(date.d).padStart(2, '0')
-      return `${y}-${m}-${d}`
-    }
-    return ''
+    return parseExcelSerialDate(value)
   }
 
   const str = String(value).trim()
@@ -170,61 +163,69 @@ function ImportPlayersDialog({ open, onOpenChange, onImport }: ImportPlayersDial
     }
   }, [])
 
-  const processWorkbook = useCallback((data: Uint8Array, name: string) => {
+  const processWorkbook = useCallback(async (data: Uint8Array, name: string) => {
     try {
-      const workbook = XLSX.read(data, { type: 'array' })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet)
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(data.buffer as ArrayBuffer)
+      const ws = wb.worksheets[0]
+      if (!ws) {
+        setParseError('El archivo no contiene hojas')
+        return
+      }
 
-      if (jsonData.length === 0) {
+      // Read header row (row 1)
+      const headerRow = ws.getRow(1)
+      const headers: string[] = []
+      headerRow.eachCell({ includeEmpty: false }, (cell) => {
+        headers.push(String(cell.value ?? ''))
+      })
+
+      if (headers.length === 0) {
         setParseError('El archivo no contiene datos')
         return
       }
 
-      // Build column mapping from headers
-      const headers = Object.keys(jsonData[0])
-      const headerMap: Record<string, string> = {}
-      for (const header of headers) {
+      // Build column map
+      const headerMap: Record<number, string> = {}
+      headers.forEach((header, idx) => {
         const mapped = mapColumnHeader(header)
-        if (mapped) {
-          headerMap[header] = mapped
-        }
-      }
-
-      // Parse each row
-      const rows: ParsedRow[] = jsonData.map((row) => {
-        const player: ImportedPlayer = {
-          firstName: '',
-          lastName: '',
-          dni: '',
-          birthDate: '',
-          email: '',
-          phone: '',
-          address: '',
-          city: '',
-          postalCode: '',
-          level: '',
-          status: '',
-          clothingSize: '',
-        }
-
-        for (const [originalHeader, fieldName] of Object.entries(headerMap)) {
-          const value = row[originalHeader]
-          if (fieldName === 'birthDate') {
-            ;(player as unknown as Record<string, string>)[fieldName] = parseDate(value)
-          } else {
-            ;(player as unknown as Record<string, string>)[fieldName] = value != null ? String(value).trim() : ''
-          }
-        }
-
-        const errors = validateRow(player)
-        return {
-          player,
-          errors,
-          isValid: errors.length === 0,
-        }
+        if (mapped) headerMap[idx + 1] = mapped // exceljs is 1-indexed
       })
+
+      // Parse data rows
+      const rows: ParsedRow[] = []
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return // skip header
+        const player: ImportedPlayer = {
+          firstName: '', lastName: '', dni: '', birthDate: '',
+          email: '', phone: '', address: '', city: '',
+          postalCode: '', level: '', status: '', clothingSize: '',
+        }
+        Object.entries(headerMap).forEach(([colIdx, fieldName]) => {
+          const cell = row.getCell(Number(colIdx))
+          const rawValue = cell.value
+          if (fieldName === 'birthDate') {
+            if (rawValue instanceof Date) {
+              const y = rawValue.getFullYear()
+              const m = String(rawValue.getMonth() + 1).padStart(2, '0')
+              const d = String(rawValue.getDate()).padStart(2, '0')
+                ; (player as unknown as Record<string, string>)[fieldName] = `${y}-${m}-${d}`
+            } else {
+              ; (player as unknown as Record<string, string>)[fieldName] = parseDate(rawValue)
+            }
+          } else {
+            ; (player as unknown as Record<string, string>)[fieldName] =
+              rawValue != null ? String(rawValue).trim() : ''
+          }
+        })
+        const errors = validateRow(player)
+        rows.push({ player, errors, isValid: errors.length === 0 })
+      })
+
+      if (rows.length === 0) {
+        setParseError('El archivo no contiene datos')
+        return
+      }
 
       setFileName(name)
       setParsedRows(rows)
@@ -327,11 +328,10 @@ function ImportPlayersDialog({ open, onOpenChange, onImport }: ImportPlayersDial
         {!hasFile ? (
           <div>
             <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragging
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
                   ? 'border-primary bg-primary/5'
                   : 'border-muted-foreground/25'
-              }`}
+                }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}

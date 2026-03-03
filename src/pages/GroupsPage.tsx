@@ -351,9 +351,9 @@ export default function GroupsPage() {
         {filteredGroups.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="No hay grupos"
-            description="Crea tu primer grupo para empezar a organizar las clases de la escuela"
-            action={{ label: 'Crear grupo', onClick: openCreateDialog }}
+            title={isEntrenador ? "No tienes grupos asignados" : "No hay grupos"}
+            description={isEntrenador ? "Actualmente no tienes ningún grupo asignado a tu perfil." : "Crea tu primer grupo para empezar a organizar las clases de la escuela"}
+            action={isEntrenador ? undefined : { label: 'Crear grupo', onClick: openCreateDialog }}
           />
         ) : viewMode === 'grid' ? (
           /* Grid View */
@@ -444,7 +444,7 @@ export default function GroupsPage() {
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Pista</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Horario</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Ocupación</th>
-                      <th className="p-3 text-right text-sm font-medium text-muted-foreground w-24">Acciones</th>
+                      {!isEntrenador && <th className="p-3 text-right text-sm font-medium text-muted-foreground w-24">Acciones</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -496,26 +496,28 @@ export default function GroupsPage() {
                               </span>
                             </div>
                           </td>
-                          <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditDialog(group)}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => setShowDeleteConfirm(group.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
+                          {!isEntrenador && (
+                            <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openEditDialog(group)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => setShowDeleteConfirm(group.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       )
                     })}

@@ -49,7 +49,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import * as XLSX from 'xlsx'
+import { downloadXlsxAoa } from '@/lib/excel'
 
 type ViewMode = 'mensual' | 'anual'
 
@@ -553,7 +553,6 @@ export default function PaymentsPage() {
 
   const handleExportXLSX = () => {
     if (viewMode === 'anual') {
-      // Export annual summary
       const wsData = [
         ['Mes', 'Ingresos', 'Pendiente', 'Tasa cobro (%)', 'Recibos'],
         ...annualSummary.map((r) => [
@@ -571,14 +570,8 @@ export default function PaymentsPage() {
           annualTotals.totalRecibos,
         ],
       ]
-      const ws = XLSX.utils.aoa_to_sheet(wsData)
-      // Set column widths
-      ws['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 10 }]
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Resumen Anual')
-      XLSX.writeFile(wb, `pagos_anual_${selectedYear}.xlsx`)
+      downloadXlsxAoa(wsData, 'Resumen Anual', `pagos_anual_${selectedYear}.xlsx`)
     } else {
-      // Export monthly detail
       const wsData = [
         ['Jugador', 'Concepto', 'Grupo', 'Categoria', 'Importe', 'Estado', 'Vencimiento', 'Fecha pago', 'Metodo', 'Registrado por'],
         ...filteredPayments.map((p) => [
@@ -596,14 +589,7 @@ export default function PaymentsPage() {
           p.registeredBy ?? '',
         ]),
       ]
-      const ws = XLSX.utils.aoa_to_sheet(wsData)
-      ws['!cols'] = [
-        { wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 12 },
-        { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 },
-      ]
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Pagos')
-      XLSX.writeFile(wb, `pagos_${selectedMonth}_${selectedYear}.xlsx`)
+      downloadXlsxAoa(wsData, 'Pagos', `pagos_${selectedMonth}_${selectedYear}.xlsx`)
     }
   }
 

@@ -248,7 +248,7 @@ export default function DashboardPage() {
 
   const today = now.getDay()
   const todayGroups = groups.filter(
-    (g) => g.isActive && g.schedule.some((s) => s.dayOfWeek === today)
+    (g) => g.isActive && g.schedule.some((s) => s.dayOfWeek === today) && (!isCoach || g.coachId === currentCoachId)
   )
 
   const coachClassesToday = useMemo(() => {
@@ -307,9 +307,16 @@ export default function DashboardPage() {
     }
   })
 
-  const visibleActivities = canReadPayments
-    ? activities
-    : activities.filter((a) => a.type !== 'payment_received')
+  const visibleActivities = useMemo(() => {
+    let filtered = activities
+    if (!canReadPayments) {
+      filtered = filtered.filter((a) => a.type !== 'payment_received')
+    }
+    if (isCoach && user?.id) {
+      filtered = filtered.filter((a) => a.userId === user.id)
+    }
+    return filtered
+  }, [activities, canReadPayments, isCoach, user?.id])
 
   const timeAgo = (_date: Date) => '' // now handled by ActivityFeed
 
@@ -517,7 +524,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Charts row 1 ────────────────────────────────────── */}
-        {(kpiConfig.attendanceChart || kpiConfig.levelChart) && (
+        {!isCoach && (kpiConfig.attendanceChart || kpiConfig.levelChart) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {kpiConfig.attendanceChart && (
               <Card className="lg:col-span-2 border-border/60 shadow-[var(--shadow-card)]">
@@ -611,7 +618,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── Financial chart ──────────────────────────────────── */}
-        {isAdmin && kpiConfig.financialChart && (
+        {!isCoach && isAdmin && kpiConfig.financialChart && (
           <Card className="border-border/60 shadow-[var(--shadow-card)]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-5 pt-5">
               <div>
@@ -652,7 +659,7 @@ export default function DashboardPage() {
 
           {/* Activity feed */}
           <Card className="border-border/60 shadow-[var(--shadow-card)] flex flex-col min-h-[460px]">
-            <ActivityFeed activities={activities} canReadPayments={canReadPayments} />
+            <ActivityFeed activities={visibleActivities} canReadPayments={canReadPayments} />
           </Card>
 
           {/* Today's schedule */}
