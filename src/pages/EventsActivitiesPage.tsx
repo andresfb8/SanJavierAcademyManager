@@ -112,7 +112,16 @@ export default function EventsActivitiesPage() {
   const [evGuestInput, setEvGuestInput] = useState('')
   const [eventPlayerSearch, setEventPlayerSearch] = useState('')
 
-  const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
+  const activeCourts = useMemo(() => {
+    return courts
+      .filter((c) => c.isActive)
+      .sort((a, b) => {
+        const orderA = a.order ?? 9999
+        const orderB = b.order ?? 9999
+        if (orderA !== orderB) return orderA - orderB
+        return a.name.localeCompare(b.name)
+      })
+  }, [courts])
   const activeCoaches = useMemo(
     () => coaches.filter((c) => c.isActive).sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [coaches]
@@ -133,8 +142,8 @@ export default function EventsActivitiesPage() {
       const dni = p.dni?.toLowerCase() || ''
 
       return fullName.includes(search) ||
-             reverseName.includes(search) ||
-             dni.includes(search)
+        reverseName.includes(search) ||
+        dni.includes(search)
     })
   }, [activePlayers, lessonPlayerSearch])
 
@@ -149,8 +158,8 @@ export default function EventsActivitiesPage() {
       const dni = p.dni?.toLowerCase() || ''
 
       return fullName.includes(search) ||
-             reverseName.includes(search) ||
-             dni.includes(search)
+        reverseName.includes(search) ||
+        dni.includes(search)
     })
   }, [activePlayers, eventPlayerSearch])
 

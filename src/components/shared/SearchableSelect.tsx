@@ -4,6 +4,7 @@
 // Select con búsqueda integrada tipo combobox
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Input } from '@/components/ui/input'
 import { Check, ChevronDown } from 'lucide-react'
 
@@ -35,24 +36,50 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [dropdownStyles, setDropdownStyles] = useState<React.CSSProperties>({})
+
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Normalize text to ignore accents and case
+  const normalizeText = (text: string) =>
+    text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
 
   // Filter options based on search
   const filteredOptions = search.trim()
     ? options.filter((option) =>
-        option.label.toLowerCase().includes(search.toLowerCase())
-      )
+      normalizeText(option.label).includes(normalizeText(search))
+    )
     : options
 
   // Get selected option label
   const selectedOption = options.find((opt) => opt.value === value)
   const displayValue = selectedOption ? selectedOption.label : placeholder
 
+  // Update dropdown position
+  const updatePosition = () => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      setDropdownStyles({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 99999,
+      })
+    }
+  }
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      // Check if click is outside both the button container and the dropdown portal
+      const clickedOutsideContainer = containerRef.current && !containerRef.current.contains(target)
+      const clickedOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target)
+
+      if (clickedOutsideContainer && clickedOutsideDropdown) {
         setIsOpen(false)
         setSearch('')
       }
@@ -64,10 +91,21 @@ export function SearchableSelect({
     }
   }, [isOpen])
 
-  // Focus input when opening dropdown
+  // Manage positioning and event listeners while open
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus()
+    if (isOpen) {
+      updatePosition()
+      window.addEventListener('resize', updatePosition)
+      window.addEventListener('scroll', updatePosition, true)
+
+      if (inputRef.current) {
+        inputRef.current.focus()
+      }
+
+      return () => {
+        window.removeEventListener('resize', updatePosition)
+        window.removeEventListener('scroll', updatePosition, true)
+      }
     }
   }, [isOpen])
 
@@ -107,9 +145,13 @@ export function SearchableSelect({
         <ChevronDown className={`ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 rounded-md border bg-popover shadow-md">
+      {/* Dropdown via Portal */}
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          style={dropdownStyles}
+          className="rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+        >
           {/* Search Input */}
           <div className="p-2 border-b">
             <Input
@@ -139,7 +181,7 @@ export function SearchableSelect({
                     rounded-sm px-2 py-1.5 text-sm
                     hover:bg-accent hover:text-accent-foreground
                     cursor-pointer
-                    ${option.value === value ? 'bg-accent/50' : ''}
+                    ${option.value === value ? 'bg-accent/50 text-accent-foreground' : 'text-foreground'}
                   `}
                 >
                   <span className="truncate">{option.label}</span>
@@ -150,8 +192,10 @@ export function SearchableSelect({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
 }
+

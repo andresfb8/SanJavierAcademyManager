@@ -26,6 +26,7 @@ export const demoCourts: Court[] = [
     type: 'outdoor',
     surface: 'cristal',
     isActive: true,
+    order: 1,
     notes: 'Pista principal con iluminación LED',
   },
   {
@@ -34,6 +35,7 @@ export const demoCourts: Court[] = [
     type: 'indoor',
     surface: 'cristal',
     isActive: true,
+    order: 2,
     notes: 'Pista cubierta climatizada',
   },
   {
@@ -42,6 +44,7 @@ export const demoCourts: Court[] = [
     type: 'outdoor',
     surface: 'cesped',
     isActive: true,
+    order: 3,
   },
   {
     id: 'court-004',
@@ -49,6 +52,7 @@ export const demoCourts: Court[] = [
     type: 'outdoor',
     surface: 'muro',
     isActive: false,
+    order: 4,
     notes: 'En mantenimiento - renovación de suelo prevista para marzo 2026',
   },
 ]

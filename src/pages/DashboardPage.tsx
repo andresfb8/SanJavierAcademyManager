@@ -353,7 +353,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="flex overflow-x-auto pb-4 snap-x snap-mandatory -mx-5 px-5 lg:mx-0 lg:px-0 lg:pb-0 lg:grid lg:grid-cols-4 xl:grid-cols-5 gap-4 no-scrollbar">
+        {/* Mobile: Horizontal scroll (flex). Tablet/Desktop: Grid */}
+        <div className="flex flex-row overflow-x-auto pb-4 snap-x snap-mandatory -mx-5 px-5 md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 no-scrollbar">
           {isCoach ? (
             /* KPIs para Entrenadores */
             <>
@@ -363,7 +364,7 @@ export default function DashboardPage() {
                 icon={Clock}
                 iconClassName="bg-blue-100 text-blue-600"
                 accentColor="#2563eb"
-                className="min-w-[280px] sm:min-w-0 snap-center"
+                className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Jugadores Asignados"
@@ -371,7 +372,7 @@ export default function DashboardPage() {
                 icon={Users}
                 iconClassName="bg-green-100 text-green-600"
                 accentColor="#16a34a"
-                className="min-w-[280px] sm:min-w-0 snap-center"
+                className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Grupos Totales"
@@ -379,7 +380,7 @@ export default function DashboardPage() {
                 icon={GraduationCap}
                 iconClassName="bg-purple-100 text-purple-600"
                 accentColor="#9333ea"
-                className="min-w-[280px] sm:min-w-0 snap-center"
+                className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Clases Particulares"
@@ -387,7 +388,7 @@ export default function DashboardPage() {
                 icon={CalendarDays}
                 iconClassName="bg-orange-100 text-orange-600"
                 accentColor="#ea580c"
-                className="min-w-[280px] sm:min-w-0 snap-center"
+                className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Clases Hoy"
@@ -395,7 +396,7 @@ export default function DashboardPage() {
                 icon={CalendarCheck}
                 iconClassName="bg-indigo-100 text-indigo-600"
                 accentColor="#4f46e5"
-                className="min-w-[280px] sm:min-w-0 snap-center"
+                className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Grupos Incompletos"
@@ -403,7 +404,7 @@ export default function DashboardPage() {
                 icon={AlertCircle}
                 iconClassName="bg-amber-100 text-amber-600"
                 accentColor="#d97706"
-                className="min-w-[280px] sm:min-w-0 snap-center"
+                className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
             </>
           ) : (
@@ -416,7 +417,7 @@ export default function DashboardPage() {
                   icon={Users}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {isAdmin && kpiConfig.revenue && (
@@ -427,7 +428,7 @@ export default function DashboardPage() {
                   trend={{ value: revenueDiff, label: 'vs mes anterior' }}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {isAdmin && kpiConfig.pendingPayments && (
@@ -438,7 +439,7 @@ export default function DashboardPage() {
                   trend={{ value: pendingDiff, label: 'vs mes anterior' }}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {kpiConfig.activeGroups && (
@@ -448,7 +449,7 @@ export default function DashboardPage() {
                   icon={GraduationCap}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {isAdmin && kpiConfig.collectionRate && (
@@ -458,7 +459,7 @@ export default function DashboardPage() {
                   icon={TrendingUp}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {kpiConfig.todayClasses && (
@@ -468,7 +469,7 @@ export default function DashboardPage() {
                   icon={CalendarDays}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {kpiConfig.totalEnrolled && (
@@ -478,7 +479,7 @@ export default function DashboardPage() {
                   icon={Activity}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {kpiConfig.waitingList && (
@@ -488,7 +489,7 @@ export default function DashboardPage() {
                   icon={Clock}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {kpiConfig.rotationIndex && (
@@ -498,7 +499,7 @@ export default function DashboardPage() {
                   icon={RefreshCw}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
               {kpiConfig.churnRate && (
@@ -508,7 +509,7 @@ export default function DashboardPage() {
                   icon={UserMinus}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
-                  className="min-w-[280px] sm:min-w-0 snap-center"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
             </>

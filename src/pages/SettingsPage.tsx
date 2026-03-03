@@ -60,7 +60,7 @@ export default function SettingsPage() {
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null)
   const [courtForm, setCourtForm] = useState({
     name: '', type: 'outdoor' as CourtType, surface: 'cristal' as CourtSurface,
-    isActive: true, notes: '',
+    isActive: true, order: 0, notes: '',
   })
   const [deleteCourtId, setDeleteCourtId] = useState<string | null>(null)
 
@@ -93,7 +93,7 @@ export default function SettingsPage() {
   }
 
   const resetCourtForm = () => {
-    setCourtForm({ name: '', type: 'outdoor', surface: 'cristal', isActive: true, notes: '' })
+    setCourtForm({ name: '', type: 'outdoor', surface: 'cristal', isActive: true, order: 0, notes: '' })
     setEditingCourtId(null)
   }
 
@@ -102,7 +102,7 @@ export default function SettingsPage() {
     if (!court) return
     setCourtForm({
       name: court.name, type: court.type, surface: court.surface,
-      isActive: court.isActive, notes: court.notes || '',
+      isActive: court.isActive, order: court.order ?? 0, notes: court.notes || '',
     })
     setEditingCourtId(id)
     setShowCourtDialog(true)
@@ -428,6 +428,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
+                        <p>Orden visual: {court.order ?? '-'}</p>
                         <p>Tipo: {court.type === 'indoor' ? 'Cubierta' : 'Exterior'}</p>
                         <p>Superficie: {court.surface === 'cristal' ? 'Cristal' : court.surface === 'muro' ? 'Muro' : 'Césped'}</p>
                         {court.notes && <p className="text-xs italic">{court.notes}</p>}
@@ -514,6 +515,11 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Superficie</Label>
               <Select options={COURT_SURFACES.map((s) => ({ value: s.value, label: s.label }))} value={courtForm.surface} onChange={(e) => setCourtForm({ ...courtForm, surface: e.target.value as CourtSurface })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Orden de visualización</Label>
+              <Input type="number" min={0} value={courtForm.order || ''} onChange={(e) => setCourtForm({ ...courtForm, order: e.target.value === '' ? 0 : Number(e.target.value) })} />
+              <p className="text-xs text-muted-foreground">Posición en la que aparecerá en la agenda.</p>
             </div>
             <div className="space-y-2">
               <Label>Notas</Label>

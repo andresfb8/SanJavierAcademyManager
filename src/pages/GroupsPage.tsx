@@ -85,7 +85,16 @@ export default function GroupsPage() {
   const [newSlotEnd, setNewSlotEnd] = useState('19:30')
 
   const activeCoaches = useMemo(() => coaches.filter((c) => c.isActive), [coaches])
-  const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
+  const activeCourts = useMemo(() => {
+    return courts
+      .filter((c) => c.isActive)
+      .sort((a, b) => {
+        const orderA = a.order ?? 9999
+        const orderB = b.order ?? 9999
+        if (orderA !== orderB) return orderA - orderB
+        return a.name.localeCompare(b.name)
+      })
+  }, [courts])
   const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
 
   const isEntrenador = user?.role === 'entrenador'

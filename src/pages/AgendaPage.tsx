@@ -164,7 +164,16 @@ export default function AgendaPage() {
   const [editLessonNotes, setEditLessonNotes] = useState('')
   const [editLessonIsPaid, setEditLessonIsPaid] = useState(false)
 
-  const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
+  const activeCourts = useMemo(() => {
+    return courts
+      .filter((c) => c.isActive)
+      .sort((a, b) => {
+        const orderA = a.order ?? 9999
+        const orderB = b.order ?? 9999
+        if (orderA !== orderB) return orderA - orderB
+        return a.name.localeCompare(b.name)
+      })
+  }, [courts])
   const selectedDayOfWeek = selectedDate.getDay()
 
   const blocksByCourt = useMemo(() => {
@@ -469,8 +478,8 @@ export default function AgendaPage() {
       const dni = p.dni?.toLowerCase() || ''
 
       return fullName.includes(search) ||
-             reverseName.includes(search) ||
-             dni.includes(search)
+        reverseName.includes(search) ||
+        dni.includes(search)
     })
   }, [activePlayers, lessonPlayerSearch])
 
@@ -485,8 +494,8 @@ export default function AgendaPage() {
       const dni = p.dni?.toLowerCase() || ''
 
       return fullName.includes(search) ||
-             reverseName.includes(search) ||
-             dni.includes(search)
+        reverseName.includes(search) ||
+        dni.includes(search)
     })
   }, [activePlayers, eventPlayerSearch])
 

@@ -59,6 +59,7 @@ export interface Court {
   type: CourtType
   surface: CourtSurface
   isActive: boolean
+  order?: number // Campo para ordenar la agenda y selectores
   notes?: string
 }
 
