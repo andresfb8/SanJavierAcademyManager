@@ -239,10 +239,67 @@ function getCurrentUser() {
   }
 }
 
+function toISODate(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date)
+  if (isNaN(d.getTime())) return 'invalid-date'
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// =====================================================
+// RECOVERY CREDIT BALANCE COMPUTATION
+// =====================================================
+// Computes the current usable credits for a player using a FIFO algorithm
+// with 60-day expiration.
+const RECOVERY_CREDIT_EXPIRY_DAYS = 60
+
+function computePlayerRecoveryBalance(
+  playerId: string,
+  attendance: AttendanceRecord[],
+  now = new Date()
+): number {
+  const expiryMs = RECOVERY_CREDIT_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+
+  // Collect all earned credits (justificado, non-recovery) sorted oldest first
+  const earned: Date[] = []
+  // Collect all recovery uses sorted oldest first
+  const uses: Date[] = []
+
+  for (const record of attendance) {
+    const recordDate = record.date instanceof Date ? record.date : new Date(record.date)
+    for (const entry of record.records) {
+      if (entry.playerId !== playerId) continue
+      if (entry.status === 'justificado' && !entry.isRecovery) {
+        earned.push(recordDate)
+      }
+      if (entry.isRecovery) {
+        uses.push(recordDate)
+      }
+    }
+  }
+
+  earned.sort((a, b) => a.getTime() - b.getTime())
+  uses.sort((a, b) => a.getTime() - b.getTime())
+
+  // Consumed credits are those that match a use (FIFO)
+  // Since we only care about the balance, we just need to skip as many earned
+  // credits as there were total uses.
+  const totalUses = uses.length
+  const unconsumedEarned = earned.slice(totalUses)
+
+  // Count remaining unconsumed credits that have not yet expired
+  return unconsumedEarned.filter(
+    (earnedDate) => now.getTime() - earnedDate.getTime() < expiryMs
+  ).length
+}
+
 export const useDataStore = create<DataState>()(
   persist(
     (set, get) => ({
       club: defaultClub,
+
       courts: [],
       tariffs: [],
       players: [],
@@ -939,39 +996,101 @@ export const useDataStore = create<DataState>()(
       },
 
       addAttendanceRecord: (recordData) => {
-        const newRecord: AttendanceRecord = { ...recordData, id: generateId(), createdAt: new Date() }
-        const playerUpdates: Map<string, number> = new Map()
-        for (const entry of recordData.records) {
-          const currentDelta = playerUpdates.get(entry.playerId) || 0
-          if (entry.status === 'justificado') playerUpdates.set(entry.playerId, currentDelta + 1)
-          if (entry.isRecovery) playerUpdates.set(entry.playerId, currentDelta - 1)
-        }
-        set((state) => ({
-          attendance: [...state.attendance, newRecord],
-          players: playerUpdates.size > 0 ? state.players.map((p) => {
-            const delta = playerUpdates.get(p.id)
-            return delta ? { ...p, recoveryCredits: Math.max(0, p.recoveryCredits + delta), updatedAt: new Date() } : p
-          }) : state.players,
-        }))
         const clubId = getClubId()
+
+        // Guard: prevent duplicate attendance records for the same group/day
+        const recordDateStr = toISODate(recordData.date)
+        const duplicate = get().attendance.find((a) => {
+          const d = toISODate(a.date)
+          return a.groupId === recordData.groupId && d === recordDateStr
+        })
+        if (duplicate) {
+          console.warn('[addAttendanceRecord] Duplicate record detected. Update the existing record instead:', duplicate.id)
+          return
+        }
+
+        const newRecord: AttendanceRecord = { ...recordData, id: generateId(), createdAt: new Date() }
+
+        // Collect all players affected by this new record
+        const affectedPlayerIds = new Set(recordData.records.map((e) => e.playerId))
+
+        set((state) => {
+          const newAttendance = [...state.attendance, newRecord]
+          const players = state.players.map((p) => {
+            if (!affectedPlayerIds.has(p.id)) return p
+            const newCredits = computePlayerRecoveryBalance(p.id, newAttendance)
+            if (newCredits === (p.recoveryCredits ?? 0)) return p
+            return { ...p, recoveryCredits: newCredits, updatedAt: new Date() }
+          })
+          return { attendance: newAttendance, players }
+        })
+
         if (clubId) {
           syncDoc('attendance', newRecord.id, newRecord as any, clubId)
-          if (playerUpdates.size > 0) get().players.filter((p) => playerUpdates.has(p.id)).forEach((p) => syncDoc('players', p.id, p as any, clubId))
+          get().players
+            .filter((p) => affectedPlayerIds.has(p.id))
+            .forEach((p) => syncDoc('players', p.id, p as any, clubId))
         }
         const { userName } = getCurrentUser()
         get().addActivity({ type: 'attendance_recorded', description: `Asistencia: ${recordData.groupName}`, relatedEntityId: newRecord.id, userId: 'sys', userName })
       },
 
       updateAttendanceRecord: (id, data) => {
+        const oldRecord = get().attendance.find((a) => a.id === id)
+
         set((state) => ({ attendance: state.attendance.map((a) => a.id === id ? { ...a, ...data } : a) }))
+
         const clubId = getClubId()
         const updated = get().attendance.find((a) => a.id === id)
         if (clubId && updated) syncDoc('attendance', id, updated as any, clubId)
+
+        // Recompute credits for all players affected by old or new records
+        if (data.records && oldRecord) {
+          const affectedPlayerIds = new Set([
+            ...oldRecord.records.map((e) => e.playerId),
+            ...data.records.map((e) => e.playerId),
+          ])
+          const clubId2 = getClubId()
+          set((state) => ({
+            players: state.players.map((p) => {
+              if (!affectedPlayerIds.has(p.id)) return p
+              const newCredits = computePlayerRecoveryBalance(p.id, state.attendance)
+              if (newCredits === (p.recoveryCredits ?? 0)) return p
+              return { ...p, recoveryCredits: newCredits, updatedAt: new Date() }
+            }),
+          }))
+          if (clubId2) {
+            get().players
+              .filter((p) => affectedPlayerIds.has(p.id))
+              .forEach((p) => syncDoc('players', p.id, p as any, clubId2))
+          }
+        }
       },
 
       deleteAttendanceRecord: (id) => {
+        const record = get().attendance.find((a) => a.id === id)
+        const affectedPlayerIds = new Set(record?.records.map((e) => e.playerId) ?? [])
+
         set((state) => ({ attendance: state.attendance.filter((a) => a.id !== id) }))
         deleteFirestoreDoc('attendance', id)
+
+        // Recompute credits for affected players after deletion
+        if (affectedPlayerIds.size > 0) {
+          const clubId = getClubId()
+          set((state) => ({
+            players: state.players.map((p) => {
+              if (!affectedPlayerIds.has(p.id)) return p
+              const newCredits = computePlayerRecoveryBalance(p.id, state.attendance)
+              if (newCredits === (p.recoveryCredits ?? 0)) return p
+              return { ...p, recoveryCredits: newCredits, updatedAt: new Date() }
+            }),
+          }))
+          if (clubId) {
+            get().players
+              .filter((p) => affectedPlayerIds.has(p.id))
+              .forEach((p) => syncDoc('players', p.id, p as any, clubId))
+          }
+        }
       },
 
       // --- Invoices ---

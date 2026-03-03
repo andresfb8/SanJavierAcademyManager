@@ -65,6 +65,15 @@ function SuccessToast({ message }: { message: string }) {
   )
 }
 
+function toISODate(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 /** Seccion colapsable */
 function CollapsibleSection({
   title,
@@ -117,7 +126,6 @@ export default function ClassDetailPage() {
     markPaymentPaid,
     addAttendanceRecord,
     updateAttendanceRecord,
-    updatePlayer,
     addEventPayment,
   } = useDataStore()
 
@@ -179,11 +187,8 @@ export default function ClassDetailPage() {
     if (!groupId || !date) return null
     return (
       attendance.find((a) => {
-        const recordDate =
-          a.date instanceof Date
-            ? a.date.toISOString().split('T')[0]
-            : new Date(a.date).toISOString().split('T')[0]
-        return a.groupId === groupId && recordDate === date
+        const d = toISODate(a.date)
+        return a.groupId === groupId && d === date
       }) ?? null
     )
   }, [groupId, date, attendance])
@@ -336,19 +341,12 @@ export default function ClassDetailPage() {
       }
 
       if (existingAttendance) {
-        // updateAttendanceRecord no procesa creditos automaticamente,
-        // por lo que debemos decrementar manualmente
+        // updateAttendanceRecord now handles credit synchronization automatically
         updateAttendanceRecord(existingAttendance.id, {
           records: [...existingAttendance.records, entry],
         })
-        const player = players.find((p) => p.id === playerId)
-        if (player) {
-          updatePlayer(playerId, {
-            recoveryCredits: Math.max(0, player.recoveryCredits - 1),
-          })
-        }
       } else {
-        // addAttendanceRecord SI procesa creditos automaticamente (isRecovery -> -1)
+        // addAttendanceRecord also handles credits automatically (isRecovery -> -1)
         addAttendanceRecord({
           groupId: groupId!,
           groupName: group!.name,
@@ -365,10 +363,8 @@ export default function ClassDetailPage() {
       groupId,
       date,
       group,
-      players,
       updateAttendanceRecord,
       addAttendanceRecord,
-      updatePlayer,
       showToast,
     ]
   )

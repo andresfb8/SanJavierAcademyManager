@@ -35,9 +35,18 @@ import type { AttendanceEntry, AttendanceStatus } from '@/types'
 // AttendancePage - Registro de Asistencia
 // ==========================================
 
+function toISODate(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function AttendancePage() {
   const { user } = useAuthStore()
-  const { groups, players, enrollments, attendance, addAttendanceRecord, coaches } =
+  const { groups, players, enrollments, attendance, addAttendanceRecord, updateAttendanceRecord, coaches } =
     useDataStore()
 
   // --- Seleccion de grupo y fecha ---
@@ -140,11 +149,8 @@ export default function AttendancePage() {
     if (!selectedGroupId || !selectedDate) return null
     return (
       attendance.find((a) => {
-        const recordDate =
-          a.date instanceof Date
-            ? a.date.toISOString().split('T')[0]
-            : new Date(a.date).toISOString().split('T')[0]
-        return a.groupId === selectedGroupId && recordDate === selectedDate
+        const d = toISODate(a.date)
+        return a.groupId === selectedGroupId && d === selectedDate
       }) ?? null
     )
   }, [selectedGroupId, selectedDate, attendance])
@@ -213,6 +219,16 @@ export default function AttendancePage() {
 
   // Cargar hoja de asistencia
   const handleLoadSheet = () => {
+    if (!selectedGroupId) return
+
+    if (existingRecord) {
+      // Pre-load existing entries for editing
+      setEntries(existingRecord.records)
+      setEntriesInitialized(true)
+      setSaved(false)
+      return
+    }
+
     initializeEntries()
   }
 
@@ -223,6 +239,7 @@ export default function AttendancePage() {
         entry.playerId === playerId ? { ...entry, status } : entry
       )
     )
+    if (saved) setSaved(false)
   }
 
   // Cambiar nota de un jugador
@@ -232,6 +249,7 @@ export default function AttendancePage() {
         entry.playerId === playerId ? { ...entry, notes: notes || undefined } : entry
       )
     )
+    if (saved) setSaved(false)
   }
 
   // Anadir jugador de recuperacion
@@ -261,19 +279,25 @@ export default function AttendancePage() {
   // Quitar jugador de recuperacion de la lista
   const handleRemoveRecovery = (playerId: string) => {
     setEntries((prev) => prev.filter((e) => !(e.playerId === playerId && e.isRecovery)))
+    if (saved) setSaved(false)
   }
 
   // Guardar registro de asistencia
   const handleSave = () => {
     if (!selectedGroup || entries.length === 0) return
 
-    addAttendanceRecord({
-      groupId: selectedGroup.id,
-      groupName: selectedGroup.name,
-      date: new Date(selectedDate + 'T00:00:00'),
-      records: entries,
-      coachId: selectedGroup.coachId,
-    })
+    if (existingRecord) {
+      // Update the existing record instead of creating a duplicate
+      updateAttendanceRecord(existingRecord.id, { records: entries })
+    } else {
+      addAttendanceRecord({
+        groupId: selectedGroup.id,
+        groupName: selectedGroup.name,
+        date: new Date(selectedDate + 'T00:00:00'),
+        records: entries,
+        coachId: selectedGroup.coachId,
+      })
+    }
 
     setSaved(true)
   }
@@ -461,9 +485,7 @@ export default function AttendancePage() {
               <div className="mt-4 flex items-center gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
                 <AlertCircle className="h-5 w-5 flex-shrink-0" />
                 <span>
-                  Ya existe un registro de asistencia para este grupo en la
-                  fecha seleccionada ({formatDate(new Date(existingRecord.date))}
-                  ). Si guardas se creara un nuevo registro.
+                  Ya existe un registro para este grupo en esta fecha. Al cargar la hoja podrás editarlo y al guardar se actualizará el registro existente.
                 </span>
               </div>
             )}
@@ -553,8 +575,8 @@ export default function AttendancePage() {
                               handleStatusChange(entry.playerId, 'presente')
                             }
                             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'presente'
-                                ? 'bg-green-100 text-green-700 border-green-300 shadow-sm'
-                                : 'bg-background text-muted-foreground border-border hover:bg-green-50 hover:text-green-600'
+                              ? 'bg-green-100 text-green-700 border-green-300 shadow-sm'
+                              : 'bg-background text-muted-foreground border-border hover:bg-green-50 hover:text-green-600'
                               }`}
                           >
                             <CheckCircle className="h-3.5 w-3.5" />
@@ -566,8 +588,8 @@ export default function AttendancePage() {
                               handleStatusChange(entry.playerId, 'ausente')
                             }
                             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'ausente'
-                                ? 'bg-red-100 text-red-700 border-red-300 shadow-sm'
-                                : 'bg-background text-muted-foreground border-border hover:bg-red-50 hover:text-red-600'
+                              ? 'bg-red-100 text-red-700 border-red-300 shadow-sm'
+                              : 'bg-background text-muted-foreground border-border hover:bg-red-50 hover:text-red-600'
                               }`}
                           >
                             <XCircle className="h-3.5 w-3.5" />
@@ -579,8 +601,8 @@ export default function AttendancePage() {
                               handleStatusChange(entry.playerId, 'justificado')
                             }
                             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'justificado'
-                                ? 'bg-yellow-100 text-yellow-700 border-yellow-300 shadow-sm'
-                                : 'bg-background text-muted-foreground border-border hover:bg-yellow-50 hover:text-yellow-600'
+                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300 shadow-sm'
+                              : 'bg-background text-muted-foreground border-border hover:bg-yellow-50 hover:text-yellow-600'
                               }`}
                           >
                             <AlertCircle className="h-3.5 w-3.5" />

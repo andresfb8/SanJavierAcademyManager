@@ -21,6 +21,15 @@ import { AttendanceStatusButtons } from './AttendanceStatusButtons'
 import { useDataStore } from '@/stores/dataStore'
 import type { AttendanceEntry, AttendanceStatus } from '@/types'
 
+function toISODate(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 interface AttendanceQuickDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -66,10 +75,8 @@ export function AttendanceQuickDialog({
   // Buscar attendance record existente para esta fecha
   const existingAttendance = useMemo(() => {
     return attendance.find(a => {
-      const recordDate = a.date instanceof Date
-        ? a.date.toISOString().split('T')[0]
-        : new Date(a.date).toISOString().split('T')[0]
-      return a.groupId === groupId && recordDate === date
+      const d = toISODate(a.date)
+      return a.groupId === groupId && d === date
     })
   }, [attendance, groupId, date])
 
