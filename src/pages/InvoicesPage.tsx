@@ -33,6 +33,7 @@ import {
   ClipboardList,
   Receipt,
   RotateCcw,
+  MessageCircle,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { INVOICE_STATUSES, INVOICE_SERIES } from '@/constants'
@@ -40,6 +41,8 @@ import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDial
 import { InvoiceDetailDialog } from '@/components/invoices/InvoiceDetailDialog'
 import { generateInvoicePDF } from '@/lib/invoice-pdf'
 import { generateCorrectiveInvoice } from '@/lib/invoice-utils'
+import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
+import type { WhatsAppPayload } from '@/components/shared/WhatsAppNotificationDialog'
 import type { Invoice, InvoiceStatus, InvoiceSeries } from '@/types'
 
 export default function InvoicesPage() {
@@ -53,6 +56,9 @@ export default function InvoicesPage() {
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
+
+  // WhatsApp notification
+  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppPayload | null>(null)
 
   // Filtrar facturas
   const filteredInvoices = useMemo(() => {
@@ -353,6 +359,20 @@ export default function InvoicesPage() {
                                     Marcar pagada
                                   </DropdownMenuItem>
                                 )}
+                                {(canMarkPaid || canRevertPaid) && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      const player = players.find((p) => p.id === invoice.playerId)
+                                      const phone = player?.phone ?? player?.guardian?.phone ?? ''
+                                      const clubName = club?.name ?? 'Club de Padel San Javier'
+                                      const msg = `Hola ${invoice.playerName}, te informamos que la factura ${invoice.invoiceNumber} de ${clubName} por importe de ${formatCurrency(invoice.total)} está pendiente de pago. Puedes contactarnos para cualquier consulta. ¡Gracias!`
+                                      setWhatsAppPayload({ phone, message: msg, recipientName: invoice.playerName })
+                                    }}
+                                  >
+                                    <MessageCircle className="h-4 w-4 mr-2 text-green-600" />
+                                    Avisar por WhatsApp
+                                  </DropdownMenuItem>
+                                )}
                                 {canRevertPaid && (
                                   <DropdownMenuItem onClick={() => handleChangeStatus(invoice, 'issued')}>
                                     <RotateCcw className="h-4 w-4 mr-2" />
@@ -402,6 +422,13 @@ export default function InvoicesPage() {
         onOpenChange={setShowDetailDialog}
         invoice={selectedInvoice}
         onGenerateCorrective={handleGenerateCorrective}
+      />
+
+      {/* WhatsApp Notification Dialog */}
+      <WhatsAppNotificationDialog
+        open={!!whatsAppPayload}
+        onOpenChange={(open) => { if (!open) setWhatsAppPayload(null) }}
+        payload={whatsAppPayload}
       />
     </div>
   )

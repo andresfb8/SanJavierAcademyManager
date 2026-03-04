@@ -376,6 +376,20 @@ function drawLegalFooter(
     y += 4
   }
 
+  // Exención de IVA
+  if (invoice.totalVat === 0) {
+    doc.setFontSize(FONT_SIZE.small)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b)
+    const exemptionText = "Operación exenta de IVA en virtud de la Ley 37/1992, de 28 de diciembre, del Impuesto sobre el Valor Añadido, Art. 20.1.13º y 14º."
+    const exemptionLines = doc.splitTextToSize(exemptionText, CONTENT_WIDTH)
+    exemptionLines.forEach((line: string) => {
+      doc.text(line, MARGIN, y)
+      y += 4
+    })
+    y += 4
+  }
+
   // Pie legal
   doc.setFontSize(FONT_SIZE.small)
   doc.setTextColor(COLORS.muted.r, COLORS.muted.g, COLORS.muted.b)

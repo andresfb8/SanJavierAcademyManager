@@ -69,10 +69,15 @@ export type BillingFrequency = 'monthly' | 'installments'
 export interface Tariff {
   id: string
   name: string
+  /** For monthly: the monthly fee. For installments: auto-calculated sum of all installmentPrices. */
   price: number
   billingFrequency: BillingFrequency
-  installmentMonths?: number[]
-  installmentPrices?: Record<number, number>
+  /** First month of the installment plan (day is always 1). Installments only. */
+  installmentStartDate?: Date
+  /** Last month of the installment plan (day is always 1). Installments only. */
+  installmentEndDate?: Date
+  /** Prices keyed by 'YYYY-MM'. Only months with an entry will generate a payment. */
+  installmentPrices?: Record<string, number>
   description?: string
   vatRate: VatRate     // Tipo de IVA aplicable (0, 10, 21)
   isActive: boolean
@@ -194,7 +199,8 @@ export interface Group {
   defaultTariffId: string
   defaultTariffPrice: number
   billingFrequency: BillingFrequency
-  installmentMonths?: number[]
+  /** Prices keyed by 'YYYY-MM', copied from the tariff for fast payment generation. */
+  installmentPrices?: Record<string, number>
   startDate: Date
   endDate: Date
   isActive: boolean

@@ -46,6 +46,9 @@ import {
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
 import { STAFF_ROLES } from '@/constants'
 import type { Coach, StaffRole } from '@/types'
+import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { useAuthStore } from '@/stores/authStore'
 
 // ==========================================
 // CoachesPage - Gestion de personal (entrenadores y coordinadores)
@@ -102,6 +105,7 @@ export default function CoachesPage() {
   } = useDataStore()
 
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('active')
   const [roleFilter, setRoleFilter] = useState<string>('')
@@ -112,6 +116,8 @@ export default function CoachesPage() {
   const [form, setForm] = useState<CoachForm>({ ...emptyForm })
   const [showInviteSuccess, setShowInviteSuccess] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ fixed: number; message: string } | null>(null)
 
   const resetForm = () => setForm({ ...emptyForm })
 
@@ -260,16 +266,86 @@ export default function CoachesPage() {
 
   const activeCount = coaches.filter((c) => c.isActive).length
 
+  // Repair: match existing user accounts to coach records that are missing a userId
+  const handleSyncAccounts = async () => {
+    const clubId = user?.clubId
+    if (!clubId) return
+    setIsSyncing(true)
+    try {
+      // 1. Load all coach/coordinador users from Firestore
+      const usersSnap = await getDocs(
+        query(
+          collection(db, 'users'),
+          where('clubId', '==', clubId),
+          where('role', 'in', ['entrenador', 'coordinador'])
+        )
+      )
+      const staffUsers = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() as { email: string } }))
+
+      // 2. Load coaches missing a userId
+      const coachesSnap = await getDocs(
+        query(collection(db, 'coaches'), where('clubId', '==', clubId))
+      )
+
+      let fixed = 0
+      for (const coachDoc of coachesSnap.docs) {
+        const coachData = coachDoc.data()
+        if (coachData.userId) continue // Already linked
+
+        const matchingUser = staffUsers.find(
+          (u) => u.email?.toLowerCase() === coachData.email?.toLowerCase()
+        )
+        if (matchingUser) {
+          await updateDoc(doc(db, 'coaches', coachDoc.id), { userId: matchingUser.id })
+          updateCoach(coachDoc.id, { userId: matchingUser.id })
+          fixed++
+        }
+      }
+
+      setSyncResult({
+        fixed,
+        message: fixed > 0
+          ? `Se vincularon ${fixed} entrenador${fixed > 1 ? 'es' : ''} correctamente.`
+          : 'Todos los entrenadores ya están vinculados correctamente.',
+      })
+    } catch (err) {
+      console.error('[SyncAccounts] Failed:', err)
+      setSyncResult({ fixed: 0, message: 'Error al sincronizar. Inténtalo de nuevo.' })
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   return (
     <div>
       <Header
         title="Personal"
         subtitle={`${activeCount} activos · ${coaches.length} total`}
         actions={
-          <Button size="sm" onClick={openCreateDialog}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nuevo miembro
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSyncAccounts}
+              disabled={isSyncing}
+            >
+              {isSyncing ? (
+                <>
+                  <span className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Sincronizando...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  Reparar vinculaciones
+                </>
+              )}
+            </Button>
+            <Button size="sm" onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nuevo miembro
+            </Button>
+          </div>
         }
       />
 
@@ -797,6 +873,21 @@ export default function CoachesPage() {
           </div>
           <DialogFooter>
             <Button onClick={() => setShowInviteSuccess(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Sync result dialog */}
+      <Dialog open={!!syncResult} onOpenChange={() => setSyncResult(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Sincronización completada
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{syncResult?.message}</p>
+          <DialogFooter>
+            <Button onClick={() => setSyncResult(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

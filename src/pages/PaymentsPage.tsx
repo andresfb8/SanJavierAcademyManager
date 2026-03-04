@@ -32,6 +32,7 @@ import {
   Receipt,
   RotateCcw,
   Trash2,
+  MessageCircle,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
@@ -40,6 +41,8 @@ import type { SepaClubConfig } from '@/lib/sepa-utils'
 import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
 import type { PaymentMethod, PaymentCategory } from '@/types'
 import type { NormalizedPayment } from '@/lib/payment-utils'
+import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
+import type { WhatsAppPayload } from '@/components/shared/WhatsAppNotificationDialog'
 import {
   useReactTable,
   getCoreRowModel,
@@ -121,6 +124,9 @@ export default function PaymentsPage() {
   // Invoice generation
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set())
   const [showGenerateInvoiceDialog, setShowGenerateInvoiceDialog] = useState(false)
+
+  // WhatsApp notification
+  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppPayload | null>(null)
 
   // Generate available years (current year +/- 2)
   const availableYears = useMemo(() => {
@@ -443,8 +449,25 @@ export default function PaymentsPage() {
         cell: ({ row }) => {
           const payment = row.original
           if (payment.status === 'pendiente') {
+            const player = players.find((p) => p.id === payment.playerId)
+            const monthLabel = MONTHS.find((m) => m.value === payment.billingMonth)?.label ?? payment.billingMonth
+
             return (
               <div className="flex items-center gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  title="Avisar por WhatsApp"
+                  onClick={() => {
+                    const phone = player?.phone ?? player?.guardian?.phone ?? ''
+                    const clubName = club?.name ?? 'Club de Padel San Javier'
+                    const msg = `Hola ${payment.playerName}, te recordamos desde ${clubName} que tienes un recibo pendiente de ${monthLabel} por importe de ${formatCurrency(payment.amount)}. Por favor, realiza el pago cuando puedas. ¡Gracias!`
+                    setWhatsAppPayload({ phone, message: msg, recipientName: payment.playerName })
+                  }}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1180,6 +1203,13 @@ export default function PaymentsPage() {
           if (!open) setSelectedPaymentIds(new Set()) // Limpiar selección al cerrar
         }}
         preSelectedPaymentIds={Array.from(selectedPaymentIds)}
+      />
+
+      {/* WhatsApp Notification Dialog */}
+      <WhatsAppNotificationDialog
+        open={!!whatsAppPayload}
+        onOpenChange={(open) => { if (!open) setWhatsAppPayload(null) }}
+        payload={whatsAppPayload}
       />
     </div>
   )

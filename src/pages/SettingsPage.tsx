@@ -9,7 +9,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { Checkbox } from '@/components/ui/checkbox'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
 import { COURT_TYPES, COURT_SURFACES, BILLING_FREQUENCIES, MONTHS } from '@/constants'
@@ -69,7 +68,11 @@ export default function SettingsPage() {
   const [editingTariffId, setEditingTariffId] = useState<string | null>(null)
   const [tariffForm, setTariffForm] = useState({
     name: '', price: 0, billingFrequency: 'monthly' as BillingFrequency,
-    installmentMonths: [] as number[], installmentPrices: {} as Record<number, number>,
+    installmentStartYear: new Date().getFullYear(),
+    installmentStartMonth: 9,
+    installmentEndYear: new Date().getFullYear() + 1,
+    installmentEndMonth: 6,
+    installmentPrices: {} as Record<string, number>,
     description: '', vatRate: 0 as VatRate, isActive: true,
   })
   const [deleteTariffId, setDeleteTariffId] = useState<string | null>(null)
@@ -109,23 +112,26 @@ export default function SettingsPage() {
   }
 
   const handleSaveTariff = () => {
-    // Build installmentPrices only with months that have a custom price
-    const cleanPrices: Record<number, number> = {}
+    let finalPrice = tariffForm.price
+    let installmentStartDate: Date | undefined
+    let installmentEndDate: Date | undefined
+    let installmentPrices: Record<string, number> | undefined
+
     if (tariffForm.billingFrequency === 'installments') {
-      for (const month of tariffForm.installmentMonths) {
-        if (tariffForm.installmentPrices[month] && tariffForm.installmentPrices[month] !== tariffForm.price) {
-          cleanPrices[month] = tariffForm.installmentPrices[month]
-        }
-      }
+      installmentStartDate = new Date(tariffForm.installmentStartYear, tariffForm.installmentStartMonth - 1, 1)
+      installmentEndDate = new Date(tariffForm.installmentEndYear, tariffForm.installmentEndMonth - 1, 1)
+      installmentPrices = { ...tariffForm.installmentPrices }
+      // Auto-calculate total price as the sum of all installment amounts
+      finalPrice = Object.values(installmentPrices).reduce((sum, v) => sum + (v || 0), 0)
     }
-    const hasCustomPrices = Object.keys(cleanPrices).length > 0
 
     const data = {
       name: tariffForm.name,
-      price: tariffForm.price,
+      price: finalPrice,
       billingFrequency: tariffForm.billingFrequency,
-      installmentMonths: tariffForm.billingFrequency === 'installments' ? tariffForm.installmentMonths : undefined,
-      installmentPrices: hasCustomPrices ? cleanPrices : undefined,
+      installmentStartDate: tariffForm.billingFrequency === 'installments' ? installmentStartDate : undefined,
+      installmentEndDate: tariffForm.billingFrequency === 'installments' ? installmentEndDate : undefined,
+      installmentPrices: tariffForm.billingFrequency === 'installments' ? installmentPrices : undefined,
       description: tariffForm.description || undefined,
       vatRate: tariffForm.vatRate,
       isActive: tariffForm.isActive,
@@ -144,7 +150,10 @@ export default function SettingsPage() {
       name: '',
       price: 0,
       billingFrequency: 'monthly',
-      installmentMonths: [],
+      installmentStartYear: new Date().getFullYear(),
+      installmentStartMonth: 9,
+      installmentEndYear: new Date().getFullYear() + 1,
+      installmentEndMonth: 6,
       installmentPrices: {},
       description: '',
       vatRate: (club?.defaultVatRateTariffs ?? 0) as VatRate,
@@ -156,10 +165,15 @@ export default function SettingsPage() {
   const openEditTariff = (id: string) => {
     const tariff = tariffs.find((t) => t.id === id)
     if (!tariff) return
+    const startDate = tariff.installmentStartDate ? new Date(tariff.installmentStartDate) : new Date()
+    const endDate = tariff.installmentEndDate ? new Date(tariff.installmentEndDate) : new Date()
     setTariffForm({
       name: tariff.name, price: tariff.price,
       billingFrequency: tariff.billingFrequency,
-      installmentMonths: tariff.installmentMonths || [],
+      installmentStartYear: startDate.getFullYear(),
+      installmentStartMonth: startDate.getMonth() + 1,
+      installmentEndYear: endDate.getFullYear(),
+      installmentEndMonth: endDate.getMonth() + 1,
       installmentPrices: tariff.installmentPrices ? { ...tariff.installmentPrices } : {},
       description: tariff.description || '', vatRate: tariff.vatRate, isActive: tariff.isActive,
     })
@@ -450,51 +464,66 @@ export default function SettingsPage() {
                 </Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tariffs.map((tariff) => (
-                  <Card key={tariff.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-5 w-5 text-primary" />
-                          <div>
-                            <p className="font-semibold">{tariff.name}</p>
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tariff.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                              {tariff.isActive ? 'Activa' : 'Inactiva'}
-                            </span>
+                {tariffs.map((tariff) => {
+                  const installmentCount = tariff.installmentPrices
+                    ? Object.keys(tariff.installmentPrices).length
+                    : 0
+                  return (
+                    <Card key={tariff.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-primary" />
+                            <div>
+                              <p className="font-semibold">{tariff.name}</p>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tariff.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {tariff.isActive ? 'Activa' : 'Inactiva'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTariff(tariff.id)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTariffId(tariff.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTariff(tariff.id)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTariffId(tariff.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div className="space-y-1">
+                          {tariff.billingFrequency === 'monthly' ? (
+                            <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
+                          ) : (
+                            <>
+                              <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground"> total plan</span></p>
+                              <p className="text-sm text-muted-foreground">Dividido en {installmentCount} plazos</p>
+                            </>
+                          )}
+                          {tariff.billingFrequency === 'monthly'
+                            ? <p className="text-sm text-muted-foreground">Facturación mensual</p>
+                            : tariff.installmentPrices && (
+                              <p className="text-xs text-muted-foreground">
+                                {Object.entries(tariff.installmentPrices)
+                                  .sort(([a], [b]) => a.localeCompare(b))
+                                  .map(([key, amount]) => {
+                                    const [y, m] = key.split('-')
+                                    const monthLabel = MONTHS.find(mo => mo.value === Number(m))?.label.slice(0, 3) ?? m
+                                    return `${monthLabel} ${y}: ${formatCurrency(amount)}`
+                                  })
+                                  .join(' · ')}
+                              </p>
+                            )
+                          }
+                          {tariff.description && <p className="text-xs text-muted-foreground">{tariff.description}</p>}
                         </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">{tariff.billingFrequency === 'monthly' ? '/mes' : ' base'}</span></p>
-                        <p className="text-sm text-muted-foreground">
-                          {tariff.billingFrequency === 'monthly' ? 'Facturación mensual' : `Plazos: ${tariff.installmentMonths?.map((m) => MONTHS.find((mo) => mo.value === m)?.label.slice(0, 3)).join(', ')}`}
-                        </p>
-                        {tariff.billingFrequency === 'installments' && tariff.installmentPrices && Object.keys(tariff.installmentPrices).length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {tariff.installmentMonths
-                              ?.filter((m) => tariff.installmentPrices?.[m])
-                              .map((m) => `${MONTHS.find((mo) => mo.value === m)?.label.slice(0, 3)}: ${formatCurrency(tariff.installmentPrices![m])}`)
-                              .join(', ')}
-                          </p>
-                        )}
-                        {tariff.description && <p className="text-xs text-muted-foreground">{tariff.description}</p>}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
           </TabsContent>
         </Tabs>
-
       </div>
 
       {/* Court Dialog */}
@@ -535,7 +564,7 @@ export default function SettingsPage() {
 
       {/* Tariff Dialog */}
       <Dialog open={showTariffDialog} onOpenChange={setShowTariffDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingTariffId ? 'Editar tarifa' : 'Nueva tarifa'}</DialogTitle>
           </DialogHeader>
@@ -545,66 +574,104 @@ export default function SettingsPage() {
               <Input value={tariffForm.name} onChange={(e) => setTariffForm({ ...tariffForm, name: e.target.value })} placeholder="Ej: 2 días/semana Adultos" />
             </div>
             <div className="space-y-2">
-              <Label>Precio mensual *</Label>
-              <Input type="number" min={0} step={0.01} value={tariffForm.price} onChange={(e) => setTariffForm({ ...tariffForm, price: Number(e.target.value) })} />
-            </div>
-            <div className="space-y-2">
               <Label>Frecuencia de facturación</Label>
-              <Select options={BILLING_FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))} value={tariffForm.billingFrequency} onChange={(e) => setTariffForm({ ...tariffForm, billingFrequency: e.target.value as BillingFrequency })} />
+              <Select
+                options={BILLING_FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))}
+                value={tariffForm.billingFrequency}
+                onChange={(e) => setTariffForm({ ...tariffForm, billingFrequency: e.target.value as BillingFrequency })}
+              />
             </div>
-            {tariffForm.billingFrequency === 'installments' && (
-              <>
-                <div className="space-y-2">
-                  <Label>Meses de facturación</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {MONTHS.map((m) => (
-                      <label key={m.value} className="flex items-center gap-1.5 text-sm">
-                        <Checkbox
-                          checked={tariffForm.installmentMonths.includes(m.value)}
-                          onCheckedChange={(checked) => {
-                            const newMonths = checked
-                              ? [...tariffForm.installmentMonths, m.value]
-                              : tariffForm.installmentMonths.filter((v) => v !== m.value)
-                            const newPrices = { ...tariffForm.installmentPrices }
-                            if (!checked) delete newPrices[m.value]
-                            setTariffForm({
-                              ...tariffForm,
-                              installmentMonths: newMonths,
-                              installmentPrices: newPrices,
-                            })
-                          }}
-                        />
-                        {m.label.slice(0, 3)}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {tariffForm.installmentMonths.length > 0 && (
+
+            {tariffForm.billingFrequency === 'monthly' && (
+              <div className="space-y-2">
+                <Label>Precio mensual *</Label>
+                <Input
+                  type="number" min={0} step={0.01}
+                  value={tariffForm.price}
+                  onChange={(e) => setTariffForm({ ...tariffForm, price: Number(e.target.value) })}
+                />
+              </div>
+            )}
+
+            {tariffForm.billingFrequency === 'installments' && (() => {
+              // Build list of YYYY-MM keys for all months in the selected range
+              const months: string[] = []
+              const startY = tariffForm.installmentStartYear
+              const startM = tariffForm.installmentStartMonth
+              const endY = tariffForm.installmentEndYear
+              const endM = tariffForm.installmentEndMonth
+              let y = startY, m = startM
+              while (y < endY || (y === endY && m <= endM)) {
+                months.push(`${y}-${String(m).padStart(2, '0')}`)
+                m++
+                if (m > 12) { m = 1; y++ }
+                if (months.length > 36) break // safety cap
+              }
+              const total = months.reduce((s, key) => s + (tariffForm.installmentPrices[key] || 0), 0)
+              const monthOptions = MONTHS.map(mo => ({ value: String(mo.value), label: mo.label }))
+              const yearOptions = [2024, 2025, 2026, 2027, 2028].map(y => ({ value: String(y), label: String(y) }))
+
+              return (
+                <>
+                  {/* Date range */}
                   <div className="space-y-2">
-                    <Label>Precio por plazo</Label>
-                    <p className="text-xs text-muted-foreground">Deja en blanco para usar el precio base ({formatCurrency(tariffForm.price)})</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {tariffForm.installmentMonths
-                        .slice()
-                        .sort((a, b) => a - b)
-                        .map((month) => {
-                          const monthLabel = MONTHS.find((m) => m.value === month)?.label ?? `Mes ${month}`
+                    <Label>Rango del plan</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Inicio</p>
+                        <div className="flex gap-1">
+                          <Select
+                            options={monthOptions}
+                            value={String(tariffForm.installmentStartMonth)}
+                            onChange={(e) => setTariffForm({ ...tariffForm, installmentStartMonth: Number(e.target.value) })}
+                          />
+                          <Select
+                            options={yearOptions}
+                            value={String(tariffForm.installmentStartYear)}
+                            onChange={(e) => setTariffForm({ ...tariffForm, installmentStartYear: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Fin</p>
+                        <div className="flex gap-1">
+                          <Select
+                            options={monthOptions}
+                            value={String(tariffForm.installmentEndMonth)}
+                            onChange={(e) => setTariffForm({ ...tariffForm, installmentEndMonth: Number(e.target.value) })}
+                          />
+                          <Select
+                            options={yearOptions}
+                            value={String(tariffForm.installmentEndYear)}
+                            onChange={(e) => setTariffForm({ ...tariffForm, installmentEndYear: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-month prices */}
+                  {months.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Importe por plazo</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {months.map((key) => {
+                          const [y, mm] = key.split('-')
+                          const monthLabel = MONTHS.find(mo => mo.value === Number(mm))?.label ?? mm
                           return (
-                            <div key={month} className="flex items-center gap-2">
-                              <span className="text-sm w-12 shrink-0">{monthLabel.slice(0, 3)}</span>
+                            <div key={key} className="flex items-center gap-2">
+                              <span className="text-sm shrink-0 w-20">{monthLabel.slice(0, 3)} {y}</span>
                               <Input
-                                type="number"
-                                min={0}
-                                step={0.01}
-                                placeholder={String(tariffForm.price)}
-                                value={tariffForm.installmentPrices[month] ?? ''}
+                                type="number" min={0} step={0.01}
+                                placeholder="0.00"
+                                value={tariffForm.installmentPrices[key] ?? ''}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   const newPrices = { ...tariffForm.installmentPrices }
                                   if (val === '' || val === '0') {
-                                    delete newPrices[month]
+                                    delete newPrices[key]
                                   } else {
-                                    newPrices[month] = Number(val)
+                                    newPrices[key] = Number(val)
                                   }
                                   setTariffForm({ ...tariffForm, installmentPrices: newPrices })
                                 }}
@@ -613,11 +680,18 @@ export default function SettingsPage() {
                             </div>
                           )
                         })}
+                      </div>
+                      {/* Auto-calculated total */}
+                      <div className="mt-3 flex items-center justify-between rounded-md bg-muted/60 px-3 py-2">
+                        <span className="text-sm font-medium">Total plan (autocalculado)</span>
+                        <span className="text-lg font-bold text-primary">{formatCurrency(total)}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
+                  )}
+                </>
+              )
+            })()}
+
             <div className="space-y-2">
               <Label>Descripción</Label>
               <Input value={tariffForm.description} onChange={(e) => setTariffForm({ ...tariffForm, description: e.target.value })} />
@@ -637,7 +711,15 @@ export default function SettingsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTariffDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSaveTariff} disabled={!tariffForm.name || tariffForm.price <= 0}>{editingTariffId ? 'Guardar' : 'Crear'}</Button>
+            <Button
+              onClick={handleSaveTariff}
+              disabled={
+                !tariffForm.name ||
+                (tariffForm.billingFrequency === 'monthly' && tariffForm.price <= 0)
+              }
+            >
+              {editingTariffId ? 'Guardar' : 'Crear'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

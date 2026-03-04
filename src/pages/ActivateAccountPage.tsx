@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useDataStore } from '@/stores/dataStore'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ const roleLabels: Record<string, string> = {
 
 export default function ActivateAccountPage() {
   const { token } = useParams<{ token: string }>()
-  const { updateInvitation } = useDataStore()
+  const { updateInvitation, updateCoach } = useDataStore()
 
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -134,42 +134,63 @@ export default function ActivateAccountPage() {
       }
       await setDoc(doc(db, 'users', credential.user.uid), userDoc)
 
-      // 4. Also add/update coach in the local store if role is entrenador or coordinador
-      const { addCoach, updateCoach, coaches } = useDataStore.getState()
+      // 4. Link coach record in Firestore directly (store is empty/unauthenticated here)
       if (invitation.role === 'entrenador' || invitation.role === 'coordinador') {
         const nameParts = name.trim().split(' ')
         const firstName = nameParts[0] || ''
         const lastName = nameParts.slice(1).join(' ') || ''
+        const clubId = invitation.clubId
 
-        // Try to find the coach by ID first (new robust method), then by email (fallback)
-        let existingCoach = null
+        let coachDocId: string | null = null
+
+        // Priority 1: use coachId stored in the invitation
         if (invitation.coachId) {
-          existingCoach = coaches.find((c) => c.id === invitation.coachId)
-        }
-        if (!existingCoach) {
-          existingCoach = coaches.find((c) => c.email.toLowerCase() === invitation.email.toLowerCase())
+          const coachSnap = await getDoc(doc(db, 'coaches', invitation.coachId))
+          if (coachSnap.exists()) {
+            coachDocId = invitation.coachId
+          }
         }
 
-        if (existingCoach) {
-          // Verify and link existing coach
-          updateCoach(existingCoach.id, {
+        // Priority 2: find by email in Firestore
+        if (!coachDocId) {
+          const coachQuery = query(
+            collection(db, 'coaches'),
+            where('clubId', '==', clubId),
+            where('email', '==', invitation.email.toLowerCase()),
+            limit(1)
+          )
+          const coachSnap = await getDocs(coachQuery)
+          if (!coachSnap.empty) {
+            coachDocId = coachSnap.docs[0].id
+          }
+        }
+
+        if (coachDocId) {
+          // Update the coach's userId directly in Firestore
+          await updateDoc(doc(db, 'coaches', coachDocId), {
             userId: credential.user.uid,
             firstName,
             lastName,
           })
+          // Also update local store as best-effort (may be a no-op if store is empty)
+          updateCoach(coachDocId, { userId: credential.user.uid, firstName, lastName })
         } else {
-          // Fallback: Create new coach if it really doesn't exist
-          addCoach({
+          console.warn('[ActivateAccount] No coach record found to link. Creating one.')
+          // Fallback: create new coach doc directly in Firestore
+          const newCoachId = credential.user.uid // use uid as a stable id
+          await setDoc(doc(db, 'coaches', newCoachId), {
+            id: newCoachId,
             firstName,
             lastName,
             dni: '',
-            email: invitation.email,
+            email: invitation.email.toLowerCase(),
             phone: '',
             hireDate: new Date(),
             isActive: true,
-            specialization: invitation.role === 'coordinador' ? 'Coordinador' : undefined,
-            userId: credential.user.uid,
             staffRole: invitation.role,
+            userId: credential.user.uid,
+            clubId,
+            createdAt: new Date(),
           })
         }
       }

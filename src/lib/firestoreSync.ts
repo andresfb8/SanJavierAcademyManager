@@ -363,13 +363,13 @@ export async function generateMonthlyReceiptsAtomic(
     const groupsSnap = await getDocs(
       query(collection(db, 'groups'), where('clubId', '==', clubId))
     )
-    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; installmentMonths?: number[] }>()
+    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; installmentPrices?: Record<string, number> }>()
     for (const groupDoc of groupsSnap.docs) {
       const g = groupDoc.data()
       groupsMap.set(groupDoc.id, {
         defaultTariffPrice: g.defaultTariffPrice ?? 0,
         billingFrequency: g.billingFrequency ?? 'monthly',
-        installmentMonths: g.installmentMonths,
+        installmentPrices: g.installmentPrices,
       })
     }
 
@@ -393,9 +393,9 @@ export async function generateMonthlyReceiptsAtomic(
 
       // Respetar frecuencia de facturación: si es por plazos, solo generar en los meses configurados
       if (group.billingFrequency === 'installments') {
-        const installmentMonths = group.installmentMonths ?? []
-        if (!installmentMonths.includes(month)) {
-          continue // Mes no es un plazo de este grupo
+        const billingKey = `${year}-${String(month).padStart(2, '0')}`
+        if (!group.installmentPrices || !group.installmentPrices[billingKey]) {
+          continue // Este mes-año no es un plazo de este grupo
         }
       }
 
@@ -416,8 +416,16 @@ export async function generateMonthlyReceiptsAtomic(
         continue // Ya existe
       }
 
-      // Calcular importe: customPrice tiene prioridad; si no, usar el precio por defecto del grupo
-      const amount = enrollment.customPrice ?? group.defaultTariffPrice
+      // Calcular importe: customPrice tiene prioridad
+      // Para plazos: usar el precio específico del mes (YYYY-MM), para mensual: usar precio base del grupo
+      let baseAmount: number
+      if (group.billingFrequency === 'installments' && group.installmentPrices) {
+        const billingKey = `${year}-${String(month).padStart(2, '0')}`
+        baseAmount = group.installmentPrices[billingKey] ?? group.defaultTariffPrice
+      } else {
+        baseAmount = group.defaultTariffPrice
+      }
+      const amount = enrollment.customPrice ?? baseAmount
 
       // Crear pago
       const paymentId = generateId()

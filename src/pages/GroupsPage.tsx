@@ -239,7 +239,7 @@ export default function GroupsPage() {
     const courtName = selectedCourt ? selectedCourt.name : ''
     const tariffPrice = selectedTariff ? selectedTariff.price : 0
     const billingFrequency = selectedTariff?.billingFrequency ?? 'monthly'
-    const installmentMonths = selectedTariff?.installmentMonths
+    const installmentPrices = selectedTariff?.installmentPrices
 
     if (editingGroup) {
       updateGroup(editingGroup.id, {
@@ -254,7 +254,7 @@ export default function GroupsPage() {
         defaultTariffId: form.defaultTariffId,
         defaultTariffPrice: tariffPrice,
         billingFrequency,
-        installmentMonths,
+        installmentPrices,
         startDate: new Date(form.startDate),
         endDate: new Date(form.endDate),
       })
@@ -271,7 +271,7 @@ export default function GroupsPage() {
         defaultTariffId: form.defaultTariffId,
         defaultTariffPrice: tariffPrice,
         billingFrequency,
-        installmentMonths,
+        installmentPrices,
         startDate: new Date(form.startDate),
         endDate: new Date(form.endDate),
         isActive: true,
@@ -670,7 +670,9 @@ export default function GroupsPage() {
                     { value: '', label: 'Seleccionar tarifa' },
                     ...activeTariffs.map((t) => ({
                       value: t.id,
-                      label: `${t.name} - ${t.price.toFixed(2)} € (${t.billingFrequency === 'installments' ? 'Por plazos' : 'Mensual'})`,
+                      label: t.billingFrequency === 'monthly'
+                        ? `${t.name} - ${t.price.toFixed(2)} €/mes`
+                        : `${t.name} - ${t.price.toFixed(2)} € total (${Object.keys(t.installmentPrices ?? {}).length} plazos)`,
                     })),
                   ]}
                   value={form.defaultTariffId}
