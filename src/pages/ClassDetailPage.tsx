@@ -16,8 +16,9 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Select } from '@/components/ui/select'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore, hasPermission } from '@/stores/authStore'
 import { PLAYER_LEVELS, DAYS_OF_WEEK, PAYMENT_METHODS } from '@/constants'
-import type { AttendanceEntry, PaymentMethod } from '@/types'
+import type { AttendanceEntry, PaymentMethod, UserRole } from '@/types'
 import {
   ArrowLeft,
   CalendarDays,
@@ -116,6 +117,8 @@ function CollapsibleSection({
 export default function ClassDetailPage() {
   const { groupId, date } = useParams<{ groupId: string; date: string }>()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const canEditPayments = hasPermission(user?.role as UserRole, 'payments', 'write')
 
   const {
     groups,
@@ -835,7 +838,7 @@ export default function ClassDetailPage() {
                               <span className="text-[10px] text-muted-foreground capitalize">{payment.paymentMethod}</span>
                             )}
                           </div>
-                        ) : (
+                        ) : canEditPayments ? (
                           <div className="flex items-center gap-1 shrink-0">
                             <Select
                               className="w-32 h-8 text-xs"
@@ -847,6 +850,8 @@ export default function ClassDetailPage() {
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Pagado
                             </Button>
                           </div>
+                        ) : (
+                          <Badge variant="outline" className="text-yellow-600 border-yellow-300">Pendiente</Badge>
                         )}
                       </div>
                     )

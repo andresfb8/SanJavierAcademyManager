@@ -509,14 +509,13 @@ export async function createInvoiceAtomic(
   newPayments?: Payment[]
 ): Promise<void> {
   return runTransaction(db, async (transaction) => {
-    // Paso 1: Verificar que ningún pago tenga invoiceId
-    // Necesitamos determinar la colección correcta para cada pago
+    // Paso 1: Verificar que ningún pago tenga invoiceId (TODAS LAS LECTURAS PRIMERO)
     const paymentCollections = ['payments', 'eventPayments', 'privateLessonPayments']
+    const paymentRefsToUpdate = [] // Guardamos las referencias para actualizar luego
 
     for (const paymentId of paymentIds) {
       let found = false
 
-      // Buscar el pago en las 3 colecciones posibles
       for (const collectionName of paymentCollections) {
         const paymentRef = doc(db, collectionName, paymentId)
         const paymentSnap = await transaction.get(paymentRef)
@@ -525,12 +524,12 @@ export async function createInvoiceAtomic(
           found = true
           const paymentData = paymentSnap.data()
 
-          // Verificar que no tenga invoiceId
           if (paymentData.invoiceId) {
             throw new Error(`El pago ${paymentId} ya está facturado`)
           }
 
-          break // Encontrado, no seguir buscando
+          paymentRefsToUpdate.push(paymentRef)
+          break
         }
       }
 
@@ -538,6 +537,8 @@ export async function createInvoiceAtomic(
         throw new Error(`Pago ${paymentId} no encontrado`)
       }
     }
+
+    // A PARTIR DE AQUÍ SOLO ESCRITURAS
 
     // Paso 1.5: Insertar nuevos pagos manuales vinculados a esta factura
     if (newPayments && newPayments.length > 0) {
@@ -551,18 +552,9 @@ export async function createInvoiceAtomic(
     const invoiceRef = doc(db, 'invoices', invoice.id)
     transaction.set(invoiceRef, toFirestore({ ...invoice, clubId }))
 
-    // Paso 3: Actualizar todos los pagos con invoiceId
-    for (const paymentId of paymentIds) {
-      // Buscar y actualizar en la colección correcta
-      for (const collectionName of paymentCollections) {
-        const paymentRef = doc(db, collectionName, paymentId)
-        const paymentSnap = await transaction.get(paymentRef)
-
-        if (paymentSnap.exists()) {
-          transaction.update(paymentRef, { invoiceId: invoice.id })
-          break
-        }
-      }
+    // Paso 3: Actualizar todos los pagos encontrados previamente
+    for (const paymentRef of paymentRefsToUpdate) {
+      transaction.update(paymentRef, { invoiceId: invoice.id })
     }
 
     // Paso 4: Incrementar contador del club

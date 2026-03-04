@@ -5,14 +5,28 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { LogIn } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { LogIn, KeyRound } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const { login, isLoading } = useAuthStore()
+  const [resetEmail, setResetEmail] = useState('')
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
+
+  const { login, resetPassword, isLoading } = useAuthStore()
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,6 +43,35 @@ export default function LoginPage() {
       } else {
         setError('Error al iniciar sesión. Inténtalo de nuevo.')
       }
+    }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetEmail) return
+    setIsResetting(true)
+    try {
+      await resetPassword(resetEmail)
+      setIsResetDialogOpen(false)
+      toast({
+        type: 'success',
+        message: 'Revisa tu bandeja de entrada para restablecer tu contraseña.',
+      })
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code
+      if (code === 'auth/user-not-found') {
+        toast({
+          type: 'error',
+          message: 'No hay ningún usuario registrado con ese email.',
+        })
+      } else {
+        toast({
+          type: 'error',
+          message: 'No se pudo enviar el correo de restablecimiento.',
+        })
+      }
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -56,7 +99,17 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Contraseña</Label>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="px-0 py-0 h-auto text-xs"
+                  onClick={() => setIsResetDialogOpen(true)}
+                >
+                  ¿Has olvidado tu contraseña?
+                </Button>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -85,6 +138,56 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
-    </div>
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleResetPassword}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-primary" />
+                Recuperar contraseña
+              </DialogTitle>
+              <DialogDescription>
+                Introduce tu correo electrónico y te enviaremos un enlace para crear una contraseña nueva.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="resetEmail">Email</Label>
+                <Input
+                  id="resetEmail"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsResetDialogOpen(false)}
+                disabled={isResetting}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isResetting || !resetEmail}>
+                {isResetting ? (
+                  <>
+                    <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar enlace'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div >
   )
 }

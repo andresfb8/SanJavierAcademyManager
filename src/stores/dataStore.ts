@@ -124,7 +124,7 @@ export interface DataState {
   cancelPlayer: (id: string) => void
 
   // --- Coaches CRUD ---
-  addCoach: (coach: Omit<Coach, 'id' | 'createdAt'>) => void
+  addCoach: (coach: Omit<Coach, 'id' | 'createdAt'>) => string
   updateCoach: (id: string, data: Partial<Coach>) => void
   deleteCoach: (id: string) => void
 
@@ -502,6 +502,7 @@ export const useDataStore = create<DataState>()(
           userId,
           userName,
         })
+        return newCoach.id
       },
 
       updateCoach: (id, data) => {
@@ -1463,7 +1464,20 @@ export const useDataStore = create<DataState>()(
       },
 
       updateCoachSalaryConfig: (coachId, config) => {
-        set((state) => ({ coachSalaryConfigs: state.coachSalaryConfigs.map((c) => c.coachId === coachId ? { ...c, ...config } : c) }))
+        const existing = get().coachSalaryConfigs.find((c) => c.coachId === coachId)
+        if (existing) {
+          set((state) => ({ coachSalaryConfigs: state.coachSalaryConfigs.map((c) => c.coachId === coachId ? { ...c, ...config } : c) }))
+        } else {
+          const newConfig = {
+            coachId,
+            ratePerGroup: config.ratePerGroup || 0,
+            ratePerPrivateLesson: config.ratePerPrivateLesson || 0,
+            bonuses: config.bonuses || 0,
+            notes: config.notes,
+          }
+          set((state) => ({ coachSalaryConfigs: [...state.coachSalaryConfigs, newConfig] }))
+        }
+
         const clubId = getClubId()
         const updated = get().coachSalaryConfigs.find((c) => c.coachId === coachId)
         if (clubId && updated) syncDoc('coachSalaryConfigs', coachId, updated as any, clubId)

@@ -190,7 +190,15 @@ export default function CoachesPage() {
       })
       setEditingCoach(null)
     } else {
-      addCoach(coachData)
+      const newCoachId = addCoach(coachData)
+      // Save initial salary config
+      updateCoachSalaryConfig(newCoachId, {
+        coachId: newCoachId,
+        ratePerGroup: parseFloat(form.ratePerGroup) || 0,
+        ratePerPrivateLesson: parseFloat(form.ratePerPrivateLesson) || 0,
+        bonuses: parseFloat(form.bonuses) || 0,
+        notes: form.salaryNotes || undefined,
+      })
     }
 
     setShowCreateDialog(false)

@@ -3,6 +3,10 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
   type User as FirebaseUser,
 } from 'firebase/auth'
 import {
@@ -24,6 +28,8 @@ interface AuthState {
   isDataLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  resetPassword: (email: string) => Promise<void>
+  changePassword: (currentPass: string, newPass: string) => Promise<void>
   setUser: (user: AppUser | null) => void
   initAuth: () => () => void
 }
@@ -179,6 +185,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     // 3. Cerrar sesión en Firebase Auth (dispara la rama null de onAuthStateChanged)
     signOut(auth)
     set({ user: null, isAuthenticated: false, isDataLoading: false })
+  },
+
+  resetPassword: async (email: string) => {
+    await sendPasswordResetEmail(auth, email)
+  },
+
+  changePassword: async (currentPass: string, newPass: string) => {
+    const user = auth.currentUser
+    if (!user || (!user.email && !user.uid)) throw new Error('Usuario no autenticado en Firebase')
+    // We need to re-authenticate the user before changing the password
+    const credential = EmailAuthProvider.credential(user.email || '', currentPass)
+    await reauthenticateWithCredential(user, credential)
+    await updatePassword(user, newPass)
   },
 
   setUser: (user) => {

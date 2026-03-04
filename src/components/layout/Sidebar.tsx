@@ -21,11 +21,13 @@ import {
   History,
   Receipt,
   Map,
+  KeyRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
 import { useState } from 'react'
 import type { UserRole } from '@/types'
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog'
 
 interface NavItem {
   name: string
@@ -87,6 +89,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
 
   const toggleGroup = (label: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
@@ -216,13 +219,22 @@ export function Sidebar() {
               {user?.role || 'director'}
             </p>
           </div>
-          <button
-            onClick={logout}
-            className="rounded-lg p-2 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150 shrink-0"
-            title="Cerrar sesión"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setIsPasswordDialogOpen(true)}
+              className="rounded-lg p-2 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150"
+              title="Cambiar contraseña"
+            >
+              <KeyRound className="h-4 w-4" />
+            </button>
+            <button
+              onClick={logout}
+              className="rounded-lg p-2 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150"
+              title="Cerrar sesión"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -261,6 +273,12 @@ export function Sidebar() {
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-72 lg:flex-col bg-sidebar-background">
         {sidebarContent}
       </aside>
+
+      {/* Change Password Dialog */}
+      <ChangePasswordDialog
+        open={isPasswordDialogOpen}
+        onOpenChange={setIsPasswordDialogOpen}
+      />
     </>
   )
 }

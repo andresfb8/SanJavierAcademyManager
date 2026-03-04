@@ -2,6 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, CreditCard, ClipboardCheck, CalendarDays, X } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore, hasPermission } from '@/stores/authStore'
+import type { UserRole } from '@/types'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
 
@@ -105,7 +107,13 @@ export function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
-  const { payments, groups, attendance, events } = useDataStore()
+  const { user } = useAuthStore()
+  const { payments, groups, attendance, events, coaches } = useDataStore()
+
+  const currentCoachId = useMemo(() => {
+    if (user?.role !== 'entrenador' || !user?.id) return null
+    return coaches.find(c => c.userId === user.id)?.id ?? null
+  }, [user?.role, user?.id, coaches])
 
   // Cerrar al hacer clic fuera
   useEffect(() => {
@@ -133,27 +141,37 @@ export function NotificationBell() {
     const todayDow = now.getDay()
 
     // --- 1. Pagos pendientes del mes actual ---
-    const pendingPayments = payments.filter(
-      (p) =>
-        p.status === 'pendiente' &&
-        p.billingMonth === currentMonth &&
-        p.billingYear === currentYear
-    )
-    if (pendingPayments.length > 0) {
-      const totalAmount = pendingPayments.reduce((sum, p) => sum + p.amount, 0)
-      items.push({
-        id: 'pending-payments',
-        type: 'payment',
-        title: `${pendingPayments.length} pago${pendingPayments.length !== 1 ? 's' : ''} pendiente${pendingPayments.length !== 1 ? 's' : ''}`,
-        description: `${formatCurrency(totalAmount)} por cobrar este mes`,
-        icon: CreditCard,
-        color: 'text-amber-600 bg-amber-100',
-        href: '/pagos',
-      })
+    const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
+    if (canReadPayments) {
+      const pendingPayments = payments.filter(
+        (p) =>
+          p.status === 'pendiente' &&
+          p.billingMonth === currentMonth &&
+          p.billingYear === currentYear
+      )
+      if (pendingPayments.length > 0) {
+        const totalAmount = pendingPayments.reduce((sum, p) => sum + p.amount, 0)
+        items.push({
+          id: 'pending-payments',
+          type: 'payment',
+          title: `${pendingPayments.length} pago${pendingPayments.length !== 1 ? 's' : ''} pendiente${pendingPayments.length !== 1 ? 's' : ''}`,
+          description: `${formatCurrency(totalAmount)} por cobrar este mes`,
+          icon: CreditCard,
+          color: 'text-amber-600 bg-amber-100',
+          href: '/pagos',
+        })
+      }
     }
 
     // --- 2. Grupos sin asistencia registrada hoy ---
-    const activeGroups = groups.filter((g) => g.isActive)
+    const activeGroups = groups.filter((g) => {
+      if (!g.isActive) return false
+      // Si es entrenador, solo ver sus grupos
+      if (user?.role === 'entrenador' && currentCoachId) {
+        return g.coachId === currentCoachId
+      }
+      return true
+    })
     const groupsWithClassToday = activeGroups.filter((g) => {
       // Filtrar sesiones de hoy
       const todaySchedules = g.schedule.filter((s) => s.dayOfWeek === todayDow)
@@ -214,7 +232,7 @@ export function NotificationBell() {
     }
 
     return items
-  }, [payments, groups, attendance, events])
+  }, [payments, groups, attendance, events, user?.role, currentCoachId, coaches])
 
   const visibleNotifications = notifications.filter((n) => !dismissed.has(n.id))
   const count = visibleNotifications.length
