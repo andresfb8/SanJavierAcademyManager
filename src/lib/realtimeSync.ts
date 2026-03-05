@@ -5,7 +5,7 @@
 // Cuando cualquier dispositivo escribe un cambio, todos los listeners activos
 // reciben la actualización automáticamente y actualizan el store de Zustand.
 
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from './firebase'
 import { fromFirestore } from './firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
@@ -30,15 +30,18 @@ const COLLECTIONS = [
   { name: 'coachSalaryConfigs', stateKey: 'coachSalaryConfigs' },
   { name: 'invoices', stateKey: 'invoices' },
   { name: 'users', stateKey: 'users' },
+  { name: 'settings_holidays', stateKey: 'holidays' },
 ] as const
 
 /**
- * Suscribe a las 19 colecciones del club en tiempo real.
+ * Suscribe a las colecciones del club y al documento de configuración en tiempo real.
  *
  * - Cada snapshot actualiza la colección correspondiente en el store de Zustand.
+ * - El documento `clubs/{clubId}` también se escucha para sincronizar la
+ *   configuración del club (IBAN, CIF, email, etc.) entre dispositivos.
  * - `onFirstLoad` se llama UNA SOLA VEZ cuando todos los listeners han recibido
  *   su primer snapshot (sirve para ocultar el spinner de carga inicial).
- * - Retorna una función que cancela los 17 listeners (llamar al hacer logout).
+ * - Retorna una función que cancela todos los listeners (llamar al hacer logout).
  */
 export function subscribeToAllData(
   clubId: string,
@@ -46,12 +49,14 @@ export function subscribeToAllData(
 ): () => void {
   const unsubscribers: Array<() => void> = []
   const loaded = new Set<string>()
+  // +1 for the club document listener
+  const TOTAL = COLLECTIONS.length + 1
   let firstLoadCalled = false
 
   const markLoaded = (name: string) => {
     if (!loaded.has(name)) {
       loaded.add(name)
-      if (!firstLoadCalled && loaded.size === COLLECTIONS.length) {
+      if (!firstLoadCalled && loaded.size === TOTAL) {
         firstLoadCalled = true
         onFirstLoad()
       }
@@ -96,6 +101,25 @@ export function subscribeToAllData(
 
     unsubscribers.push(unsub)
   }
+
+  // Club document listener (single doc, not a collection query)
+  // This ensures settings like IBAN, CIF, email are synced across all devices.
+  const clubUnsub = onSnapshot(
+    doc(db, 'clubs', clubId),
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = fromFirestore(snapshot.data() as Record<string, unknown>)
+        useDataStore.setState({ club: { ...data, id: clubId } as any })
+      }
+      markLoaded('clubs')
+    },
+    (err) => {
+      console.error('[realtimeSync] FAILED listening to "clubs":', err)
+      markLoaded('clubs')
+    }
+  )
+
+  unsubscribers.push(clubUnsub)
 
   return () => unsubscribers.forEach((u) => u())
 }

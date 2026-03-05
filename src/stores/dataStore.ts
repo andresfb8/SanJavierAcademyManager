@@ -34,6 +34,7 @@ import type {
   ActivityType,
   Invoice,
   AppUser,
+  Holiday,
 } from '@/types'
 import {
   demoCourts,
@@ -103,6 +104,7 @@ export interface DataState {
   coachSalaryConfigs: CoachSalaryConfig[]
   invoices: Invoice[]
   users: AppUser[]
+  holidays: Holiday[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -207,6 +209,10 @@ export interface DataState {
 
   // --- Coach Salary ---
   updateCoachSalaryConfig: (coachId: string, config: Partial<CoachSalaryConfig>) => void
+
+  // --- Holidays ---
+  addHolidayStore: (date: Date, description?: string) => Promise<void>
+  deleteHolidayStore: (id: string) => Promise<void>
 
 }
 
@@ -319,6 +325,7 @@ export const useDataStore = create<DataState>()(
       coachSalaryConfigs: [],
       invoices: [],
       users: [],
+      holidays: [],
       updateClub: (data) => {
         set((state) => ({
           club: state.club ? { ...state.club, ...data } : null,
@@ -1503,6 +1510,33 @@ export const useDataStore = create<DataState>()(
           const list = coll === 'payments' ? payments : coll === 'eventPayments' ? eventPayments : privateLessonPayments
           for (const item of list) await deleteFirestoreDoc(coll, item.id)
         }
+      },
+
+      // --- Holidays Actions ---
+      addHolidayStore: async (date: Date, description?: string) => {
+        const clubId = getClubId()
+        if (!clubId) return
+
+        const { addHoliday: addHolidayService } = await import('@/lib/settings-service')
+        try {
+          const id = await addHolidayService(clubId, date, description)
+          // local update will be handled by realtimeSync
+          console.info('[DataStore] addHoliday: Firestore OK', id)
+        } catch (error) {
+          console.error('[DataStore] addHoliday: FAILED', error)
+          throw error
+        }
+      },
+
+      deleteHolidayStore: async (id: string) => {
+        const { deleteHoliday: deleteHolidayService } = await import('@/lib/settings-service')
+        try {
+          await deleteHolidayService(id)
+          // local update will be handled by realtimeSync
+        } catch (error) {
+          console.error('[DataStore] deleteHoliday: FAILED', error)
+          throw error
+        }
       }
     }),
     {
@@ -1558,6 +1592,7 @@ export const useDataStore = create<DataState>()(
           dueDate: i.dueDate instanceof Date ? i.dueDate.toISOString() : i.dueDate,
         })),
         users: state.users,
+        holidays: state.holidays,
       } as unknown as DataState)
     }
   )

@@ -669,8 +669,7 @@ export default function AgendaPage() {
                                 </div>
                               )
                             }
-
-                            {
+                            if (startingBlock.type === 'private') {
                               const lessonPmts = privateLessonPayments.filter((p) => p.lessonId === startingBlock.id)
                               const paidCount = lessonPmts.filter((p) => p.status === 'pagado').length
                               const totalCount = lessonPmts.length

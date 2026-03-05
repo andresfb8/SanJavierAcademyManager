@@ -4,8 +4,6 @@ import { MethodologyParameter, TrainingTemplate, GroupPlanAssignment, GroupSessi
 import { getParameters } from '@/lib/methodology-service';
 import { getActiveAssignmentForGroup, getTrainingTemplateById, unassignTemplateFromGroup } from '@/lib/planning-service';
 import { getSessionRecordsForAssignment, markSessionCompleted, skipSession, rescheduleSession, calculateSessionDates } from '@/lib/session-record-service';
-import { getHolidays } from '@/lib/settings-service';
-import { Holiday } from '@/types';
 import { Calendar, FileText, Youtube, Video, Info, CheckCircle2, AlertCircle, Clock, Trash2, CalendarHeart } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -21,7 +19,7 @@ interface GroupTrainingPlanTabProps {
 }
 
 export const GroupTrainingPlanTab: React.FC<GroupTrainingPlanTabProps> = ({ groupId }) => {
-    const { groups } = useDataStore();
+    const { groups, holidays } = useDataStore();
     const { user } = useAuthStore();
     const group = groups.find(g => g.id === groupId);
 
@@ -30,7 +28,6 @@ export const GroupTrainingPlanTab: React.FC<GroupTrainingPlanTabProps> = ({ grou
     const [assignment, setAssignment] = useState<GroupPlanAssignment | null>(null);
     const [template, setTemplate] = useState<TrainingTemplate | null>(null);
     const [records, setRecords] = useState<GroupSessionRecord[]>([]);
-    const [holidays, setHolidays] = useState<Holiday[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [feedbackDialog, setFeedbackDialog] = useState<{ isOpen: boolean, sessionName?: string, week: number, day: number, mappedDate?: Date }>({ isOpen: false, week: 0, day: 0 });
@@ -53,9 +50,6 @@ export const GroupTrainingPlanTab: React.FC<GroupTrainingPlanTabProps> = ({ grou
 
                 const recs = await getSessionRecordsForAssignment(activeAssignment.id);
                 setRecords(recs);
-
-                const hols = await getHolidays();
-                setHolidays(hols);
             }
         } catch (err) {
             console.error("Failed to load training plan data:", err);

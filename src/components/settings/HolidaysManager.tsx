@@ -4,14 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Trash2, CalendarHeart } from 'lucide-react';
-import { getHolidays, addHoliday, deleteHoliday } from '@/lib/settings-service';
-import { Holiday } from '@/types';
+import { useDataStore } from '@/stores/dataStore';
 import { formatDate } from '@/lib/utils';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
 
 export const HolidaysManager: React.FC = () => {
-    const [holidays, setHolidays] = useState<Holiday[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { holidays, addHolidayStore, deleteHolidayStore } = useDataStore();
     const [adding, setAdding] = useState(false);
 
     // Form state
@@ -21,34 +19,16 @@ export const HolidaysManager: React.FC = () => {
     // Delete dialog
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    const loadHolidays = async () => {
-        try {
-            setLoading(true);
-            const data = await getHolidays();
-            setHolidays(data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadHolidays();
-    }, []);
-
     const handleAdd = async () => {
         if (!dateInput) return;
         try {
             setAdding(true);
             const dateObj = new Date(dateInput);
-            // Ensure timezone consistency by setting hours to noon or using UTC if preferred
             dateObj.setHours(12, 0, 0, 0);
-            await addHoliday(dateObj, descriptionInput);
+            await addHolidayStore(dateObj, descriptionInput);
 
             setDateInput('');
             setDescriptionInput('');
-            await loadHolidays();
         } catch (error) {
             console.error(error);
         } finally {
@@ -59,8 +39,7 @@ export const HolidaysManager: React.FC = () => {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            await deleteHoliday(deleteId);
-            await loadHolidays();
+            await deleteHolidayStore(deleteId);
         } catch (error) {
             console.error(error);
         } finally {
@@ -107,9 +86,7 @@ export const HolidaysManager: React.FC = () => {
                 {/* Lista de Festivos */}
                 <div className="space-y-4">
                     <h3 className="text-sm font-medium">Festivos Programados</h3>
-                    {loading ? (
-                        <p className="text-sm text-gray-500 animate-pulse">Cargando...</p>
-                    ) : holidays.length === 0 ? (
+                    {holidays.length === 0 ? (
                         <p className="text-sm text-gray-500 italic">No hay días festivos configurados.</p>
                     ) : (
                         <ul className="divide-y divide-gray-100 border rounded-md">

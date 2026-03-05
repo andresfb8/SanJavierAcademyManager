@@ -3,7 +3,6 @@ import {
     collection,
     doc,
     getDocs,
-    getDoc,
     addDoc,
     deleteDoc,
     query,
@@ -16,10 +15,11 @@ import { Holiday } from '../types'
 
 const HOLIDAYS_COLLECTION = 'settings_holidays'
 
-export const getHolidays = async (): Promise<Holiday[]> => {
+export const getHolidays = async (clubId: string): Promise<Holiday[]> => {
     try {
         const q = query(
             collection(db, HOLIDAYS_COLLECTION),
+            where('clubId', '==', clubId),
             orderBy('date', 'asc')
         )
         const querySnapshot = await getDocs(q)
@@ -38,12 +38,9 @@ export const getHolidays = async (): Promise<Holiday[]> => {
     }
 }
 
-export const checkIsHoliday = async (targetDate: Date): Promise<boolean> => {
+export const checkIsHoliday = async (clubId: string, targetDate: Date): Promise<boolean> => {
     try {
-        // We compare just the YYYY-MM-DD parts by creating boundaries,
-        // or for simplicity since we control the save, we can fetch all and check locally if the array isn't massive.
-        // For performance if the list is small, we'll fetch all. 
-        const holidays = await getHolidays()
+        const holidays = await getHolidays(clubId)
         const targetStr = targetDate.toISOString().split('T')[0]
 
         return holidays.some(h => {
@@ -56,9 +53,10 @@ export const checkIsHoliday = async (targetDate: Date): Promise<boolean> => {
     }
 }
 
-export const addHoliday = async (date: Date, description?: string): Promise<string> => {
+export const addHoliday = async (clubId: string, date: Date, description?: string): Promise<string> => {
     try {
         const docRef = await addDoc(collection(db, HOLIDAYS_COLLECTION), {
+            clubId,
             date: Timestamp.fromDate(date),
             description: description || '',
             createdAt: serverTimestamp(),
