@@ -36,13 +36,19 @@ type AnyPayment = Payment | EventPayment | PrivateLessonPayment
 
 const EMPTY_PAYMENTS_ARRAY: string[] = []
 
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery } from '@/hooks/useQueries'
+
 export function GenerateInvoiceDialog({
   open,
   onOpenChange,
   preSelectedPaymentIds = EMPTY_PAYMENTS_ARRAY,
   preSelectedPlayerId,
 }: GenerateInvoiceDialogProps) {
-  const { players, payments, eventPayments, privateLessonPayments, club, addInvoice } = useDataStore()
+  const { players, club, addInvoice } = useDataStore()
+  const currentYear = new Date().getFullYear();
+  const { data: payments = [] } = usePaymentsQuery(currentYear)
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
+  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(preSelectedPlayerId || '')
   const [selectedSeries, setSelectedSeries] = useState<InvoiceSeries>('FC')

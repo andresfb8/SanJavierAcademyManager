@@ -32,6 +32,8 @@ import {
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { PAYMENT_METHODS, PLAYER_LEVELS } from '@/constants'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // ==========================================
 // PrivateLessonDetailPage — Detalle de clase particular
@@ -42,17 +44,9 @@ export default function PrivateLessonDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const {
-    privateLessons,
-    privateLessonPayments,
-    coaches,
-    courts,
-    players,
-    updatePrivateLesson,
-    deletePrivateLesson,
-    markPrivateLessonPaymentPaid,
-    addPrivateLessonPayment,
-  } = useDataStore()
+  const { privateLessons, coaches, courts, players, updatePrivateLesson, deletePrivateLesson, markPrivateLessonPaymentPaid, addPrivateLessonPayment } = useDataStore()
+  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
+
 
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
 
@@ -462,7 +456,14 @@ export default function PrivateLessonDetailPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={payment?.status ?? 'pendiente'} />
+                          <div className="flex flex-col gap-1 items-start">
+                            <StatusBadge status={payment?.status ?? 'pendiente'} />
+                            {isPaid && payment?.paymentMethod && (
+                              <Badge variant="outline" className="text-[10px] font-normal px-1 py-0 h-4 uppercase text-muted-foreground">
+                                {PAYMENT_METHODS.find((m) => m.value === payment.paymentMethod)?.label || payment.paymentMethod}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm font-medium">

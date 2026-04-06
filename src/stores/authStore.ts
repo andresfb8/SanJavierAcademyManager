@@ -48,18 +48,10 @@ function clearDataStore(): void {
     coaches: [],
     groups: [],
     enrollments: [],
-    payments: [],
-    attendance: [],
-    activities: [],
     privateLessons: [],
     invitations: [],
     events: [],
-    eventPayments: [],
-    privateLessonPayments: [],
-    evaluations: [],
-    matchReports: [],
     coachSalaryConfigs: [],
-    invoices: [],
   })
 }
 

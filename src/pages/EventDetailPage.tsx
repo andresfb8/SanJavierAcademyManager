@@ -32,6 +32,8 @@ import {
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import type { EventType } from '@/types'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // ==========================================
 // EventDetailPage - Detalle de evento
@@ -41,18 +43,9 @@ import type { EventType } from '@/types'
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const {
-    events,
-    eventPayments,
-    players,
-    coaches,
-    courts,
-    updateEvent,
-    deleteEvent,
-    addEventPayment,
-    updateEventPayment,
-    markEventPaymentPaid,
-  } = useDataStore()
+  const { events, players, coaches, courts, updateEvent, deleteEvent, addEventPayment, updateEventPayment, markEventPaymentPaid } = useDataStore()
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
+
 
   const { user } = useAuthStore()
   const isEntrenador = user?.role === 'entrenador'
@@ -524,7 +517,14 @@ export default function EventDetailPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={payment?.status ?? 'pendiente'} />
+                          <div className="flex flex-col gap-1 items-start">
+                            <StatusBadge status={payment?.status ?? 'pendiente'} />
+                            {isPaid && payment?.paymentMethod && (
+                              <Badge variant="outline" className="text-[10px] font-normal px-1 py-0 h-4 uppercase text-muted-foreground">
+                                {PAYMENT_METHODS.find((m) => m.value === payment.paymentMethod)?.label || payment.paymentMethod}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm font-medium">

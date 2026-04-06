@@ -30,6 +30,8 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { EVENT_TYPES, PLAYER_LEVELS } from '@/constants'
 import type { EventType, PrivateLesson } from '@/types'
 import { checkEventConflicts, formatConflictMessage } from '@/lib/schedule-conflicts'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 type TabValue = 'all' | 'events' | 'private'
 
@@ -51,22 +53,9 @@ interface UnifiedItem {
 export default function EventsActivitiesPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const {
-    club,
-    events,
-    privateLessons,
-    groups,
-    coaches,
-    courts,
-    players,
-    eventPayments,
-    addPrivateLesson,
-    addPrivateLessonPayment,
-    deletePrivateLesson,
-    addEvent,
-    addEventPayment,
-    deleteEvent,
-  } = useDataStore()
+  const { club, events, privateLessons, groups, coaches, courts, players, addPrivateLesson, addPrivateLessonPayment, deletePrivateLesson, addEvent, addEventPayment, deleteEvent } = useDataStore()
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
+
 
   const isEntrenador = user?.role === 'entrenador'
   const currentCoach = useMemo(

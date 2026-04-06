@@ -17,18 +17,10 @@ const COLLECTIONS = [
   { name: 'coaches', stateKey: 'coaches' },
   { name: 'groups', stateKey: 'groups' },
   { name: 'enrollments', stateKey: 'enrollments' },
-  { name: 'payments', stateKey: 'payments' },
-  { name: 'attendance', stateKey: 'attendance' },
-  { name: 'activities', stateKey: 'activities' },
   { name: 'privateLessons', stateKey: 'privateLessons' },
   { name: 'invitations', stateKey: 'invitations' },
   { name: 'events', stateKey: 'events' },
-  { name: 'eventPayments', stateKey: 'eventPayments' },
-  { name: 'privateLessonPayments', stateKey: 'privateLessonPayments' },
-  { name: 'evaluations', stateKey: 'evaluations' },
-  { name: 'matchReports', stateKey: 'matchReports' },
   { name: 'coachSalaryConfigs', stateKey: 'coachSalaryConfigs' },
-  { name: 'invoices', stateKey: 'invoices' },
   { name: 'users', stateKey: 'users' },
   { name: 'settings_holidays', stateKey: 'holidays' },
 ] as const
@@ -43,6 +35,33 @@ const COLLECTIONS = [
  *   su primer snapshot (sirve para ocultar el spinner de carga inicial).
  * - Retorna una función que cancela todos los listeners (llamar al hacer logout).
  */
+// Normaliza un documento CoachSalaryConfig migrando los campos viejos (pre-refactor)
+// a los nuevos campos granulares. Esto garantiza compatibilidad hacia atrás cuando
+// Firestore todavía tiene documentos con la estructura antigua.
+export function normalizeSalaryConfig(doc: Record<string, unknown>): Record<string, unknown> {
+  const d = { ...doc }
+  // Si faltan los campos nuevos pero existen los viejos, migrarlos
+  if (d.ratePerGroupAdults === undefined) {
+    d.ratePerGroupAdults = (d.ratePerGroup as number | undefined) ?? 0
+  }
+  if (d.ratePerGroupMinors === undefined) {
+    d.ratePerGroupMinors = 0
+  }
+  if (d.privateLessonPaymentType === undefined) {
+    d.privateLessonPaymentType = 'fixed'
+  }
+  if (d.privateLessonRate === undefined) {
+    d.privateLessonRate = (d.ratePerPrivateLesson as number | undefined) ?? 0
+  }
+  if (d.eventPaymentType === undefined) {
+    d.eventPaymentType = 'percentage'
+  }
+  if (d.eventRate === undefined) {
+    d.eventRate = 0
+  }
+  return d
+}
+
 export function subscribeToAllData(
   clubId: string,
   onFirstLoad: () => void
@@ -69,10 +88,11 @@ export function subscribeToAllData(
     const unsub = onSnapshot(
       q,
       (snapshot) => {
-        const docs = snapshot.docs.map((d) => ({
-          ...fromFirestore(d.data() as Record<string, unknown>),
-          id: d.id,
-        }))
+        const docs = snapshot.docs.map((d) => {
+          const data = fromFirestore(d.data() as Record<string, unknown>)
+          const normalized = name === 'coachSalaryConfigs' ? normalizeSalaryConfig(data) : data
+          return { ...normalized, id: d.id }
+        })
 
         // Safety guard: never replace existing local data with an empty Firestore
         // result. This prevents data loss when a Firestore write failed silently

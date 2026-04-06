@@ -1,3 +1,4 @@
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 import { useMemo, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
@@ -20,6 +21,7 @@ import { useAuthStore, hasPermission } from '@/stores/authStore'
 import { PLAYER_LEVELS, DAYS_OF_WEEK, PAYMENT_METHODS } from '@/constants'
 import type { AttendanceEntry, PaymentMethod, UserRole } from '@/types'
 import {
+
   ArrowLeft,
   CalendarDays,
   MapPin,
@@ -120,17 +122,12 @@ export default function ClassDetailPage() {
   const { user } = useAuthStore()
   const canEditPayments = hasPermission(user?.role as UserRole, 'payments', 'write')
 
-  const {
-    groups,
-    players,
-    enrollments,
-    attendance,
-    payments,
-    markPaymentPaid,
-    addAttendanceRecord,
-    updateAttendanceRecord,
-    addEventPayment,
-  } = useDataStore()
+  const { groups, players, enrollments, markPaymentPaid, addAttendanceRecord, updateAttendanceRecord, addEventPayment } = useDataStore()
+  const { data: attendance = [] } = useAttendanceQuery()
+  const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
+  const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
+  payments.push(..._prevPayments)
+
 
   // ===================
   // STATE - Pagos

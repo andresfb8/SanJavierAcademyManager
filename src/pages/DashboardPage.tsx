@@ -13,6 +13,7 @@ import { useAuthStore, hasPermission } from '@/stores/authStore'
 import type { UserRole } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery } from '@/hooks/useQueries'
 import {
   Users,
   DollarSign,
@@ -80,7 +81,20 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
   const isCoach = user?.role === 'entrenador'
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
-  const { players, payments, groups, activities, enrollments, attendance, eventPayments, privateLessonPayments, coaches, privateLessons, cleanupOrphanedPayments } = useDataStore()
+  const { players, groups, enrollments, coaches, privateLessons } = useDataStore()
+
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
+
+  const { data: paymentsCurrentYear = [] } = usePaymentsQuery(currentYear)
+  const { data: paymentsPrevYear = [] } = usePaymentsQuery(currentYear - 1)
+  const payments = [...paymentsCurrentYear, ...paymentsPrevYear]
+  
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
+  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
+  const { data: attendance = [] } = useAttendanceQuery()
+  const { data: activities = [] } = useActivitiesQuery(100)
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -96,9 +110,7 @@ export default function DashboardPage() {
     localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(kpiConfig))
   }, [kpiConfig])
 
-  useEffect(() => {
-    cleanupOrphanedPayments()
-  }, [cleanupOrphanedPayments])
+  
 
   const [chartCollapsed, setChartCollapsed] = useState<Record<string, boolean>>({})
   const toggleChartCollapsed = (key: string) => {
@@ -190,10 +202,6 @@ export default function DashboardPage() {
   // ── KPI calculations ──────────────────────────────────────────────
   const activePlayers = players.filter((p) => p.status === 'activo').length
   const activeGroups = groups.filter((g) => g.isActive).length
-
-  const now = new Date()
-  const currentMonth = now.getMonth() + 1
-  const currentYear = now.getFullYear()
   const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
 

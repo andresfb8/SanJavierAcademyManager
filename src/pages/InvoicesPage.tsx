@@ -44,9 +44,13 @@ import { generateCorrectiveInvoice } from '@/lib/invoice-utils'
 import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
 import type { WhatsAppPayload } from '@/components/shared/WhatsAppNotificationDialog'
 import type { Invoice, InvoiceStatus, InvoiceSeries } from '@/types'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 export default function InvoicesPage() {
-  const { invoices, players, club, updateInvoice, unlinkPaymentsFromInvoice, deleteInvoice, addInvoice } = useDataStore()
+  const { players, club, updateInvoice, unlinkPaymentsFromInvoice, deleteInvoice, addInvoice } = useDataStore()
+  const { data: invoices = [] } = useInvoicesQuery()
+
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')

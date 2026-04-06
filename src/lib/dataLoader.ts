@@ -8,6 +8,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import { loadCollection, syncDoc, fromFirestore } from './firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
+import { normalizeSalaryConfig } from './realtimeSync'
 import type {
   Club,
   Court,
@@ -37,16 +38,9 @@ export async function loadAllData(clubId: string): Promise<void> {
     coaches,
     groups,
     enrollments,
-    payments,
-    attendance,
-    activities,
     privateLessons,
     invitations,
     events,
-    eventPayments,
-    privateLessonPayments,
-    evaluations,
-    matchReports,
     coachSalaryConfigs,
   ] = await Promise.all([
     loadCollection<Court>('courts', clubId),
@@ -55,16 +49,9 @@ export async function loadAllData(clubId: string): Promise<void> {
     loadCollection<Coach>('coaches', clubId),
     loadCollection<Group>('groups', clubId),
     loadCollection<Enrollment>('enrollments', clubId),
-    loadCollection<Payment>('payments', clubId),
-    loadCollection<AttendanceRecord>('attendance', clubId),
-    loadCollection<Activity>('activities', clubId),
     loadCollection<PrivateLesson>('privateLessons', clubId),
     loadCollection<Invitation>('invitations', clubId),
     loadCollection<AcademyEvent>('events', clubId),
-    loadCollection<EventPayment>('eventPayments', clubId),
-    loadCollection<PrivateLessonPayment>('privateLessonPayments', clubId),
-    loadCollection<Evaluation>('evaluations', clubId),
-    loadCollection<MatchReport>('matchReports', clubId),
     loadCollection<CoachSalaryConfig>('coachSalaryConfigs', clubId),
   ])
 
@@ -75,17 +62,10 @@ export async function loadAllData(clubId: string): Promise<void> {
     coaches,
     groups,
     enrollments,
-    payments,
-    attendance,
-    activities,
     privateLessons,
     invitations,
     events,
-    eventPayments,
-    privateLessonPayments,
-    evaluations,
-    matchReports,
-    coachSalaryConfigs,
+    coachSalaryConfigs: coachSalaryConfigs.map(c => normalizeSalaryConfig(c as unknown as Record<string, unknown>) as unknown as typeof c),
   })
 
   // Cargar el documento del club desde Firestore (contiene NIF, razón social, etc.)
@@ -128,16 +108,9 @@ export async function migrateLocalToFirestore(clubId: string): Promise<void> {
     { name: 'coaches', items: state.coaches as unknown as Array<Record<string, unknown>> },
     { name: 'groups', items: state.groups as unknown as Array<Record<string, unknown>> },
     { name: 'enrollments', items: state.enrollments as unknown as Array<Record<string, unknown>> },
-    { name: 'payments', items: state.payments as unknown as Array<Record<string, unknown>> },
-    { name: 'attendance', items: state.attendance as unknown as Array<Record<string, unknown>> },
-    { name: 'activities', items: state.activities as unknown as Array<Record<string, unknown>> },
     { name: 'privateLessons', items: state.privateLessons as unknown as Array<Record<string, unknown>> },
     { name: 'invitations', items: state.invitations as unknown as Array<Record<string, unknown>> },
     { name: 'events', items: state.events as unknown as Array<Record<string, unknown>> },
-    { name: 'eventPayments', items: state.eventPayments as unknown as Array<Record<string, unknown>> },
-    { name: 'privateLessonPayments', items: state.privateLessonPayments as unknown as Array<Record<string, unknown>> },
-    { name: 'evaluations', items: state.evaluations as unknown as Array<Record<string, unknown>> },
-    { name: 'matchReports', items: state.matchReports as unknown as Array<Record<string, unknown>> },
     { name: 'coachSalaryConfigs', items: state.coachSalaryConfigs as unknown as Array<Record<string, unknown>> },
   ]
 

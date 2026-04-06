@@ -14,6 +14,8 @@ import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, 
 import { formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // =========================================
 // Helper: InfoRow
@@ -72,7 +74,13 @@ const attendanceStatusLabels: Record<string, string> = {
 export default function PlayerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { players, enrollments, payments, groups, attendance, evaluations, updatePlayer } = useDataStore()
+  const { players, enrollments, groups, updatePlayer } = useDataStore()
+  const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
+  const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
+  payments.push(..._prevPayments)
+  const { data: attendance = [] } = useAttendanceQuery()
+  const { data: evaluations = [] } = useEvaluationsQuery()
+
 
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [viewingEvaluation, setViewingEvaluation] = useState<Evaluation | null>(null)

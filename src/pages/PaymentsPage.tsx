@@ -53,6 +53,8 @@ import {
 } from '@tanstack/react-table'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { downloadXlsxAoa } from '@/lib/excel'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 type ViewMode = 'mensual' | 'anual'
 
@@ -94,7 +96,14 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { payments, groups, players, eventPayments, privateLessonPayments, invoices, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, deletePayment, deleteEventPayment, deletePrivateLessonPayment, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { groups, players, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, deletePayment, deleteEventPayment, deletePrivateLessonPayment, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
+  const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
+  payments.push(..._prevPayments)
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
+  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
+  const { data: invoices = [] } = useInvoicesQuery()
+
 
   const now = new Date()
   const [search, setSearch] = useState('')

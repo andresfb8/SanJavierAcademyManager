@@ -17,6 +17,8 @@ import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, St
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import type { PrivateLesson, EventType } from '@/types'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // ==========================================
 // Constantes de la agenda
@@ -104,7 +106,10 @@ export default function AgendaPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const isEntrenador = user?.role === 'entrenador'
-  const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, privateLessonPayments, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment, attendance } = useDataStore()
+  const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment } = useDataStore()
+  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
+  const { data: attendance = [] } = useAttendanceQuery()
+
 
   const currentCoachId = useMemo(() => {
     if (!isEntrenador || !user?.id) return null

@@ -30,6 +30,8 @@ import {
 import { formatDate, generateId } from '@/lib/utils'
 import { downloadXlsx } from '@/lib/excel'
 import type { AttendanceEntry, AttendanceStatus } from '@/types'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // ==========================================
 // AttendancePage - Registro de Asistencia
@@ -46,8 +48,9 @@ function toISODate(date: Date | string): string {
 
 export default function AttendancePage() {
   const { user } = useAuthStore()
-  const { groups, players, enrollments, attendance, addAttendanceRecord, updateAttendanceRecord, coaches } =
-    useDataStore()
+  const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches } = useDataStore()
+  const { data: attendance = [] } = useAttendanceQuery()
+
 
   // --- Seleccion de grupo y fecha ---
   const [selectedGroupId, setSelectedGroupId] = useState('')

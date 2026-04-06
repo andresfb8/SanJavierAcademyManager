@@ -39,6 +39,8 @@ interface AttendanceQuickDialogProps {
   onNavigateToDetail?: () => void
 }
 
+import { useAttendanceQuery } from '@/hooks/useQueries'
+
 export function AttendanceQuickDialog({
   open,
   onOpenChange,
@@ -47,7 +49,8 @@ export function AttendanceQuickDialog({
   date,
   onNavigateToDetail,
 }: AttendanceQuickDialogProps) {
-  const { groups, enrollments, players, attendance, addAttendanceRecord, updateAttendanceRecord } = useDataStore()
+  const { groups, enrollments, players, addAttendanceRecord, updateAttendanceRecord } = useDataStore()
+  const { data: attendance = [] } = useAttendanceQuery(groupId)
 
   const [entries, setEntries] = useState<AttendanceEntry[]>([])
   const [isSaving, setIsSaving] = useState(false)

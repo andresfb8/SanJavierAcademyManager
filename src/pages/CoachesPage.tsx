@@ -66,8 +66,12 @@ interface CoachForm {
   notes: string
   isActive: boolean
   staffRole: StaffRole
-  ratePerGroup: string
-  ratePerPrivateLesson: string
+  ratePerGroupAdults: string
+  ratePerGroupMinors: string
+  privateLessonPaymentType: string
+  privateLessonRate: string
+  eventPaymentType: string
+  eventRate: string
   bonuses: string
   salaryNotes: string
 }
@@ -84,8 +88,12 @@ const emptyForm: CoachForm = {
   notes: '',
   isActive: true,
   staffRole: 'entrenador',
-  ratePerGroup: '',
-  ratePerPrivateLesson: '',
+  ratePerGroupAdults: '',
+  ratePerGroupMinors: '',
+  privateLessonPaymentType: 'fixed',
+  privateLessonRate: '',
+  eventPaymentType: 'percentage',
+  eventRate: '',
   bonuses: '',
   salaryNotes: '',
 }
@@ -146,18 +154,32 @@ export default function CoachesPage() {
     const config = getSalaryConfig(coachId)
     if (!config) return 0
     const coachGroups = getCoachGroups(coachId)
+    const adultGroupsCount = coachGroups.filter(g => g.level !== 'menores').length
+    const minorsGroupsCount = coachGroups.filter(g => g.level === 'menores').length
+    
+    // Group salary
+    const groupsSalary = (adultGroupsCount * (config.ratePerGroupAdults || 0)) + (minorsGroupsCount * (config.ratePerGroupMinors || 0))
+    
     const now = new Date()
+    // Private lessons salary
     const monthLessons = privateLessons.filter(
       (pl) =>
         pl.coachId === coachId &&
         new Date(pl.date).getMonth() === now.getMonth() &&
         new Date(pl.date).getFullYear() === now.getFullYear()
     )
-    return (
-      coachGroups.length * config.ratePerGroup +
-      monthLessons.length * config.ratePerPrivateLesson +
-      config.bonuses
-    )
+    
+    const lessonsSalary = monthLessons.reduce((acc, lesson) => {
+       if (config.privateLessonPaymentType === 'fixed') {
+         return acc + (config.privateLessonRate || 0)
+       } else {
+         return acc + (lesson.price * ((config.privateLessonRate || 0) / 100))
+       }
+    }, 0)
+    
+    // NOTE: Event salary can be estimated if events with the coach exist, but currently not included in estimation
+
+    return groupsSalary + lessonsSalary + (config.bonuses || 0)
   }
 
   const handleSubmit = () => {
@@ -183,8 +205,12 @@ export default function CoachesPage() {
       // Update salary config
       updateCoachSalaryConfig(editingCoach.id, {
         coachId: editingCoach.id,
-        ratePerGroup: parseFloat(form.ratePerGroup) || 0,
-        ratePerPrivateLesson: parseFloat(form.ratePerPrivateLesson) || 0,
+        ratePerGroupAdults: parseFloat(form.ratePerGroupAdults) || 0,
+        ratePerGroupMinors: parseFloat(form.ratePerGroupMinors) || 0,
+        privateLessonPaymentType: form.privateLessonPaymentType as 'fixed' | 'percentage',
+        privateLessonRate: parseFloat(form.privateLessonRate) || 0,
+        eventPaymentType: form.eventPaymentType as 'fixed' | 'percentage',
+        eventRate: parseFloat(form.eventRate) || 0,
         bonuses: parseFloat(form.bonuses) || 0,
         notes: form.salaryNotes || undefined,
       })
@@ -194,8 +220,12 @@ export default function CoachesPage() {
       // Save initial salary config
       updateCoachSalaryConfig(newCoachId, {
         coachId: newCoachId,
-        ratePerGroup: parseFloat(form.ratePerGroup) || 0,
-        ratePerPrivateLesson: parseFloat(form.ratePerPrivateLesson) || 0,
+        ratePerGroupAdults: parseFloat(form.ratePerGroupAdults) || 0,
+        ratePerGroupMinors: parseFloat(form.ratePerGroupMinors) || 0,
+        privateLessonPaymentType: form.privateLessonPaymentType as 'fixed' | 'percentage',
+        privateLessonRate: parseFloat(form.privateLessonRate) || 0,
+        eventPaymentType: form.eventPaymentType as 'fixed' | 'percentage',
+        eventRate: parseFloat(form.eventRate) || 0,
         bonuses: parseFloat(form.bonuses) || 0,
         notes: form.salaryNotes || undefined,
       })
@@ -219,8 +249,12 @@ export default function CoachesPage() {
       notes: coach.notes || '',
       isActive: coach.isActive,
       staffRole: coach.staffRole ?? 'entrenador',
-      ratePerGroup: config ? String(config.ratePerGroup) : '',
-      ratePerPrivateLesson: config ? String(config.ratePerPrivateLesson) : '',
+      ratePerGroupAdults: config && config.ratePerGroupAdults !== undefined ? String(config.ratePerGroupAdults) : '',
+      ratePerGroupMinors: config && config.ratePerGroupMinors !== undefined ? String(config.ratePerGroupMinors) : '',
+      privateLessonPaymentType: config?.privateLessonPaymentType ?? 'fixed',
+      privateLessonRate: config && config.privateLessonRate !== undefined ? String(config.privateLessonRate) : '',
+      eventPaymentType: config?.eventPaymentType ?? 'percentage',
+      eventRate: config && config.eventRate !== undefined ? String(config.eventRate) : '',
       bonuses: config ? String(config.bonuses) : '',
       salaryNotes: config?.notes || '',
     })
@@ -770,29 +804,83 @@ export default function CoachesPage() {
                     Configuracion salarial
                   </h3>
                 </div>
-                <div className="space-y-2">
-                  <Label>Tarifa por grupo (€/mes)</Label>
-                  <Input
-                    type="number"
-                    value={form.ratePerGroup}
-                    onChange={(e) => setForm({ ...form, ratePerGroup: e.target.value })}
-                    placeholder="250"
-                    min="0"
-                    step="10"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Tarifa Grupos Adultos (€/mes)</Label>
+                    <Input
+                      type="number"
+                      value={form.ratePerGroupAdults}
+                      onChange={(e) => setForm({ ...form, ratePerGroupAdults: e.target.value })}
+                      placeholder="250"
+                      min="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tarifa Grupos Menores (€/mes)</Label>
+                    <Input
+                      type="number"
+                      value={form.ratePerGroupMinors}
+                      onChange={(e) => setForm({ ...form, ratePerGroupMinors: e.target.value })}
+                      placeholder="200"
+                      min="0"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Tarifa clase particular (€)</Label>
-                  <Input
-                    type="number"
-                    value={form.ratePerPrivateLesson}
-                    onChange={(e) =>
-                      setForm({ ...form, ratePerPrivateLesson: e.target.value })
-                    }
-                    placeholder="30"
-                    min="0"
-                    step="5"
-                  />
+
+                <div className="border-t border-border mt-4 mb-4"></div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Modo de cobro Clases Particulares</Label>
+                    <Select
+                      options={[
+                        { value: 'fixed', label: 'Cantidad fija (€) por clase' },
+                        { value: 'percentage', label: 'Porcentaje (%) de recaudación' },
+                      ]}
+                      value={form.privateLessonPaymentType}
+                      onChange={(e) => setForm({ ...form, privateLessonPaymentType: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{form.privateLessonPaymentType === 'fixed' ? 'Cantidad fija (€/clase)' : 'Porcentaje de recaudación (%)'}</Label>
+                    <Input
+                      type="number"
+                      value={form.privateLessonRate}
+                      onChange={(e) =>
+                        setForm({ ...form, privateLessonRate: e.target.value })
+                      }
+                      placeholder={form.privateLessonPaymentType === 'fixed' ? "30" : "50"}
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-border mt-4 mb-4"></div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Modo de cobro en Eventos</Label>
+                    <Select
+                      options={[
+                        { value: 'fixed', label: 'Cantidad fija (€) por evento' },
+                        { value: 'percentage', label: 'Porcentaje (%) de recaudación' },
+                      ]}
+                      value={form.eventPaymentType}
+                      onChange={(e) => setForm({ ...form, eventPaymentType: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{form.eventPaymentType === 'fixed' ? 'Cantidad fija (€/evento)' : 'Porcentaje de recaudación (%)'}</Label>
+                    <Input
+                      type="number"
+                      value={form.eventRate}
+                      onChange={(e) =>
+                        setForm({ ...form, eventRate: e.target.value })
+                      }
+                      placeholder={form.eventPaymentType === 'fixed' ? "50" : "60"}
+                      min="0"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Primas / Bonificaciones (€)</Label>

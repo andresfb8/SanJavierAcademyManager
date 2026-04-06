@@ -100,6 +100,8 @@ function saveDismissals(ids: string[]) {
   }
 }
 
+import { usePaymentsQuery, useAttendanceQuery } from '@/hooks/useQueries'
+
 export function NotificationBell() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -108,7 +110,12 @@ export function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null)
 
   const { user } = useAuthStore()
-  const { payments, groups, attendance, events, coaches } = useDataStore()
+  const { groups, events, coaches } = useDataStore()
+  
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const { data: payments = [] } = usePaymentsQuery(currentYear, currentMonth)
+  const { data: attendance = [] } = useAttendanceQuery()
 
   const currentCoachId = useMemo(() => {
     if (user?.role !== 'entrenador' || !user?.id) return null

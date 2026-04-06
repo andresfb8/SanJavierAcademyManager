@@ -24,6 +24,8 @@ import { useDataStore } from '@/stores/dataStore'
 import { FileText, Plus, Search, Eye, Trash2, Star, Swords, Users } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Evaluation, MatchReport } from '@/types'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // ==========================================
 // EvaluacionesPage - Informes y evaluaciones
@@ -32,15 +34,10 @@ import type { Evaluation, MatchReport } from '@/types'
 
 export default function EvaluacionesPage() {
   const navigate = useNavigate()
-  const {
-    evaluations,
-    matchReports,
-    coaches,
-    addEvaluation,
-    deleteEvaluation,
-    addMatchReport,
-    deleteMatchReport,
-  } = useDataStore()
+  const { coaches, addEvaluation, deleteEvaluation, addMatchReport, deleteMatchReport } = useDataStore()
+  const { data: evaluations = [] } = useEvaluationsQuery()
+  const { data: matchReports = [] } = useMatchReportsQuery()
+
 
   // Tab activo
   const [activeTab, setActiveTab] = useState('evaluaciones')

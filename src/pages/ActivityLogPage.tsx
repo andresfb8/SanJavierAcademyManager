@@ -118,8 +118,10 @@ function SortableHeader({
   )
 }
 
+import { useActivitiesQuery } from '@/hooks/useQueries'
+
 export default function ActivityLogPage() {
-  const { activities } = useDataStore()
+  const { data: activities = [] } = useActivitiesQuery(2000)
 
   const now = new Date()
   const [search, setSearch] = useState('')

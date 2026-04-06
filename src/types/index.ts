@@ -463,11 +463,14 @@ export interface MatchReport {
   updatedAt: Date
 }
 
-// --- Configuración Salario Entrenador ---
 export interface CoachSalaryConfig {
   coachId: string
-  ratePerGroup: number
-  ratePerPrivateLesson: number
+  ratePerGroupAdults: number
+  ratePerGroupMinors: number
+  privateLessonPaymentType: 'fixed' | 'percentage'
+  privateLessonRate: number
+  eventPaymentType: 'fixed' | 'percentage'
+  eventRate: number
   bonuses: number
   notes?: string
 }

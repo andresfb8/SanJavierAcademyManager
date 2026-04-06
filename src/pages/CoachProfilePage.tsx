@@ -31,6 +31,8 @@ import {
   IdCard,
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+
 
 // ==========================================
 // CoachProfilePage - Perfil del entrenador
@@ -41,13 +43,9 @@ export default function CoachProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const {
-    coaches,
-    groups,
-    evaluations,
-    coachSalaryConfigs,
-    privateLessons,
-  } = useDataStore()
+  const { coaches, groups, coachSalaryConfigs, privateLessons, events } = useDataStore()
+  const { data: evaluations = [] } = useEvaluationsQuery()
+
 
   const coach = useMemo(
     () => coaches.find((c) => c.id === id) ?? null,
@@ -83,14 +81,46 @@ export default function CoachProfilePage() {
     )
   }, [privateLessons, id])
 
+  const monthlyEvents = useMemo(() => {
+    if (!id) return []
+    const now = new Date()
+    return events.filter(
+      (ev) =>
+        ev.coachIds.includes(id) &&
+        new Date(ev.date).getMonth() === now.getMonth() &&
+        new Date(ev.date).getFullYear() === now.getFullYear()
+    )
+  }, [events, id])
+
   const estimatedSalary = useMemo(() => {
     if (!salaryConfig) return 0
-    return (
-      coachGroups.length * salaryConfig.ratePerGroup +
-      monthlyPrivateLessons.length * salaryConfig.ratePerPrivateLesson +
-      salaryConfig.bonuses
-    )
-  }, [salaryConfig, coachGroups.length, monthlyPrivateLessons.length])
+    
+    // 1. Group salary
+    const adultGroupsCount = coachGroups.filter(g => g.level !== 'menores').length
+    const minorsGroupsCount = coachGroups.filter(g => g.level === 'menores').length
+    const groupsSalary = (adultGroupsCount * (salaryConfig.ratePerGroupAdults || 0)) + (minorsGroupsCount * (salaryConfig.ratePerGroupMinors || 0))
+
+    // 2. Private lesson salary
+    const lessonsSalary = monthlyPrivateLessons.reduce((acc, lesson) => {
+       if (salaryConfig.privateLessonPaymentType === 'fixed') {
+         return acc + (salaryConfig.privateLessonRate || 0)
+       } else {
+         return acc + (lesson.price * ((salaryConfig.privateLessonRate || 0) / 100))
+       }
+    }, 0)
+
+    // 3. Events salary -> Need to get events for the month that the coach is in.
+    const eventsSalary = monthlyEvents.reduce((acc, ev) => {
+       if (salaryConfig.eventPaymentType === 'fixed') {
+         return acc + (salaryConfig.eventRate || 0)
+       } else {
+         const totalCollected = ev.price * ev.attendeePlayerIds.length
+         return acc + (totalCollected * ((salaryConfig.eventRate || 0) / 100))
+       }
+    }, 0)
+    
+    return groupsSalary + lessonsSalary + eventsSalary + (salaryConfig.bonuses || 0)
+  }, [salaryConfig, coachGroups, monthlyPrivateLessons, monthlyEvents])
 
   // Guarda
   if (!coach) {
@@ -357,29 +387,43 @@ export default function CoachProfilePage() {
                 <CardContent>
                   {salaryConfig ? (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="rounded-lg border p-4">
                           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                            Tarifa por grupo
+                            Grupos
                           </p>
                           <p className="text-lg font-semibold">
-                            {formatCurrency(salaryConfig.ratePerGroup)}
+                            {formatCurrency((coachGroups.filter(g => g.level !== 'menores').length * (salaryConfig.ratePerGroupAdults || 0)) + (coachGroups.filter(g => g.level === 'menores').length * (salaryConfig.ratePerGroupMinors || 0)))}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {coachGroups.length} grupo{coachGroups.length !== 1 ? 's' : ''} ={' '}
-                            {formatCurrency(coachGroups.length * salaryConfig.ratePerGroup)}
+                            {coachGroups.filter(g => g.level !== 'menores').length} ad. ({formatCurrency(salaryConfig.ratePerGroupAdults || 0)})<br/>
+                            {coachGroups.filter(g => g.level === 'menores').length} men. ({formatCurrency(salaryConfig.ratePerGroupMinors || 0)})
                           </p>
                         </div>
                         <div className="rounded-lg border p-4">
                           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                            Tarifa clase particular
+                            Clases Particulares
                           </p>
                           <p className="text-lg font-semibold">
-                            {formatCurrency(salaryConfig.ratePerPrivateLesson)}
+                            {formatCurrency(monthlyPrivateLessons.reduce((acc, lesson) => {
+                               return acc + (salaryConfig.privateLessonPaymentType === 'fixed' ? (salaryConfig.privateLessonRate || 0) : (lesson.price * ((salaryConfig.privateLessonRate || 0) / 100)))
+                            }, 0))}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {monthlyPrivateLessons.length} clase{monthlyPrivateLessons.length !== 1 ? 's' : ''} este mes ={' '}
-                            {formatCurrency(monthlyPrivateLessons.length * salaryConfig.ratePerPrivateLesson)}
+                            {monthlyPrivateLessons.length} este mes ({salaryConfig.privateLessonPaymentType === 'fixed' ? formatCurrency(salaryConfig.privateLessonRate || 0) + ' fijas' : (salaryConfig.privateLessonRate || 0) + '%'})
+                          </p>
+                        </div>
+                        <div className="rounded-lg border p-4">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                            Eventos
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {formatCurrency(monthlyEvents.reduce((acc, ev) => {
+                               return acc + (salaryConfig.eventPaymentType === 'fixed' ? (salaryConfig.eventRate || 0) : ((ev.price * ev.attendeePlayerIds.length) * ((salaryConfig.eventRate || 0) / 100)))
+                            }, 0))}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {monthlyEvents.length} este mes ({salaryConfig.eventPaymentType === 'fixed' ? formatCurrency(salaryConfig.eventRate || 0) + ' fijos' : (salaryConfig.eventRate || 0) + '%'})
                           </p>
                         </div>
                         <div className="rounded-lg border p-4">
