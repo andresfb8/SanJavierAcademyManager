@@ -719,21 +719,24 @@ export const useDataStore = create<DataState>()(
           // Conditional Receipt Deletion (<= 5)
           if (unenrollDay <= 5) {
             // Find PENDING payments for this user, this group, this month
-            const paymentsToDelete = [] as Payment[]; // TODO: Fix pending payments deletion logic // 
-      ([] as any[]).filter((p: any) =>
-              p.enrollmentId === id &&
-              p.status === 'pendiente' &&
-              p.billingMonth === unenrollMonth &&
-              p.billingYear === unenrollYear
-            )
+            const paymentsSnap = await getDocs(
+              query(
+                collection(db, 'payments'),
+                where('clubId', '==', clubId),
+                where('enrollmentId', '==', id),
+                where('status', '==', 'pendiente'),
+                where('billingMonth', '==', unenrollMonth),
+                where('billingYear', '==', unenrollYear)
+              )
+            );
 
-            if (paymentsToDelete.length > 0) {
+            if (!paymentsSnap.empty) {
               // Delete from firestore in parallel
               await Promise.all(
-                paymentsToDelete.map(p => deleteFirestoreDoc('payments', p.id))
+                paymentsSnap.docs.map((d) => deleteFirestoreDoc('payments', d.id))
               )
               queryClient.invalidateQueries({ queryKey: ['payments'] });
-              console.info(`[deactivateEnrollment] Deleted ${paymentsToDelete.length} pending receipts for month ${unenrollMonth}`)
+              console.info(`[deactivateEnrollment] Deleted ${paymentsSnap.docs.length} pending receipts for month ${unenrollMonth}`)
             }
           }
 
@@ -792,8 +795,7 @@ export const useDataStore = create<DataState>()(
 
       updatePayment: (id, data) => {
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('payments', id, updated as any, clubId)
+        if (clubId) syncDoc('payments', id, data as any, clubId, { merge: true })
         queryClient.invalidateQueries({ queryKey: ['payments'] });
       },
 
@@ -813,51 +815,47 @@ export const useDataStore = create<DataState>()(
       },
 
       markPaymentPaid: (id, method) => {
-        const payment = ([] as any[]).find((p: any) => p.id === id)
-        if (!payment || payment.status === 'pagado') return
         const now = new Date()
         const { userName } = getCurrentUser()
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('payments', id, updated as any, clubId)
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
+        if (clubId) {
+          syncDoc('payments', id, { status: 'pagado', paymentMethod: method, paidDate: now, registeredBy: userName } as any, clubId, { merge: true })
+          queryClient.invalidateQueries({ queryKey: ['payments'] });
+        }
       },
 
       markEventPaymentPaid: (id, method) => {
-        const payment = ([] as any[]).find((p: any) => p.id === id)
-        if (!payment || payment.status === 'pagado') return
         const now = new Date()
         const { userName } = getCurrentUser()
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('eventPayments', id, updated as any, clubId)
-        queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
+        if (clubId) {
+          syncDoc('eventPayments', id, { status: 'pagado', paymentMethod: method, paidDate: now, registeredBy: userName } as any, clubId, { merge: true })
+          queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
+        }
       },
 
       markPrivateLessonPaymentPaid: (id, method) => {
-        const payment = ([] as any[]).find((p: any) => p.id === id)
-        if (!payment || payment.status === 'pagado') return
         const now = new Date()
         const { userName } = getCurrentUser()
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('privateLessonPayments', id, updated as any, clubId)
-        queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
+        if (clubId) {
+          syncDoc('privateLessonPayments', id, { status: 'pagado', paymentMethod: method, paidDate: now, registeredBy: userName } as any, clubId, { merge: true })
+          queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
+        }
       },
 
       cancelPayment: (id) => {
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('payments', id, updated as any, clubId)
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
+        if (clubId) {
+          syncDoc('payments', id, { status: 'cancelado' } as any, clubId, { merge: true })
+          queryClient.invalidateQueries({ queryKey: ['payments'] });
+        }
       },
 
       revertPaymentPaidStatus: (id, source) => {
         let collectionName: 'payments' | 'eventPayments' | 'privateLessonPayments' = 'payments'
         if (source === 'evento') collectionName = 'eventPayments'
         if (source === 'clase_particular') collectionName = 'privateLessonPayments'
-
-        set((state) => { return {} })
 
         const clubId = getClubId()
         if (clubId) {
@@ -867,7 +865,8 @@ export const useDataStore = create<DataState>()(
             paidDate: null,
             paymentMethod: null,
             registeredBy: null
-          } as any, clubId)
+          } as any, clubId, { merge: true })
+          queryClient.invalidateQueries({ queryKey: [collectionName] })
         }
       },
 
@@ -944,33 +943,10 @@ export const useDataStore = create<DataState>()(
         queryClient.invalidateQueries({ queryKey: ['attendance'] })
       },
       updateAttendanceRecord: (id, data) => {
-        const oldRecord = ([] as any[]).find((a) => a.id === id)
         const clubId = getClubId()
-        const updated = ([] as any[]).find((a) => a.id === id)
-        if (clubId && updated) syncDoc('attendance', id, updated as any, clubId)
+        if (clubId) syncDoc('attendance', id, data as any, clubId, { merge: true })
         queryClient.invalidateQueries({ queryKey: ['attendance'] });
-
-        // Recompute credits for all players affected by old or new records
-        if (data.records && oldRecord) {
-          const affectedPlayerIds = new Set([
-            ...oldRecord.records.map((e: any) => e.playerId),
-            ...data.records.map((e: any) => e.playerId),
-          ])
-          const clubId2 = getClubId()
-          set((state) => ({
-            players: state.players.map((p) => {
-              if (!affectedPlayerIds.has(p.id)) return p
-              const newCredits = computePlayerRecoveryBalance(p.id, [] as any)
-              if (newCredits === (p.recoveryCredits ?? 0)) return p
-              return { ...p, recoveryCredits: newCredits, updatedAt: new Date() }
-            }),
-          }))
-          if (clubId2) {
-            get().players
-              .filter((p) => affectedPlayerIds.has(p.id))
-              .forEach((p) => syncDoc('players', p.id, p as any, clubId2))
-          }
-        }
+        // En la versión con queryClient la actualización del store (recoveryCredits) es delegada al lado de vista/consultas o hooks dedicados.
       },
 
       deleteAttendanceRecord: (id: string) => {
@@ -1016,13 +992,18 @@ export const useDataStore = create<DataState>()(
         })
       },
 
-      deletePrivateLesson: (id: string) => {
+      deletePrivateLesson: async (id: string) => {
         const lesson = get().privateLessons.find((l) => l.id === id)
-        const paymentsToDelete = ([] as any[]).filter((p) => p.lessonId === id).map((p) => p.id)
         set((state) => ({ privateLessons: state.privateLessons.filter((l) => l.id !== id) }))
         deleteFirestoreDoc('privateLessons', id)
-        paymentsToDelete.forEach((pid) => deleteFirestoreDoc('privateLessonPayments', pid));
-        queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
+        
+        const clubId = getClubId()
+        if (clubId) {
+          const paymentsSnap = await getDocs(query(collection(db, 'privateLessonPayments'), where('clubId', '==', clubId), where('lessonId', '==', id)))
+          paymentsSnap.docs.forEach((d) => deleteFirestoreDoc('privateLessonPayments', d.id))
+          queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
+        }
+        
         const { userId, userName } = getCurrentUser()
         get().addActivity({
           type: 'lesson_deleted',
@@ -1042,15 +1023,17 @@ export const useDataStore = create<DataState>()(
 
       updatePrivateLessonPayment: (id, data) => {
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('privateLessonPayments', id, updated as any, clubId)
+        if (clubId) syncDoc('privateLessonPayments', id, data as any, clubId, { merge: true })
         queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
       },
 
-      deletePrivateLessonPaymentsByLesson: (lessonId: string) => {
-        const paymentsToDelete = ([] as any[]).filter((p) => p.lessonId === lessonId).map((p) => p.id)
-        paymentsToDelete.forEach((pid) => deleteFirestoreDoc('privateLessonPayments', pid));
-        queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
+      deletePrivateLessonPaymentsByLesson: async (lessonId: string) => {
+        const clubId = getClubId()
+        if (clubId) {
+          const paymentsSnap = await getDocs(query(collection(db, 'privateLessonPayments'), where('clubId', '==', clubId), where('lessonId', '==', lessonId)))
+          paymentsSnap.docs.forEach((doc) => deleteFirestoreDoc('privateLessonPayments', doc.id))
+          queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
+        }
       },
 
       addInvitation: (invitationData) => {
@@ -1105,13 +1088,18 @@ export const useDataStore = create<DataState>()(
         })
       },
 
-      deleteEvent: (id) => {
+      deleteEvent: async (id) => {
         const event = get().events.find((e) => e.id === id)
-        const paymentsToDelete = ([] as any[]).filter((p) => p.eventId === id).map((p) => p.id)
         set((state) => ({ events: state.events.filter((e) => e.id !== id) }))
         deleteFirestoreDoc('events', id)
-        paymentsToDelete.forEach((pid) => deleteFirestoreDoc('eventPayments', pid));
-        queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
+        
+        const clubId = getClubId()
+        if (clubId) {
+          const paymentsSnap = await getDocs(query(collection(db, 'eventPayments'), where('clubId', '==', clubId), where('eventId', '==', id)))
+          paymentsSnap.docs.forEach((doc) => deleteFirestoreDoc('eventPayments', doc.id))
+          queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
+        }
+        
         const { userId, userName } = getCurrentUser()
         get().addActivity({
           type: 'event_deleted',
@@ -1131,8 +1119,7 @@ export const useDataStore = create<DataState>()(
 
       updateEventPayment: (id: string, data: any) => {
         const clubId = getClubId()
-        const updated = ([] as any[]).find((p: any) => p.id === id)
-        if (clubId && updated) syncDoc('eventPayments', id, updated as any, clubId)
+        if (clubId) syncDoc('eventPayments', id, data as any, clubId, { merge: true })
         queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
       },
 
@@ -1146,19 +1133,17 @@ export const useDataStore = create<DataState>()(
 
       updateEvaluation: (id: string, data: any) => {
         const clubId = getClubId()
-        const updated = ([] as any[]).find((e) => e.id === id)
-        if (clubId && updated) syncDoc('evaluations', id, updated as any, clubId)
+        if (clubId) syncDoc('evaluations', id, data as any, clubId, { merge: true })
         queryClient.invalidateQueries({ queryKey: ['evaluations'] });
       },
 
       deleteEvaluation: (id) => {
-        const evaluation = ([] as any[]).find((e) => e.id === id)
         deleteFirestoreDoc('evaluations', id)
         queryClient.invalidateQueries({ queryKey: ['evaluations'] });
         const { userId, userName } = getCurrentUser()
         get().addActivity({
           type: 'evaluation_deleted',
-          description: `Evaluación eliminada (${evaluation?.playerName || id})`,
+          description: `Evaluación eliminada (${id})`,
           relatedEntityId: id,
           userId,
           userName,
@@ -1175,19 +1160,17 @@ export const useDataStore = create<DataState>()(
 
       updateMatchReport: (id: string, data: any) => {
         const clubId = getClubId()
-        const updated = ([] as any[]).find((r) => r.id === id)
-        if (clubId && updated) syncDoc('matchReports', id, updated as any, clubId)
+        if (clubId) syncDoc('matchReports', id, data as any, clubId, { merge: true })
         queryClient.invalidateQueries({ queryKey: ['matchReports'] });
       },
 
       deleteMatchReport: (id) => {
-        const report = ([] as any[]).find((r) => r.id === id)
         deleteFirestoreDoc('matchReports', id)
         queryClient.invalidateQueries({ queryKey: ['matchReports'] });
         const { userId, userName } = getCurrentUser()
         get().addActivity({
           type: 'match_report_deleted',
-          description: `Informe de partido eliminado (${report?.title || id})`,
+          description: `Informe de partido eliminado (${id})`,
           relatedEntityId: id,
           userId,
           userName,
