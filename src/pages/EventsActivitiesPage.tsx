@@ -26,9 +26,9 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { EVENT_TYPES, PLAYER_LEVELS } from '@/constants'
-import type { EventType, PrivateLesson } from '@/types'
+import type { EventType, PrivateLesson, PaymentMethod } from '@/types'
 import { checkEventConflicts, formatConflictMessage } from '@/lib/schedule-conflicts'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
@@ -48,6 +48,7 @@ interface UnifiedItem {
   price: number
   typeBadge: string
   typeBadgeColor: string
+  paymentMethod?: PaymentMethod | null
 }
 
 export default function EventsActivitiesPage() {
@@ -55,6 +56,7 @@ export default function EventsActivitiesPage() {
   const { user } = useAuthStore()
   const { club, events, privateLessons, groups, coaches, courts, players, addPrivateLesson, addPrivateLessonPayment, deletePrivateLesson, addEvent, addEventPayment, deleteEvent } = useDataStore()
   const { data: eventPayments = [] } = useEventPaymentsQuery()
+  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
 
 
   const isEntrenador = user?.role === 'entrenador'
@@ -123,32 +125,24 @@ export default function EventsActivitiesPage() {
   // Filtered players for lesson search
   const filteredLessonPlayers = useMemo(() => {
     if (!lessonPlayerSearch.trim()) return activePlayers
-
-    const search = lessonPlayerSearch.toLowerCase()
+    const q = normalizeText(lessonPlayerSearch)
     return activePlayers.filter((p) => {
-      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
-      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase()
+      const fullName = normalizeText(`${p.firstName} ${p.lastName}`)
+      const reverseName = normalizeText(`${p.lastName} ${p.firstName}`)
       const dni = p.dni?.toLowerCase() || ''
-
-      return fullName.includes(search) ||
-        reverseName.includes(search) ||
-        dni.includes(search)
+      return fullName.includes(q) || reverseName.includes(q) || dni.includes(q)
     })
   }, [activePlayers, lessonPlayerSearch])
 
   // Filtered players for event search
   const filteredEventPlayers = useMemo(() => {
     if (!eventPlayerSearch.trim()) return activePlayers
-
-    const search = eventPlayerSearch.toLowerCase()
+    const q = normalizeText(eventPlayerSearch)
     return activePlayers.filter((p) => {
-      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
-      const reverseName = `${p.lastName} ${p.firstName}`.toLowerCase()
+      const fullName = normalizeText(`${p.firstName} ${p.lastName}`)
+      const reverseName = normalizeText(`${p.lastName} ${p.firstName}`)
       const dni = p.dni?.toLowerCase() || ''
-
-      return fullName.includes(search) ||
-        reverseName.includes(search) ||
-        dni.includes(search)
+      return fullName.includes(q) || reverseName.includes(q) || dni.includes(q)
     })
   }, [activePlayers, eventPlayerSearch])
 
@@ -184,6 +178,10 @@ export default function EventsActivitiesPage() {
     }
 
     for (const lesson of visibleLessons) {
+      // Find a paid payment for this lesson to show its payment method
+      const paidPayment = privateLessonPayments.find(
+        (p) => p.lessonId === lesson.id && p.status === 'pagado'
+      )
       items.push({
         type: 'private',
         id: lesson.id,
@@ -197,6 +195,7 @@ export default function EventsActivitiesPage() {
         price: lesson.price,
         typeBadge: 'Clase particular',
         typeBadgeColor: 'bg-amber-100 text-amber-800',
+        paymentMethod: paidPayment?.paymentMethod ?? null,
       })
     }
 
@@ -207,19 +206,21 @@ export default function EventsActivitiesPage() {
 
   // Apply filters
   const filteredItems = useMemo(() => {
+    const q = normalizeText(search)
     return unifiedItems.filter((item) => {
       if (activeTab === 'events' && item.type !== 'event') return false
       if (activeTab === 'private' && item.type !== 'private') return false
 
       if (search) {
-        const q = search.toLowerCase()
-        if (!item.name.toLowerCase().includes(q) && !item.coachName.toLowerCase().includes(q) && !item.courtName.toLowerCase().includes(q)) {
-          return false
-        }
+        if (
+          !normalizeText(item.name).includes(q) &&
+          !normalizeText(item.coachName).includes(q) &&
+          !normalizeText(item.courtName).includes(q)
+        ) return false
       }
 
       if (coachFilter) {
-        if (!item.coachName.toLowerCase().includes(coachFilter.toLowerCase())) return false
+        if (!normalizeText(item.coachName).includes(normalizeText(coachFilter))) return false
       }
 
       if (dateFrom) {
@@ -535,6 +536,7 @@ export default function EventsActivitiesPage() {
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Pista</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Asist.</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Precio</th>
+                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden xl:table-cell">Método de Pago</th>
                       <th className="p-3 text-right text-sm font-medium text-muted-foreground w-28">Acciones</th>
                     </tr>
                   </thead>
@@ -567,6 +569,20 @@ export default function EventsActivitiesPage() {
                         </td>
                         <td className="p-3">
                           <span className="text-sm font-medium">{formatCurrency(item.price)}</span>
+                        </td>
+                        <td className="p-3 hidden xl:table-cell">
+                          {item.type === 'private' && item.paymentMethod ? (
+                            <span className="text-sm text-foreground capitalize">
+                              {{
+                                transferencia: 'Transferencia',
+                                efectivo: 'Efectivo',
+                                domiciliacion: 'Domiciliación',
+                                tarjeta: 'Tarjeta',
+                              }[item.paymentMethod] ?? item.paymentMethod}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex justify-end gap-1">

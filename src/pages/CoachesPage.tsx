@@ -43,7 +43,7 @@ import {
   Eye,
   UserPlus,
 } from 'lucide-react'
-import { formatDate, formatCurrency, generateId } from '@/lib/utils'
+import { formatDate, formatCurrency, generateId, normalizeText } from '@/lib/utils'
 import { STAFF_ROLES } from '@/constants'
 import type { Coach, StaffRole } from '@/types'
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore'
@@ -134,11 +134,12 @@ export default function CoachesPage() {
   const resetForm = () => setForm({ ...emptyForm })
 
   const filteredCoaches = useMemo(() => {
+    const q = normalizeText(search)
     return coaches.filter((c) => {
       const matchesSearch =
         search === '' ||
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-        c.email.toLowerCase().includes(search.toLowerCase()) ||
+        normalizeText(`${c.firstName} ${c.lastName}`).includes(q) ||
+        normalizeText(c.email).includes(q) ||
         c.phone.includes(search)
       const matchesActive =
         activeFilter === 'all' || (activeFilter === 'active' && c.isActive)

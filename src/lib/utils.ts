@@ -45,3 +45,14 @@ export function isMinor(birthDate: Date): boolean {
 export function generateId(): string {
   return crypto.randomUUID()
 }
+
+/**
+ * Normalizes a string by removing diacritics/accents for accent-insensitive search.
+ * Example: normalizeText('García') === 'garcia'
+ */
+export function normalizeText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/\p{Mn}/gu, '')
+    .toLowerCase()
+}

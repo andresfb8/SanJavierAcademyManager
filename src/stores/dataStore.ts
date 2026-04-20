@@ -133,7 +133,8 @@ export interface DataState {
   addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<{ needsPartialReceipt: boolean; enrollmentId: string }>
   updateEnrollment: (id: string, data: Partial<Enrollment>) => void
   deleteEnrollment: (id: string) => void
-  deactivateEnrollment: (id: string, effectiveDate?: Date) => Promise<void>
+  deactivateEnrollment: (id: string, effectiveDate?: Date, options?: { deleteInvoice?: boolean }) => Promise<void>
+  checkPendingPaymentsForEnrollment: (enrollmentId: string) => Promise<boolean>
 
   // --- Payments ---
   generatePartialReceipt: (enrollmentId: string, amount: number) => Promise<void>
@@ -703,7 +704,30 @@ export const useDataStore = create<DataState>()(
         })
       },
 
-      deactivateEnrollment: async (id: string, effectiveDate?: Date) => {
+      checkPendingPaymentsForEnrollment: async (enrollmentId: string): Promise<boolean> => {
+        const clubId = getClubId()
+        if (!clubId) return false
+        const now = new Date()
+        const currentMonth = now.getMonth() + 1
+        const currentYear = now.getFullYear()
+        try {
+          const paymentsSnap = await getDocs(
+            query(
+              collection(db, 'payments'),
+              where('clubId', '==', clubId),
+              where('enrollmentId', '==', enrollmentId),
+              where('status', '==', 'pendiente'),
+              where('billingMonth', '==', currentMonth),
+              where('billingYear', '==', currentYear)
+            )
+          )
+          return !paymentsSnap.empty
+        } catch {
+          return false
+        }
+      },
+
+      deactivateEnrollment: async (id: string, effectiveDate?: Date, options?: { deleteInvoice?: boolean }) => {
         const enrollment = get().enrollments.find((e) => e.id === id)
         if (!enrollment || !enrollment.isActive) return
 
@@ -714,14 +738,12 @@ export const useDataStore = create<DataState>()(
         }
 
         const dateToUse = effectiveDate || new Date()
-        const unenrollDay = dateToUse.getDate()
         const unenrollMonth = dateToUse.getMonth() + 1
         const unenrollYear = dateToUse.getFullYear()
 
         try {
-          // Conditional Receipt Deletion (<= 5)
-          if (unenrollDay <= 5) {
-            // Find PENDING payments for this user, this group, this month
+          // Conditional Receipt Deletion based on explicit user choice (options.deleteInvoice)
+          if (options?.deleteInvoice === true) {
             const paymentsSnap = await getDocs(
               query(
                 collection(db, 'payments'),
@@ -731,22 +753,20 @@ export const useDataStore = create<DataState>()(
                 where('billingMonth', '==', unenrollMonth),
                 where('billingYear', '==', unenrollYear)
               )
-            );
-
+            )
             if (!paymentsSnap.empty) {
-              // Delete from firestore in parallel
               await Promise.all(
                 paymentsSnap.docs.map((d) => deleteFirestoreDoc('payments', d.id))
               )
-              queryClient.invalidateQueries({ queryKey: ['payments'] });
-              console.info(`[deactivateEnrollment] Deleted ${paymentsSnap.docs.length} pending receipts for month ${unenrollMonth}`)
+              queryClient.invalidateQueries({ queryKey: ['payments'] })
+              console.info(`[deactivateEnrollment] Deleted ${paymentsSnap.docs.length} pending receipts`)
             }
           }
 
-          // Transacción atómica para actualizar enrollment y contador de grupo
+          // Atomic transaction: update enrollment status and group counter
           await updateEnrollmentStatus(id, enrollment.groupId, false, clubId)
 
-          // Update local state (listeners confirmarán desde Firestore)
+          // Update local state (Firestore listeners will confirm)
           set((state) => ({
             enrollments: state.enrollments.map((e) =>
               e.id === id ? { ...e, isActive: false, unenrollmentDate: dateToUse } : e
@@ -757,6 +777,18 @@ export const useDataStore = create<DataState>()(
                 : g
             ),
           }))
+
+          // Mejora 1: Auto-assign 'lista_espera' if no other active enrollments remain
+          const remainingActiveEnrollments = get().enrollments.filter(
+            (e) => e.playerId === enrollment.playerId && e.isActive && e.id !== id
+          )
+          if (remainingActiveEnrollments.length === 0) {
+            const player = get().players.find((p) => p.id === enrollment.playerId)
+            if (player && player.status === 'activo') {
+              get().updatePlayer(enrollment.playerId, { status: 'lista_espera' })
+              console.info(`[deactivateEnrollment] Player ${enrollment.playerId} moved to lista_espera`)
+            }
+          }
 
           const { userId, userName } = getCurrentUser()
           get().addActivity({
@@ -1018,7 +1050,15 @@ export const useDataStore = create<DataState>()(
       },
 
       addPrivateLessonPayment: (paymentData) => {
-        const newPayment: PrivateLessonPayment = { ...paymentData, id: generateId(), createdAt: new Date() }
+        // Ensure amount is a valid number and at least 0
+        const amount = Math.max(0, typeof paymentData.amount === 'number' ? paymentData.amount : parseFloat(paymentData.amount as any) || 0)
+        
+        const newPayment: PrivateLessonPayment = { 
+          ...paymentData, 
+          amount,
+          id: generateId(), 
+          createdAt: new Date() 
+        }
         const clubId = getClubId()
         if (clubId) syncDoc('privateLessonPayments', newPayment.id, newPayment as any, clubId)
         queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });

@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useDataStore } from '@/stores/dataStore'
-import { cn, isMinor as checkIsMinor, formatDate } from '@/lib/utils'
+import { cn, isMinor as checkIsMinor, formatDate, normalizeText } from '@/lib/utils'
 import { PLAYER_LEVELS, PLAYER_STATUSES } from '@/constants'
 import {
   useReactTable,
@@ -46,10 +46,11 @@ export default function PlayersPage() {
   const [sorting, setSorting] = useState<SortingState>([])
 
   const filteredPlayers = useMemo(() => {
+    const q = normalizeText(search)
     return players.filter((p) => {
       const matchesSearch = search === '' ||
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-        p.email.toLowerCase().includes(search.toLowerCase()) ||
+        normalizeText(`${p.firstName} ${p.lastName}`).includes(q) ||
+        normalizeText(p.email).includes(q) ||
         p.phone.includes(search)
       const matchesLevel = levelFilter === '' || p.level === levelFilter
       const matchesStatus = statusFilter === '' || p.status === statusFilter

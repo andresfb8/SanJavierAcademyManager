@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GroupTrainingPlanTab } from '@/components/groups/GroupTrainingPlanTab'
 import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen } from 'lucide-react'
+import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen, Pencil } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
 import { DAYS_OF_WEEK, PLAYER_LEVELS } from '@/constants'
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
@@ -27,10 +27,12 @@ export default function GroupDetailPage() {
   const { groups, players, enrollments, tariffs, addEnrollment, deactivateEnrollment } = useDataStore()
   const { user } = useAuthStore()
 
-  // Dialog state
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [removeEnrollmentId, setRemoveEnrollmentId] = useState<string | null>(null)
+  const [invoiceActionData, setInvoiceActionData] = useState<{ enrollmentId: string, hasPending: boolean } | null>(null)
   const [partialReceiptData, setPartialReceiptData] = useState<{ enrollmentId: string, amount: string } | null>(null)
+  const [showEditTariff, setShowEditTariff] = useState(false)
+  const [newTariffId, setNewTariffId] = useState('')
 
   // Add player form state
   const [selectedPlayerId, setSelectedPlayerId] = useState('')
@@ -41,6 +43,8 @@ export default function GroupDetailPage() {
 
   // Find the group
   const group = useMemo(() => groups.find((g) => g.id === id), [groups, id])
+
+  const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
 
   // Active enrollments for this group
   const groupEnrollments = useMemo(
@@ -163,12 +167,41 @@ export default function GroupDetailPage() {
   }
 
   // Handle removing a player (deactivate enrollment)
-  const handleRemovePlayer = () => {
+  const handleRemovePlayer = async () => {
     if (removeEnrollmentId) {
-      deactivateEnrollment(removeEnrollmentId, new Date(unenrollmentDate + 'T00:00:00'))
+      const hasPending = await useDataStore.getState().checkPendingPaymentsForEnrollment(removeEnrollmentId)
+      if (hasPending) {
+        setInvoiceActionData({ enrollmentId: removeEnrollmentId, hasPending: true })
+      } else {
+        await deactivateEnrollment(removeEnrollmentId, new Date(unenrollmentDate + 'T00:00:00'), { deleteInvoice: false })
+        setRemoveEnrollmentId(null)
+        setUnenrollmentDate(new Date().toISOString().split('T')[0])
+      }
+    }
+  }
+
+  const confirmRemoveEnrollment = async (deleteInvoice: boolean) => {
+    if (invoiceActionData) {
+      await deactivateEnrollment(invoiceActionData.enrollmentId, new Date(unenrollmentDate + 'T00:00:00'), { deleteInvoice })
       setRemoveEnrollmentId(null)
+      setInvoiceActionData(null)
       setUnenrollmentDate(new Date().toISOString().split('T')[0])
     }
+  }
+
+  // Handle updating group's tariff
+  const handleUpdateTariff = () => {
+    if (!group || !newTariffId) return
+    const selectedTariff = tariffs.find(t => t.id === newTariffId)
+    if (!selectedTariff) return
+
+    useDataStore.getState().updateGroup(group.id, {
+      defaultTariffId: selectedTariff.id,
+      defaultTariffPrice: selectedTariff.price,
+      billingFrequency: selectedTariff.billingFrequency,
+      installmentPrices: selectedTariff.installmentPrices
+    })
+    setShowEditTariff(false)
   }
 
   // Handle PDF export
@@ -342,10 +375,20 @@ export default function GroupDetailPage() {
               {/* Tarifa */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    Tarifa
-                  </CardTitle>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Tarifa
+                    </CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 relative -top-1" 
+                      onClick={() => { setNewTariffId(group.defaultTariffId); setShowEditTariff(true) }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold">{formatCurrency(group.defaultTariffPrice)}</p>
@@ -638,7 +681,7 @@ export default function GroupDetailPage() {
                 onChange={(e) => setUnenrollmentDate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Si la fecha seleccionada es del día 1 al 5 del mes en curso, el recibo pendiente de este mes se borrará automáticamente.
+                Se comprobará si existen recibos pendientes para este mes.
               </p>
             </div>
           </div>
@@ -648,6 +691,31 @@ export default function GroupDetailPage() {
             </Button>
             <Button variant="destructive" onClick={handleRemovePlayer}>
               Eliminar del grupo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Action Dialog for Unenrollment */}
+      <Dialog open={!!invoiceActionData} onOpenChange={(open) => !open && setInvoiceActionData(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recibo pendiente encontrado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-foreground">
+              Existe un recibo pendiente de pago para el mes actual asociado a esta inscripción.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              ¿Qué deseas hacer con este recibo pendiente?
+            </p>
+          </div>
+          <DialogFooter className="flex-col sm:justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => confirmRemoveEnrollment(true)}>
+              Eliminar el recibo
+            </Button>
+            <Button onClick={() => confirmRemoveEnrollment(false)}>
+              Mantener el recibo
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -680,6 +748,44 @@ export default function GroupDetailPage() {
             </Button>
             <Button onClick={handleGeneratePartialReceipt} disabled={!partialReceiptData?.amount}>
               Generar recibo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tariff Dialog */}
+      <Dialog open={showEditTariff} onOpenChange={setShowEditTariff}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cambiar tarifa del grupo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Actualizar la tarifa cambiará el precio asignado por defecto a las nuevas inscripciones. Las inscripciones actuales que tengan un precio modificado a mano no se alterarán.
+            </p>
+            <div className="space-y-2">
+              <Label>Seleccionar nueva tarifa</Label>
+              <Select
+                options={[
+                  { value: '', label: 'Seleccionar una tarifa...' },
+                  ...activeTariffs.map((t) => ({
+                    value: t.id,
+                    label: t.billingFrequency === 'monthly'
+                      ? `${t.name} - ${t.price.toFixed(2)} €/mes`
+                      : `${t.name} - ${t.price.toFixed(2)} € total`,
+                  })),
+                ]}
+                value={newTariffId}
+                onChange={(e) => setNewTariffId(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditTariff(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateTariff} disabled={!newTariffId || newTariffId === group.defaultTariffId}>
+              Guardar cambios
             </Button>
           </DialogFooter>
         </DialogContent>

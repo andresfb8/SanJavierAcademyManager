@@ -78,7 +78,7 @@ export default function PlayerProfilePage() {
   const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
   const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
   payments.push(..._prevPayments)
-  const { data: attendance = [] } = useAttendanceQuery()
+  const { data: attendance = [], isLoading: isLoadingAttendance } = useAttendanceQuery()
   const { data: evaluations = [] } = useEvaluationsQuery()
 
 
@@ -523,7 +523,12 @@ export default function PlayerProfilePage() {
                   <CardTitle className="text-base">Registro de asistencia</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {playerAttendance.length === 0 ? (
+                  {isLoadingAttendance ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mb-3"></div>
+                      <p className="text-sm">Cargando datos de asistencia...</p>
+                    </div>
+                  ) : playerAttendance.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                       <Activity className="h-10 w-10 mb-3" />
                       <p className="text-sm">No hay registros de asistencia</p>

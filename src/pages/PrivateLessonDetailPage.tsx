@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
+import { deleteFirestoreDoc } from '@/lib/firestoreSync'
 import {
   ArrowLeft,
   Users,
@@ -45,7 +46,7 @@ export default function PrivateLessonDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const { privateLessons, coaches, courts, players, updatePrivateLesson, deletePrivateLesson, markPrivateLessonPaymentPaid, addPrivateLessonPayment } = useDataStore()
-  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
+  const { data: privateLessonPayments = [], isFetched } = usePrivateLessonPaymentsQuery()
 
 
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
@@ -60,21 +61,70 @@ export default function PrivateLessonDetailPage() {
     [privateLessonPayments, id]
   )
 
+  // Migration, cleanup and repair effect
   useEffect(() => {
-    if (!lesson || lesson.playerIds.length === 0 || lessonPayments.length > 0) return
-    const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
-    const perPlayer = lesson.price / Math.max(lesson.playerIds.length, 1)
-    for (let i = 0; i < lesson.playerIds.length; i++) {
-      addPrivateLessonPayment({
-        lessonId: lesson.id,
-        lessonDate,
-        playerId: lesson.playerIds[i],
-        playerName: lesson.playerNames[i] || 'Jugador',
-        amount: perPlayer,
-        status: lesson.isPaid ? 'pagado' : 'pendiente',
-      })
+    if (!lesson || !isFetched) return
+    
+    // 1. MIGRATION: If there are players but no individual payments, create them
+    if (lesson.playerIds.length > 0 && lessonPayments.length === 0) {
+      const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
+      const perPlayer = lesson.price / Math.max(lesson.playerIds.length, 1)
+      
+      // Safety: Only add if perPlayer is a valid positive number
+      if (perPlayer >= 0) {
+        for (let i = 0; i < lesson.playerIds.length; i++) {
+          addPrivateLessonPayment({
+            lessonId: lesson.id,
+            lessonDate,
+            playerId: lesson.playerIds[i],
+            playerName: lesson.playerNames[i] || 'Jugador',
+            amount: perPlayer || 0,
+            status: lesson.isPaid ? 'pagado' : 'pendiente',
+          })
+        }
+      }
+      return
     }
-  }, [lesson?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // 2. CLEANUP & REPAIR: Handle duplicates and 0€ prices
+    const playerPaymentsMap: Record<string, typeof lessonPayments> = {}
+    lessonPayments.forEach(p => {
+      if (!playerPaymentsMap[p.playerId]) playerPaymentsMap[p.playerId] = []
+      playerPaymentsMap[p.playerId].push(p)
+    })
+
+    const perPlayerCalculated = lesson.price / Math.max(lesson.playerIds.length, 1)
+
+    Object.entries(playerPaymentsMap).forEach(([playerId, payments]) => {
+      // DUPLICATE REMOVAL
+      if (payments.length > 1) {
+        const sorted = [...payments].sort((a, b) => {
+          if (a.status === 'pagado' && b.status !== 'pagado') return -1
+          if (b.status === 'pagado' && a.status !== 'pagado') return 1
+          const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
+          const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
+          return dateB - dateA
+        })
+
+        const [toKeep, ...toDelete] = sorted
+        toDelete.forEach(p => {
+          deleteFirestoreDoc('privateLessonPayments', p.id)
+        })
+        
+        // After cleanup, check if the one we kept needs a price repair
+        if (toKeep.amount === 0 && perPlayerCalculated > 0) {
+          useDataStore.getState().updatePrivateLessonPayment(toKeep.id, { amount: perPlayerCalculated })
+        }
+      } 
+      // PRICE REPAIR (for non-duplicates with 0€)
+      else if (payments.length === 1) {
+        const p = payments[0]
+        if (p.amount === 0 && perPlayerCalculated > 0) {
+          useDataStore.getState().updatePrivateLessonPayment(p.id, { amount: perPlayerCalculated })
+        }
+      }
+    })
+  }, [lesson?.id, isFetched, lessonPayments.length, lesson?.price]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
 
