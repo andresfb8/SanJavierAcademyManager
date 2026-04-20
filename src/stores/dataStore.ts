@@ -22,6 +22,7 @@ import type {
   PrivateLesson,
   Invitation,
   AcademyEvent,
+  EventExpense,
   EventPayment,
   PrivateLessonPayment,
   Evaluation,
@@ -172,6 +173,8 @@ export interface DataState {
   addEvent: (...args: any[]) => any
   updateEvent: (...args: any[]) => any
   deleteEvent: (...args: any[]) => any
+  addEventExpense: (eventId: string, expense: Omit<EventExpense, 'id'>) => void
+  removeEventExpense: (eventId: string, expenseId: string) => void
   addEventPayment: (...args: any[]) => any
   updateEventPayment: (...args: any[]) => any
   updateCoachSalaryConfig: (...args: any[]) => any
@@ -1108,6 +1111,33 @@ export const useDataStore = create<DataState>()(
           userId,
           userName,
         })
+      },
+
+      addEventExpense: (eventId: string, expense: Omit<EventExpense, 'id'>) => {
+        const newExpense: EventExpense = { ...expense, id: generateId() }
+        const event = get().events.find((e) => e.id === eventId)
+        if (!event) return
+        const updatedExpenses = [...(event.expenses ?? []), newExpense]
+        set((state) => ({
+          events: state.events.map((e) =>
+            e.id === eventId ? { ...e, expenses: updatedExpenses } : e
+          ),
+        }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('events', eventId, { expenses: updatedExpenses } as any, clubId, { merge: true })
+      },
+
+      removeEventExpense: (eventId: string, expenseId: string) => {
+        const event = get().events.find((e) => e.id === eventId)
+        if (!event) return
+        const updatedExpenses = (event.expenses ?? []).filter((ex) => ex.id !== expenseId)
+        set((state) => ({
+          events: state.events.map((e) =>
+            e.id === eventId ? { ...e, expenses: updatedExpenses } : e
+          ),
+        }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('events', eventId, { expenses: updatedExpenses } as any, clubId, { merge: true })
       },
 
       addEventPayment: (paymentData) => {

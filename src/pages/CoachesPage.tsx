@@ -49,6 +49,7 @@ import type { Coach, StaffRole } from '@/types'
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/authStore'
+import { useEventPaymentsQuery } from '@/hooks/useQueries'
 
 // ==========================================
 // CoachesPage - Gestion de personal (entrenadores y coordinadores)
@@ -104,6 +105,7 @@ export default function CoachesPage() {
     groups,
     coachSalaryConfigs,
     privateLessons,
+    events,
     invitations,
     addCoach,
     updateCoach,
@@ -111,6 +113,8 @@ export default function CoachesPage() {
     updateCoachSalaryConfig,
     addInvitation,
   } = useDataStore()
+
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
 
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -156,30 +160,52 @@ export default function CoachesPage() {
     const coachGroups = getCoachGroups(coachId)
     const adultGroupsCount = coachGroups.filter(g => g.level !== 'menores').length
     const minorsGroupsCount = coachGroups.filter(g => g.level === 'menores').length
-    
-    // Group salary
+
+    // Salary from groups
     const groupsSalary = (adultGroupsCount * (config.ratePerGroupAdults || 0)) + (minorsGroupsCount * (config.ratePerGroupMinors || 0))
-    
+
     const now = new Date()
-    // Private lessons salary
+
+    // Salary from private lessons (current month)
     const monthLessons = privateLessons.filter(
       (pl) =>
         pl.coachId === coachId &&
         new Date(pl.date).getMonth() === now.getMonth() &&
         new Date(pl.date).getFullYear() === now.getFullYear()
     )
-    
-    const lessonsSalary = monthLessons.reduce((acc, lesson) => {
-       if (config.privateLessonPaymentType === 'fixed') {
-         return acc + (config.privateLessonRate || 0)
-       } else {
-         return acc + (lesson.price * ((config.privateLessonRate || 0) / 100))
-       }
-    }, 0)
-    
-    // NOTE: Event salary can be estimated if events with the coach exist, but currently not included in estimation
 
-    return groupsSalary + lessonsSalary + (config.bonuses || 0)
+    const lessonsSalary = monthLessons.reduce((acc, lesson) => {
+      if (config.privateLessonPaymentType === 'fixed') {
+        return acc + (config.privateLessonRate || 0)
+      } else {
+        return acc + (lesson.price * ((config.privateLessonRate || 0) / 100))
+      }
+    }, 0)
+
+    // Salary from events (current month) — based on net profit
+    const monthEvents = events.filter(
+      (ev) =>
+        ev.coachIds.includes(coachId) &&
+        new Date(ev.date).getMonth() === now.getMonth() &&
+        new Date(ev.date).getFullYear() === now.getFullYear()
+    )
+
+    const eventsSalary = monthEvents.reduce((acc, ev) => {
+      const totalIngresos = eventPayments
+        .filter((ep) => ep.eventId === ev.id && ep.status === 'pagado')
+        .reduce((s, ep) => s + ep.amount, 0)
+      const totalGastos = (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0)
+      const beneficioNeto = Math.max(0, totalIngresos - totalGastos)
+      const numCoaches = ev.coachIds.length || 1
+
+      if (config.eventPaymentType === 'percentage') {
+        return acc + (beneficioNeto * ((config.eventRate || 0) / 100)) / numCoaches
+      } else {
+        return acc + (config.eventRate || 0) / numCoaches
+      }
+    }, 0)
+
+    return groupsSalary + lessonsSalary + eventsSalary + (config.bonuses || 0)
   }
 
   const handleSubmit = () => {

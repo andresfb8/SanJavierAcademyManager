@@ -226,6 +226,7 @@ export function hasPermission(role: UserRole, module: string, action: string = '
       payments: ['read', 'write', 'generate'], coaches: ['read', 'write', 'delete'],
       agenda: ['read', 'write'], settings: ['read', 'write'], users: ['read', 'write', 'delete'],
       informes: ['read', 'write', 'delete'], events: ['read', 'write', 'delete'],
+      informes_mensuales: ['read', 'generate'],
     },
     coordinador: {
       dashboard: ['read', 'write'], players: ['read', 'write', 'delete', 'import', 'export'],
@@ -233,24 +234,28 @@ export function hasPermission(role: UserRole, module: string, action: string = '
       payments: ['read', 'write', 'generate'], coaches: ['read', 'write', 'delete'],
       agenda: ['read', 'write'], settings: ['read', 'write'], users: [],
       informes: ['read', 'write', 'delete'], events: ['read', 'write', 'delete'],
+      informes_mensuales: ['read', 'generate'],
     },
     entrenador: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read', 'write'], payments: [], coaches: [],
       agenda: ['read'], settings: [], users: [],
       informes: ['read', 'write'], events: ['read'],
+      informes_mensuales: [],
     },
     jugador: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read'], payments: ['read'], coaches: [],
       agenda: ['read'], settings: [], users: [],
       informes: ['read'], events: ['read'],
+      informes_mensuales: [],
     },
     tutor: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read'], payments: ['read'], coaches: [],
       agenda: ['read'], settings: [], users: [],
       informes: ['read'], events: ['read'],
+      informes_mensuales: [],
     },
   }
   return permissions[role]?.[module]?.includes(action) ?? false

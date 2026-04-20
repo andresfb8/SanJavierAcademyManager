@@ -43,7 +43,7 @@ import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery,
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { events, players, coaches, courts, updateEvent, deleteEvent, addEventPayment, updateEventPayment, markEventPaymentPaid } = useDataStore()
+  const { events, players, coaches, courts, updateEvent, deleteEvent, addEventPayment, updateEventPayment, markEventPaymentPaid, addEventExpense, removeEventExpense } = useDataStore()
   const { data: eventPayments = [] } = useEventPaymentsQuery()
 
 
@@ -73,6 +73,10 @@ export default function EventDetailPage() {
   const [editPrice, setEditPrice] = useState('')
   const [editMaxCapacity, setEditMaxCapacity] = useState('')
   const [editDescription, setEditDescription] = useState('')
+
+  // Estado para gastos del evento
+  const [newExpenseDescription, setNewExpenseDescription] = useState('')
+  const [newExpenseAmount, setNewExpenseAmount] = useState('')
 
   // ===================
   // DATOS DERIVADOS
@@ -115,6 +119,13 @@ export default function EventDetailPage() {
         .reduce((sum, ep) => sum + ep.amount, 0),
     [thisEventPayments]
   )
+
+  const totalGastos = useMemo(
+    () => (event?.expenses ?? []).reduce((sum, ex) => sum + ex.amount, 0),
+    [event?.expenses]
+  )
+
+  const beneficioNeto = totalCobrado - totalGastos
 
   const isCoachWithoutAccess = isEntrenador && (!event || !event.coachIds.includes(currentCoachId ?? ''))
 
@@ -209,6 +220,16 @@ export default function EventDetailPage() {
     })
 
     setGuestNameInput('')
+  }
+
+  const handleAddExpense = () => {
+    if (!event || !newExpenseDescription.trim() || !newExpenseAmount) return
+    addEventExpense(event.id, {
+      description: newExpenseDescription.trim(),
+      amount: parseFloat(newExpenseAmount) || 0,
+    })
+    setNewExpenseDescription('')
+    setNewExpenseAmount('')
   }
 
   const activeCourts = useMemo(() => courts.filter((c) => c.isActive), [courts])
@@ -581,9 +602,100 @@ export default function EventDetailPage() {
         </Card>
 
         {/* ============================== */}
+        {/* GASTOS DEL EVENTO              */}
+        {/* ============================== */}
+        {!isCoachWithoutAccess && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Euro className="h-4 w-4" />
+                Gastos del evento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Formulario para añadir gasto */}
+              <div className="flex items-end gap-3 mb-4 pb-4 border-b">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Concepto</label>
+                  <Input
+                    placeholder="Ej: Material, premio, alquiler..."
+                    value={newExpenseDescription}
+                    onChange={(e) => setNewExpenseDescription(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddExpense() } }}
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Importe (€)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newExpenseAmount}
+                    onChange={(e) => setNewExpenseAmount(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddExpense() } }}
+                  />
+                </div>
+                <Button
+                  onClick={handleAddExpense}
+                  disabled={!newExpenseDescription.trim() || !newExpenseAmount}
+                >
+                  <Euro className="h-4 w-4 mr-1" />
+                  Añadir
+                </Button>
+              </div>
+
+              {/* Lista de gastos */}
+              {(!event.expenses || event.expenses.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-6 space-y-2">
+                  <p className="text-sm text-muted-foreground">No hay gastos registrados para este evento</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {event.expenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell className="text-sm">{expense.description}</TableCell>
+                        <TableCell className="text-right text-sm font-medium text-red-600">
+                          -{formatCurrency(expense.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => removeEventExpense(event.id, expense.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="border-t-2">
+                      <TableCell className="font-semibold text-sm">Total gastos</TableCell>
+                      <TableCell className="text-right font-bold text-red-600">
+                        -{formatCurrency(totalGastos)}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ============================== */}
         {/* RESUMEN ESTADISTICAS           */}
         {/* ============================== */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -618,12 +730,26 @@ export default function EventDetailPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Total pendiente
+                <Euro className="h-4 w-4" />
+                Total gastos
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-yellow-600">{formatCurrency(totalPendiente)}</p>
+              <p className="text-2xl font-bold text-red-600">{formatCurrency(totalGastos)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Beneficio neto
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-2xl font-bold ${beneficioNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(beneficioNeto)}
+              </p>
             </CardContent>
           </Card>
         </div>

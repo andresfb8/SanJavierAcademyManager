@@ -27,6 +27,7 @@ import CoachProfilePage from '@/pages/CoachProfilePage'
 import EvaluacionesPage from '@/pages/EvaluacionesPage'
 import ActivityLogPage from '@/pages/ActivityLogPage'
 import InvoicesPage from '@/pages/InvoicesPage'
+import ReportsPage from '@/pages/ReportsPage'
 
 function RoleRoute({
   children,
@@ -106,7 +107,8 @@ export default function App() {
           <Route path="/facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
           <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
           <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
-          <Route path="/informes" element={<EvaluacionesPage />} />
+          <Route path="/informes" element={<RoleRoute module="settings"><EvaluacionesPage /></RoleRoute>} />
+          <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
           <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
           <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
           <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />

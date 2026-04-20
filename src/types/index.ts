@@ -362,6 +362,13 @@ export interface Invitation {
 // --- Evento (mini torneos, clinics, etc.) ---
 export type EventType = 'mini_torneo' | 'clinic' | 'exhibicion' | 'social'
 
+// Gasto individual de un evento (material, premios, alquiler, etc.)
+export interface EventExpense {
+  id: string
+  description: string
+  amount: number
+}
+
 export interface AcademyEvent {
   id: string
   name: string
@@ -380,6 +387,7 @@ export interface AcademyEvent {
   maxCapacity?: number
   description?: string
   guestNames?: string[]
+  expenses?: EventExpense[]   // Lista de gastos del evento para calcular beneficio neto
   isActive: boolean
   createdAt: Date
 }
