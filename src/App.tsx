@@ -28,6 +28,7 @@ import EvaluacionesPage from '@/pages/EvaluacionesPage'
 import ActivityLogPage from '@/pages/ActivityLogPage'
 import InvoicesPage from '@/pages/InvoicesPage'
 import ReportsPage from '@/pages/ReportsPage'
+import FinancialsPage from '@/pages/FinancialsPage'
 
 function RoleRoute({
   children,
@@ -109,6 +110,7 @@ export default function App() {
           <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
           <Route path="/informes" element={<RoleRoute module="settings"><EvaluacionesPage /></RoleRoute>} />
           <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
+          <Route path="/finanzas" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
           <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
           <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
           <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />

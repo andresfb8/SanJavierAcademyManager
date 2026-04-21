@@ -12,18 +12,23 @@ function getClubId() {
 
 // --- PAYMENTS & INVOICES ---
 
-export function usePaymentsQuery(year: number, month?: number) {
+export function usePaymentsQuery(year?: number | number[], month?: number) {
   const clubId = getClubId()
   
   return useQuery({
-    queryKey: ['payments', clubId, year, month],
+    queryKey: ['payments', clubId, Array.isArray(year) ? year.join('-') : year, month],
     queryFn: async () => {
       if (!clubId) return []
       
       const constraints: QueryConstraint[] = [
-        where('clubId', '==', clubId),
-        where('billingYear', '==', year)
+        where('clubId', '==', clubId)
       ]
+      
+      if (Array.isArray(year)) {
+        constraints.push(where('billingYear', 'in', year))
+      } else if (year) {
+        constraints.push(where('billingYear', '==', year))
+      }
       if (month) constraints.push(where('billingMonth', '==', month))
         
       const q = query(collection(db, 'payments'), ...constraints)
@@ -62,7 +67,7 @@ export function usePrivateLessonPaymentsQuery() {
   })
 }
 
-export function useNormalizedPaymentsQuery(year: number, month?: number) {
+export function useNormalizedPaymentsQuery(year: number | number[], month?: number) {
   const paymentsQ = usePaymentsQuery(year, month)
   const eventsQ = useEventPaymentsQuery()
   const privateQ = usePrivateLessonPaymentsQuery()
@@ -125,6 +130,33 @@ export function useInvoicesQuery(year?: number) {
         })
       }
       return allInvoices
+    },
+    enabled: !!clubId
+  })
+}
+
+// --- FINANCIALS ---
+
+export function useClubTransactionsQuery(year?: number | number[], month?: number) {
+  const clubId = getClubId()
+  return useQuery({
+    queryKey: ['clubTransactions', clubId, Array.isArray(year) ? year.join('-') : year, month],
+    queryFn: async () => {
+      if (!clubId) return []
+      
+      const q = query(collection(db, 'clubTransactions'), where('clubId', '==', clubId))
+      const snap = await getDocs(q)
+      let transactions = snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as import('@/types').ClubTransaction))
+      
+      if (year) {
+        transactions = transactions.filter(t => {
+          const d = t.date instanceof Date ? t.date : new Date(t.date)
+          let match = Array.isArray(year) ? year.includes(d.getFullYear()) : d.getFullYear() === year
+          if (month) match = match && (d.getMonth() + 1) === month
+          return match
+        })
+      }
+      return transactions.sort((a, b) => b.date.getTime() - a.date.getTime())
     },
     enabled: !!clubId
   })

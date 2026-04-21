@@ -551,3 +551,22 @@ export interface Invoice {
   createdAt: Date
   createdBy: string        // userId
 }
+
+// --- Transacciones Financieras del Club (P&L) ---
+export type TransactionType = 'ingreso' | 'gasto'
+export type TransactionCategory = 'alquiler' | 'suministros' | 'material' | 'reparaciones' | 'publicidad' | 'limpieza' | 'nomina' | 'otro'
+
+export interface ClubTransaction {
+  id: string
+  clubId: string
+  type: TransactionType
+  category: TransactionCategory
+  concept: string
+  amount: number
+  date: Date
+  registeredBy?: string // userId del usuario que la registró
+  relatedId?: string    // Ej: coachId para vincular la nómina a un entrenador
+  notes?: string
+  createdAt: Date
+}
+

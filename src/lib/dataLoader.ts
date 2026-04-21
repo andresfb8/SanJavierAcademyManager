@@ -28,6 +28,7 @@ import type {
   Evaluation,
   MatchReport,
   CoachSalaryConfig,
+  ClubTransaction,
 } from '@/types'
 
 export async function loadAllData(clubId: string): Promise<void> {
@@ -42,6 +43,7 @@ export async function loadAllData(clubId: string): Promise<void> {
     invitations,
     events,
     coachSalaryConfigs,
+    clubTransactions,
   ] = await Promise.all([
     loadCollection<Court>('courts', clubId),
     loadCollection<Tariff>('tariffs', clubId),
@@ -53,6 +55,7 @@ export async function loadAllData(clubId: string): Promise<void> {
     loadCollection<Invitation>('invitations', clubId),
     loadCollection<AcademyEvent>('events', clubId),
     loadCollection<CoachSalaryConfig>('coachSalaryConfigs', clubId),
+    loadCollection<ClubTransaction>('clubTransactions', clubId),
   ])
 
   useDataStore.setState({
@@ -65,6 +68,7 @@ export async function loadAllData(clubId: string): Promise<void> {
     privateLessons,
     invitations,
     events,
+    clubTransactions,
     coachSalaryConfigs: coachSalaryConfigs.map(c => normalizeSalaryConfig(c as unknown as Record<string, unknown>) as unknown as typeof c),
   })
 

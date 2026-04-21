@@ -68,6 +68,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: 'Pagos', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
       { name: 'Facturas', href: '/facturas', icon: Receipt, requiredModule: 'payments' },
+      { name: 'Beneficios y Gastos', href: '/finanzas', icon: BarChart3, requiredModule: 'informes_mensuales' },
     ],
   },
   {

@@ -184,6 +184,12 @@ export interface DataState {
   addMatchReport: (...args: any[]) => any
   deleteMatchReport: (...args: any[]) => any
   addActivity: (...args: any[]) => any
+
+  // --- Financials (P&L) ---
+  clubTransactions: import('@/types').ClubTransaction[]
+  addTransaction: (transaction: Omit<import('@/types').ClubTransaction, 'id' | 'createdAt' | 'clubId' | 'registeredBy'>) => Promise<void>
+  updateTransaction: (id: string, data: Partial<import('@/types').ClubTransaction>) => Promise<void>
+  deleteTransaction: (id: string) => Promise<void>
 }
 
 const defaultClub: Club = {
@@ -288,6 +294,71 @@ export const useDataStore = create<DataState>()(
       coachSalaryConfigs: [],
       users: [],
       holidays: [],
+      clubTransactions: [],
+
+      // --- Financials (P&L) ---
+      addTransaction: async (transactionData) => {
+        const clubId = getClubId()
+        const { userId, userName } = getCurrentUser()
+        if (!clubId) {
+          console.error('[addTransaction] No clubId found')
+          return
+        }
+
+        const newTransaction: import('@/types').ClubTransaction = {
+          ...transactionData,
+          id: generateId(),
+          clubId,
+          registeredBy: userId,
+          createdAt: new Date(),
+        }
+
+        set((state) => ({ clubTransactions: [...state.clubTransactions, newTransaction] }))
+        await syncDoc('clubTransactions', newTransaction.id, newTransaction as any, clubId)
+
+        get().addActivity({
+          type: 'payment_manual', // Reuse payment_manual or create new activity type if desired
+          description: `Se registró un ${newTransaction.type} de ${newTransaction.amount}€ en la categoría ${newTransaction.category}`,
+          relatedEntityId: newTransaction.id,
+          userId,
+          userName,
+        })
+        queryClient.invalidateQueries({ queryKey: ['clubTransactions'] })
+      },
+
+      updateTransaction: async (id, data) => {
+        set((state) => ({
+          clubTransactions: state.clubTransactions.map((t) => (t.id === id ? { ...t, ...data } : t)),
+        }))
+        const clubId = getClubId()
+        const updated = get().clubTransactions.find((t) => t.id === id)
+        if (clubId && updated) await syncDoc('clubTransactions', id, updated as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'payment_updated', // We use existing activity type for simplicity
+          description: `Se actualizó el registro financiero ${id}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
+        queryClient.invalidateQueries({ queryKey: ['clubTransactions'] })
+      },
+
+      deleteTransaction: async (id) => {
+        const transaction = get().clubTransactions.find((t) => t.id === id)
+        set((state) => ({ clubTransactions: state.clubTransactions.filter((t) => t.id !== id) }))
+        deleteFirestoreDoc('clubTransactions', id)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'payment_deleted',
+          description: `Se eliminó el registro financiero ${transaction?.concept || id}`,
+          relatedEntityId: id,
+          userId,
+          userName,
+        })
+        queryClient.invalidateQueries({ queryKey: ['clubTransactions'] })
+      },
+
       updateClub: (data) => {
         set((state) => ({
           club: state.club ? { ...state.club, ...data } : null,

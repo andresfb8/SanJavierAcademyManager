@@ -412,6 +412,18 @@ service cloud.firestore {
       allow delete: if hasRole('director') && belongsToClub();
     }
 
+    // ─── Club Transactions Collection ───────────────────────────────────
+    // Tracking of manual operational expenses, extra incomes, and payroll records.
+    // director/coordinador: CRUD completo dentro de su club.
+    // otros roles: sin acceso.
+
+    match /clubTransactions/{transactionId} {
+      allow read: if isAdmin() && belongsToClub();
+      allow create: if isAdmin() && incomingBelongsToClub();
+      allow update: if isAdmin() && belongsToClub() && incomingBelongsToClub();
+      allow delete: if isAdmin() && belongsToClub();
+    }
+
     // ─── Methodology Parameters Collection ──────────────────────────────
     // Global catalog of teaching parameters.
     // director/coordinador: full CRUD (though typically they only manage their own club's data,

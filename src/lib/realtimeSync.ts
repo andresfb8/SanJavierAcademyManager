@@ -23,6 +23,7 @@ const COLLECTIONS = [
   { name: 'coachSalaryConfigs', stateKey: 'coachSalaryConfigs' },
   { name: 'users', stateKey: 'users' },
   { name: 'settings_holidays', stateKey: 'holidays' },
+  { name: 'clubTransactions', stateKey: 'clubTransactions' },
 ] as const
 
 /**

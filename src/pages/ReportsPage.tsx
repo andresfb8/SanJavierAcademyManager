@@ -15,7 +15,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery } from '@/hooks/useQueries'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useClubTransactionsQuery } from '@/hooks/useQueries'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ExcelJS from 'exceljs'
@@ -86,6 +86,7 @@ export default function ReportsPage() {
   const { data: payments = [] } = usePaymentsQuery(year, month)
   const { data: eventPayments = [] } = useEventPaymentsQuery()
   const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
+  const { data: transactions = [] } = useClubTransactionsQuery(year, month)
 
   // =====================================
   // COMPUTED DATA FOR PREVIEW
@@ -176,8 +177,13 @@ export default function ReportsPage() {
     [clasesDelMes, privateLessonPayments]
   )
 
-  const totalIngresos = ingresosCuotas + ingresosEventos + ingresosClases
-  const beneficioNetoTotal = totalIngresos - gastosEventos
+  // -- Transacciones manuales del mes --
+  const extrasIngresos = useMemo(() => transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + t.amount, 0), [transactions])
+  const extrasGastos = useMemo(() => transactions.filter(t => t.type === 'gasto').reduce((sum, t) => sum + t.amount, 0), [transactions])
+
+  const totalIngresos = ingresosCuotas + ingresosEventos + ingresosClases + extrasIngresos
+  const totalGastos = gastosEventos + extrasGastos
+  const beneficioNetoTotal = totalIngresos - totalGastos
 
   // -- Morosidad (pagos pendientes vencidos antes de fin de mes) --
   const morosos = useMemo(() => {
@@ -319,23 +325,28 @@ export default function ReportsPage() {
           ['Ingresos por cuotas', fmt(ingresosCuotas)],
           ['Ingresos por eventos', fmt(ingresosEventos)],
           ['Ingresos por clases particulares', fmt(ingresosClases)],
+          ['Otros ingresos', fmt(extrasIngresos)],
           ['TOTAL INGRESOS', fmt(totalIngresos)],
           ['Gastos de eventos', fmt(-gastosEventos)],
+          ['Gastos de explotación y nóminas', fmt(-extrasGastos)],
           ['BENEFICIO NETO', fmt(beneficioNetoTotal)],
         ],
         headStyles: { fillColor: [51, 65, 85], textColor: 255, fontSize: 9 },
         bodyStyles: { fontSize: 9 },
         didParseCell: (data) => {
-          if (data.row.index === 3 || data.row.index === 5) {
+          if (data.row.index === 4 || data.row.index === 7) {
             data.cell.styles.fontStyle = 'bold'
-            if (data.row.index === 5) {
+            if (data.row.index === 7) {
               data.cell.styles.fillColor = beneficioNetoTotal >= 0 ? [220, 252, 231] : [254, 226, 226]
               data.cell.styles.textColor = beneficioNetoTotal >= 0 ? [21, 128, 61] : [185, 28, 28]
             } else {
               data.cell.styles.fillColor = [241, 245, 249]
             }
           }
-          if (data.row.index === 4 && data.column.index === 1) {
+          if (data.row.index === 5 && data.column.index === 1) {
+            data.cell.styles.textColor = [185, 28, 28]
+          }
+          if (data.row.index === 6 && data.column.index === 1) {
             data.cell.styles.textColor = [185, 28, 28]
           }
         },
@@ -540,13 +551,15 @@ export default function ReportsPage() {
       wsEco.addRow({ concepto: 'Ingresos por cuotas', importe: ingresosCuotas })
       wsEco.addRow({ concepto: 'Ingresos por eventos', importe: ingresosEventos })
       wsEco.addRow({ concepto: 'Ingresos por clases', importe: ingresosClases })
+      wsEco.addRow({ concepto: 'Otros ingresos', importe: extrasIngresos })
       wsEco.addRow({ concepto: 'TOTAL INGRESOS', importe: totalIngresos })
       wsEco.addRow({ concepto: 'Gastos de eventos', importe: -gastosEventos })
+      wsEco.addRow({ concepto: 'Gastos de explotación y nóminas', importe: -extrasGastos })
       wsEco.addRow({ concepto: 'BENEFICIO NETO', importe: beneficioNetoTotal })
       
       wsEco.getRow(1).font = { bold: true }
-      wsEco.getRow(5).font = { bold: true }
-      wsEco.getRow(7).font = { bold: true }
+      wsEco.getRow(6).font = { bold: true }
+      wsEco.getRow(9).font = { bold: true }
 
       // Worksheet 2: Altas y Bajas
       const wsAltasBajas = workbook.addWorksheet('Movimientos Jugadores')
@@ -729,12 +742,12 @@ export default function ReportsPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <TrendingDown className="h-4 w-4" />
-                Gastos de eventos
+                Gastos del mes
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-red-600">{formatCurrency(gastosEventos)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{eventosDelMes.length} evento(s) en el mes</p>
+              <p className="text-2xl font-bold text-red-600">{formatCurrency(totalGastos)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Eventos {formatCurrency(gastosEventos)} · Explotación {formatCurrency(extrasGastos)}</p>
             </CardContent>
           </Card>
 
