@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,6 +78,29 @@ export default function SettingsPage() {
   const [deleteTariffId, setDeleteTariffId] = useState<string | null>(null)
 
 
+  // Sync form with store when club data arrives (e.g. after realtimeSync or dataLoader)
+  useEffect(() => {
+    if (club) {
+      setClubForm({
+        name: club.name || '',
+        address: club.address || '',
+        phone: club.phone || '',
+        email: club.email || '',
+        openingTime: club.openingTime || '08:00',
+        closingTime: club.closingTime || '22:00',
+        iban: club.iban || '',
+        bic: club.bic || '',
+        creditorId: club.creditorId || '',
+        nif: club.nif || '',
+        legalName: club.legalName || '',
+        fiscalAddress: club.fiscalAddress || '',
+        defaultVatRateTariffs: club.defaultVatRateTariffs ?? 0,
+        defaultVatRateEvents: club.defaultVatRateEvents ?? 21,
+        defaultVatRatePrivateLessons: club.defaultVatRatePrivateLessons ?? 21,
+        defaultVatRateOther: club.defaultVatRateOther ?? 21,
+      })
+    }
+  }, [club])
 
   const handleSaveClub = () => {
     updateClub(clubForm)

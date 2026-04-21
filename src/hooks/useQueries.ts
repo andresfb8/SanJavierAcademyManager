@@ -79,6 +79,36 @@ export function useNormalizedPaymentsQuery(year: number, month?: number) {
   return { data, isLoading, isError, refetch: () => { paymentsQ.refetch(); eventsQ.refetch(); privateQ.refetch(); } }
 }
 
+export function useAllPendingPaymentsQuery() {
+  const clubId = getClubId()
+  return useQuery({
+    queryKey: ['allPendingPayments', clubId],
+    queryFn: async () => {
+      if (!clubId) return []
+      const q = query(collection(db, 'payments'), where('clubId', '==', clubId), where('status', '==', 'pendiente'))
+      const snap = await getDocs(q)
+      return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Payment))
+    },
+    enabled: !!clubId
+  })
+}
+
+export function useAllPendingNormalizedPaymentsQuery() {
+  const pendingQ = useAllPendingPaymentsQuery()
+  const eventsQ = useEventPaymentsQuery()
+  const privateQ = usePrivateLessonPaymentsQuery()
+
+  const isLoading = pendingQ.isLoading || eventsQ.isLoading || privateQ.isLoading
+
+  const data = normalizeAllPayments(
+    pendingQ.data || [],
+    (eventsQ.data || []).filter(p => p.status === 'pendiente'),
+    (privateQ.data || []).filter(p => p.status === 'pendiente')
+  )
+
+  return { data, isLoading, refetch: () => { pendingQ.refetch(); eventsQ.refetch(); privateQ.refetch(); } }
+}
+
 export function useInvoicesQuery(year?: number) {
   const clubId = getClubId()
   return useQuery({

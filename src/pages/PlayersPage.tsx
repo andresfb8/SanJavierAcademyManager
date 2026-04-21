@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useDataStore } from '@/stores/dataStore'
-import { cn, isMinor as checkIsMinor, formatDate, normalizeText } from '@/lib/utils'
+import { cn, isMinor as checkIsMinor, formatDate, normalizeText, formatCurrency } from '@/lib/utils'
 import { PLAYER_LEVELS, PLAYER_STATUSES } from '@/constants'
 import {
   useReactTable,
@@ -24,6 +24,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { downloadXlsx } from '@/lib/excel'
+import { useAllPendingNormalizedPaymentsQuery } from '@/hooks/useQueries'
 import type { Player, PlayerLevel, PlayerStatus } from '@/types'
 import {
   Plus, Search, Upload, Download, Users, Mail, Phone,
@@ -44,6 +45,16 @@ export default function PlayersPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
+
+  const { data: allPendingPayments = [] } = useAllPendingNormalizedPaymentsQuery()
+
+  const pendingByPlayer = useMemo(() => {
+    const map: Record<string, number> = {}
+    allPendingPayments.forEach(p => {
+      map[p.playerId] = (map[p.playerId] || 0) + p.amount
+    })
+    return map
+  }, [allPendingPayments])
 
   const filteredPlayers = useMemo(() => {
     const q = normalizeText(search)
@@ -201,13 +212,21 @@ export default function PlayersPage() {
       header: 'Jugador',
       cell: ({ row }) => {
         const player = row.original
+        const debt = pendingByPlayer[player.id] || 0
         return (
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">
               {player.firstName[0]}{player.lastName[0]}
             </div>
             <div>
-              <p className="font-medium text-sm">{player.firstName} {player.lastName}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-sm">{player.firstName} {player.lastName}</p>
+                {debt > 0 && (
+                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-destructive text-destructive-foreground">
+                    🔴 {formatCurrency(debt)}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {player.isMinor && '👶 Menor · '}{player.dni}
               </p>

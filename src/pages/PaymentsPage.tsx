@@ -53,10 +53,10 @@ import {
 } from '@tanstack/react-table'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { downloadXlsxAoa } from '@/lib/excel'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery, useAllPendingNormalizedPaymentsQuery } from '@/hooks/useQueries'
 
 
-type ViewMode = 'mensual' | 'anual'
+type ViewMode = 'mensual' | 'anual' | 'morosidad'
 
 // --- Annual summary row type ---
 interface AnnualSummaryRow {
@@ -103,6 +103,7 @@ export default function PaymentsPage() {
   const { data: eventPayments = [] } = useEventPaymentsQuery()
   const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
   const { data: invoices = [] } = useInvoicesQuery()
+  const { data: allPendingPayments = [] } = useAllPendingNormalizedPaymentsQuery()
 
 
   const now = new Date()
@@ -267,6 +268,47 @@ export default function PaymentsPage() {
 
     return { totalIngresos, totalPendiente, tasaCobroAnual, totalRecibos }
   }, [annualSummary, allPayments, selectedYear])
+
+  // --- Morosidad group data ---
+  const pendingByPlayer = useMemo(() => {
+    const grouped = pendingPaymentsMap(allPendingPayments)
+    return Object.values(grouped).sort((a, b) => b.totalDebt - a.totalDebt)
+  }, [allPendingPayments])
+
+  function pendingPaymentsMap(payments: NormalizedPayment[]) {
+    const map: Record<string, {
+      playerId: string
+      playerName: string
+      totalDebt: number
+      receiptCount: number
+      oldestMonth: number
+      oldestYear: number
+    }> = {}
+    
+    payments.forEach(p => {
+      if (!map[p.playerId]) {
+        map[p.playerId] = {
+          playerId: p.playerId,
+          playerName: p.playerName,
+          totalDebt: 0,
+          receiptCount: 0,
+          oldestMonth: p.billingMonth,
+          oldestYear: p.billingYear
+        }
+      }
+      map[p.playerId].totalDebt += p.amount
+      map[p.playerId].receiptCount += 1
+      
+      const pDate = new Date(p.billingYear, p.billingMonth - 1)
+      const cDate = new Date(map[p.playerId].oldestYear, map[p.playerId].oldestMonth - 1)
+      if (pDate < cDate) {
+        map[p.playerId].oldestMonth = p.billingMonth
+        map[p.playerId].oldestYear = p.billingYear
+      }
+    })
+    
+    return map
+  }
 
   // --- Selection handlers ---
   const handleTogglePayment = (paymentId: string) => {
@@ -603,6 +645,18 @@ export default function PaymentsPage() {
         ],
       ]
       downloadXlsxAoa(wsData, 'Resumen Anual', `pagos_anual_${selectedYear}.xlsx`)
+    } else if (viewMode === 'morosidad') {
+      const wsData = [
+        ['Jugador', 'Deuda Total', 'Recibos', 'Mes mas antiguo'],
+        ...pendingByPlayer.map((r) => [
+          r.playerName,
+          r.totalDebt,
+          r.receiptCount,
+          r.oldestMonth ? `${MONTHS.find(m => m.value === r.oldestMonth)?.label} ${r.oldestYear}` : '-'
+        ]),
+        ['TOTAL', pendingByPlayer.reduce((s, r) => s + r.totalDebt, 0), pendingByPlayer.reduce((s, r) => s + r.receiptCount, 0), '']
+      ]
+      downloadXlsxAoa(wsData, 'Morosidad', `morosidad_${selectedMonth}_${selectedYear}.xlsx`)
     } else {
       const wsData = [
         ['Jugador', 'Concepto', 'Grupo', 'Categoria', 'Importe', 'Estado', 'Vencimiento', 'Fecha pago', 'Metodo', 'Registrado por'],
@@ -721,7 +775,9 @@ export default function PaymentsPage() {
         subtitle={
           viewMode === 'mensual'
             ? `${selectedMonthLabel} ${selectedYear} · ${totalRecibos} recibos`
-            : `Resumen anual ${selectedYear}`
+            : viewMode === 'anual'
+              ? `Resumen anual ${selectedYear}`
+              : `${pendingByPlayer.length} alumnos con deudas`
         }
         actions={
           <div className="flex items-center gap-2">
@@ -853,6 +909,17 @@ export default function PaymentsPage() {
               >
                 <BarChart3 className="h-4 w-4" />
                 Anual
+              </button>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'morosidad'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                onClick={() => setViewMode('morosidad')}
+              >
+                <AlertCircle className="h-4 w-4" />
+                Morosidad
               </button>
             </div>
 
@@ -1083,6 +1150,73 @@ export default function PaymentsPage() {
                         <span className="text-sm font-bold">{annualTotals.totalRecibos}</span>
                       </TableCell>
                     </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ========== MOROSIDAD VIEW ========== */}
+        {viewMode === 'morosidad' && (
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Jugador</TableHead>
+                      <TableHead className="text-right">Recibos</TableHead>
+                      <TableHead className="text-right">Mes más antiguo</TableHead>
+                      <TableHead className="text-right">Deuda Total</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingByPlayer.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                          No hay alumnos con deudas en el sistema.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pendingByPlayer.map((row) => (
+                        <TableRow key={row.playerId}>
+                          <TableCell>
+                            <span className="font-medium text-sm">{row.playerName}</span>
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            {row.receiptCount}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {MONTHS.find(m => m.value === row.oldestMonth)?.label} {row.oldestYear}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-sm font-bold text-destructive">
+                              {formatCurrency(row.totalDebt)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              title="Avisar por WhatsApp"
+                              onClick={() => {
+                                const player = players.find(p => p.id === row.playerId)
+                                const phone = player?.phone ?? player?.guardian?.phone ?? ''
+                                const clubName = club?.name ?? 'Club de Padel San Javier'
+                                const msg = `Hola ${row.playerName}, te recordamos desde ${clubName} que tienes recibos pendientes por un importe total de ${formatCurrency(row.totalDebt)}. Por favor, realiza el pago cuando puedas. ¡Gracias!`
+                                setWhatsAppPayload({ phone, message: msg, recipientName: row.playerName })
+                              }}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-2" />
+                              Avisar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
