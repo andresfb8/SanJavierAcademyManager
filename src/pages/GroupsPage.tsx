@@ -73,7 +73,9 @@ export default function GroupsPage() {
 
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [coachFilter, setCoachFilter] = useState<string>('')
+  const [sortBy, setSortBy] = useState<'schedule' | 'name'>('schedule')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showDialog, setShowDialog] = useState(false)
   const [editingGroup, setEditingGroup] = useState<Group | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
@@ -104,13 +106,32 @@ export default function GroupsPage() {
   )
 
   const filteredGroups = useMemo(() => {
-    return groups.filter((g) => {
+    const filtered = groups.filter((g) => {
       const matchesSearch = search === '' || g.name.toLowerCase().includes(search.toLowerCase())
       const matchesLevel = levelFilter === '' || g.level === levelFilter
-      const matchesCoach = !isEntrenador || g.coachId === currentCoach?.id
+      const matchesCoach = isEntrenador 
+        ? g.coachId === currentCoach?.id 
+        : coachFilter === '' || g.coachId === coachFilter
       return matchesSearch && matchesLevel && matchesCoach
     })
-  }, [groups, search, levelFilter, isEntrenador, currentCoach])
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name)
+      }
+      
+      const aSlot = a.schedule[0]
+      const bSlot = b.schedule[0]
+      if (!aSlot && !bSlot) return 0
+      if (!aSlot) return 1
+      if (!bSlot) return -1
+
+      if (aSlot.dayOfWeek !== bSlot.dayOfWeek) {
+        return aSlot.dayOfWeek - bSlot.dayOfWeek
+      }
+      return aSlot.startTime.localeCompare(bSlot.startTime)
+    })
+  }, [groups, search, levelFilter, coachFilter, sortBy, isEntrenador, currentCoach])
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
 
@@ -289,7 +310,11 @@ export default function GroupsPage() {
     <div>
       <Header
         title="Grupos"
-        subtitle={`${activeGroupsCount} activos · ${groups.length} total`}
+        subtitle={
+          (search || levelFilter || coachFilter)
+            ? `${filteredGroups.length} grupos encontrados`
+            : `${activeGroupsCount} activos · ${groups.length} total`
+        }
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={filteredGroups.length === 0}>
@@ -308,8 +333,8 @@ export default function GroupsPage() {
 
       <div className="p-6 space-y-4">
         {/* Filters and view toggle */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por nombre del grupo..."
@@ -320,6 +345,29 @@ export default function GroupsPage() {
           </div>
           <Select
             options={[
+              { value: 'schedule', label: 'Ordenar: Horario' },
+              { value: 'name', label: 'Ordenar: Nombre' },
+            ]}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'schedule' | 'name')}
+            className="w-full sm:w-40"
+          />
+          {!isEntrenador && (
+            <Select
+              options={[
+                { value: '', label: 'Todos los entrenadores' },
+                ...activeCoaches.map((c) => ({
+                  value: c.id,
+                  label: `${c.firstName} ${c.lastName}`
+                }))
+              ]}
+              value={coachFilter}
+              onChange={(e) => setCoachFilter(e.target.value)}
+              className="w-full sm:w-48"
+            />
+          )}
+          <Select
+            options={[
               { value: '', label: 'Todos los niveles' },
               ...PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label })),
             ]}
@@ -327,7 +375,7 @@ export default function GroupsPage() {
             onChange={(e) => setLevelFilter(e.target.value)}
             className="w-full sm:w-48"
           />
-          <div className="flex items-center border rounded-md">
+          <div className="flex items-center border rounded-md shrink-0">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               size="icon"
@@ -363,17 +411,27 @@ export default function GroupsPage() {
                 ? (group.currentEnrollment / group.maxCapacity) * 100
                 : 0
 
+              const activeEnrollments = enrollments.filter(e => e.groupId === group.id && e.isActive)
+              const groupPlayers = activeEnrollments
+                .map(e => players.find(p => p.id === e.playerId))
+                .filter(Boolean) as any[]
+              
+              const displayPlayers = groupPlayers.slice(0, 4)
+              const remainingPlayers = groupPlayers.length - 4
+
               return (
                 <Card
                   key={group.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  className="cursor-pointer hover:shadow-md transition-shadow flex flex-col"
                   onClick={() => navigate(`/grupos/${group.id}`)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <CardTitle className="text-base">{group.name}</CardTitle>
-                        <StatusBadge status={group.level} />
+                        <CardTitle className="text-base leading-tight">{group.name}</CardTitle>
+                        <div className="mt-1">
+                          <StatusBadge status={group.level} />
+                        </div>
                       </div>
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -395,33 +453,62 @@ export default function GroupsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 shrink-0" />
-                        <span>{group.coachName || 'Sin entrenador'}</span>
+                  <CardContent className="space-y-4 flex-1 flex flex-col">
+                    <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground bg-muted/30 p-2 rounded-lg">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <User className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate" title={group.coachName || 'Sin entrenador'}>{group.coachName || 'Sin entrenador'}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 shrink-0" />
-                        <span>{group.courtName || 'Sin pista'}</span>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate" title={group.courtName || 'Sin pista'}>{group.courtName || 'Sin pista'}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 shrink-0" />
-                        <span>{formatSchedule(group.schedule)}</span>
+                      <div className="flex items-center gap-1.5 col-span-2 truncate">
+                        <Clock className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate" title={formatSchedule(group.schedule)}>{formatSchedule(group.schedule)}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-sm">
+                    <div className="flex-1 min-h-[100px]">
+                      {groupPlayers.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Alumnos ({group.currentEnrollment})
+                          </div>
+                          <div className="space-y-1.5">
+                            {displayPlayers.map(p => (
+                              <div key={p.id} className="flex items-center gap-2 text-sm">
+                                <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                  {p.firstName?.charAt(0)}{p.lastName?.charAt(0)}
+                                </div>
+                                <span className="truncate font-medium text-foreground/90">{p.firstName}</span>
+                              </div>
+                            ))}
+                            {remainingPlayers > 0 && (
+                              <div className="text-xs text-muted-foreground pl-8 pt-0.5">
+                                + {remainingPlayers} alumno{remainingPlayers !== 1 ? 's' : ''} más
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center border-2 border-dashed rounded-lg p-4 bg-muted/20">
+                          <span className="text-sm text-muted-foreground">Sin alumnos inscritos</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t mt-auto">
+                      <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Ocupación</span>
                         <span className="font-medium">
-                          {group.currentEnrollment} / {group.maxCapacity}
+                          {group.currentEnrollment} / {group.maxCapacity} plazas
                         </span>
                       </div>
                       <Progress
                         value={group.currentEnrollment}
                         max={group.maxCapacity}
-                        className="h-2"
+                        className="h-1.5"
                         indicatorClassName={getOccupancyColor(group.currentEnrollment, group.maxCapacity)}
                       />
                     </div>
@@ -440,9 +527,8 @@ export default function GroupsPage() {
                     <tr className="border-b bg-muted/50">
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Grupo</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Nivel</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Entrenador</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Pista</th>
-                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Horario</th>
+                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Detalles</th>
+                      <th className="p-3 text-left text-sm font-medium text-muted-foreground">Alumnos</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Ocupación</th>
                       {!isEntrenador && <th className="p-3 text-right text-sm font-medium text-muted-foreground w-24">Acciones</th>}
                     </tr>
@@ -459,31 +545,46 @@ export default function GroupsPage() {
                           className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
                           onClick={() => navigate(`/grupos/${group.id}`)}
                         >
-                          <td className="p-3">
+                          <td className="p-3 align-top">
                             <span className="font-medium text-sm">{group.name}</span>
                           </td>
-                          <td className="p-3">
+                          <td className="p-3 align-top">
                             <StatusBadge status={group.level} />
                           </td>
-                          <td className="p-3 hidden md:table-cell">
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <User className="h-3.5 w-3.5" />
-                              {group.coachName || 'Sin entrenador'}
+                          <td className="p-3 hidden md:table-cell align-top">
+                            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
+                                <User className="h-3.5 w-3.5" />
+                                {group.coachName || 'Sin entrenador'}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {group.courtName || 'Sin pista'}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="h-3.5 w-3.5" />
+                                {formatSchedule(group.schedule)}
+                              </div>
                             </div>
                           </td>
-                          <td className="p-3 hidden md:table-cell">
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {group.courtName || 'Sin pista'}
+                          <td className="p-3 align-top">
+                            <div className="text-sm">
+                              {(() => {
+                                const activeEnrollments = enrollments.filter(e => e.groupId === group.id && e.isActive)
+                                const groupPlayers = activeEnrollments
+                                  .map(e => players.find(p => p.id === e.playerId))
+                                  .filter(Boolean) as any[]
+                                return groupPlayers.length > 0 ? (
+                                  <span className="text-foreground/90">
+                                    {groupPlayers.map(p => p.firstName).join(', ')}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground italic text-xs">Sin alumnos</span>
+                                )
+                              })()}
                             </div>
                           </td>
-                          <td className="p-3 hidden lg:table-cell">
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5" />
-                              {formatSchedule(group.schedule)}
-                            </div>
-                          </td>
-                          <td className="p-3">
+                          <td className="p-3 align-top">
                             <div className="flex items-center gap-2">
                               <Progress
                                 value={group.currentEnrollment}
@@ -497,7 +598,7 @@ export default function GroupsPage() {
                             </div>
                           </td>
                           {!isEntrenador && (
-                            <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td className="p-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
                               <div className="flex justify-end gap-1">
                                 <Button
                                   variant="ghost"

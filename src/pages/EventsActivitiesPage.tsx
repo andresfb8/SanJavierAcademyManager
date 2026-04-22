@@ -236,6 +236,20 @@ export default function EventsActivitiesPage() {
     })
   }, [unifiedItems, activeTab, search, coachFilter, dateFrom, dateTo])
 
+  const { totalClasses, totalIncome } = useMemo(() => {
+    let classes = 0
+    let income = 0
+    for (const item of filteredItems) {
+      classes++
+      if (item.type === 'event') {
+        income += (item.price * item.attendeeCount)
+      } else {
+        income += item.price
+      }
+    }
+    return { totalClasses: classes, totalIncome: income }
+  }, [filteredItems])
+
   const eventsCount = events.filter((e) => e.isActive).length
   const lessonsCount = privateLessons.length
 
@@ -622,6 +636,18 @@ export default function EventsActivitiesPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot className="bg-muted/50 font-medium border-t">
+                    <tr>
+                      <td colSpan={7} className="p-3 text-right">Totales:</td>
+                      <td className="p-3">
+                        <div className="flex flex-col">
+                          <span>{formatCurrency(totalIncome)}</span>
+                          <span className="text-xs text-muted-foreground">{totalClasses} actividades</span>
+                        </div>
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </CardContent>
