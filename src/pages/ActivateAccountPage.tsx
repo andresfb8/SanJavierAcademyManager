@@ -42,11 +42,11 @@ export default function ActivateAccountPage() {
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirmPassword) {
-      toast({ title: "Las contraseñas no coinciden", variant: "destructive" })
+      toast.error("Las contraseñas no coinciden")
       return
     }
     if (password.length < 6) {
-      toast({ title: "La contraseña debe tener al menos 6 caracteres", variant: "destructive" })
+      toast.error("La contraseña debe tener al menos 6 caracteres")
       return
     }
 
@@ -64,17 +64,13 @@ export default function ActivateAccountPage() {
       })
       
       setIsSuccess(true)
-      toast({ title: "¡Cuenta activada con éxito!" })
+      toast.success("¡Cuenta activada con éxito!")
       
       // Redirigir al dashboard después de un momento
       setTimeout(() => navigate('/'), 2000)
     } catch (err: any) {
       console.error(err)
-      toast({ 
-        title: "Error al activar cuenta", 
-        description: err.message || "Ocurrió un error inesperado",
-        variant: "destructive" 
-      })
+      toast.error(err.message || "Ocurrió un error inesperado")
     }
   }
 

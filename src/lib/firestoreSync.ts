@@ -571,3 +571,33 @@ export async function createInvoiceAtomic(
     throw error
   })
 }
+
+/**
+ * Desvincula pagos de una factura atómicamente
+ */
+export async function unlinkPaymentsFromInvoiceAtomic(
+  paymentIds: string[]
+): Promise<void> {
+  if (paymentIds.length === 0) return
+
+  return runTransaction(db, async (transaction) => {
+    const paymentCollections = ['payments', 'eventPayments', 'privateLessonPayments']
+    
+    for (const paymentId of paymentIds) {
+      let found = false
+      for (const collectionName of paymentCollections) {
+        const paymentRef = doc(db, collectionName, paymentId)
+        const paymentSnap = await transaction.get(paymentRef)
+        
+        if (paymentSnap.exists()) {
+          transaction.update(paymentRef, { invoiceId: null })
+          found = true
+          break
+        }
+      }
+      if (!found) {
+        console.warn(`[Firestore] Payment ${paymentId} not found during unlinking`)
+      }
+    }
+  })
+}

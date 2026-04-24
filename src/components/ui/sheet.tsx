@@ -22,15 +22,17 @@ function SheetTrigger({ children, ...props }: React.ButtonHTMLAttributes<HTMLBut
   return <button onClick={() => setOpen(true)} {...props}>{children}</button>
 }
 
-function SheetContent({ children, className, side = "left" }: { children: React.ReactNode; className?: string; side?: "left" | "right" }) {
+function SheetContent({ children, className, side = "left" }: { children: React.ReactNode; className?: string; side?: "left" | "right" | "bottom" }) {
   const { open, setOpen } = React.useContext(SheetContext)
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-50">
       <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
       <div className={cn(
-        "fixed inset-y-0 z-50 w-72 bg-background p-6 shadow-lg transition-transform",
-        side === "left" ? "left-0" : "right-0",
+        "fixed z-50 bg-background shadow-lg transition-transform",
+        side === "left" && "inset-y-0 left-0 w-72",
+        side === "right" && "inset-y-0 right-0 w-72",
+        side === "bottom" && "inset-x-0 bottom-0 h-auto",
         className
       )}>
         <button onClick={() => setOpen(false)} className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100">

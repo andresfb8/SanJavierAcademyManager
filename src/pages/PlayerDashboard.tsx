@@ -207,7 +207,7 @@ export default function PlayerDashboard() {
                   <div>
                     <h4 className="text-sm font-bold text-slate-700">{group.name}</h4>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                      {group.schedule.map(s => formatDate(new Date(), { weekday: 'short' })).join(', ')} · {group.coachName}
+                      {group.schedule.map(s => ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][s.dayOfWeek]).join(', ')} · {group.coachName}
                     </p>
                   </div>
                 </div>

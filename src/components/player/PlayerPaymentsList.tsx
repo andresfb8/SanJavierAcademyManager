@@ -7,7 +7,6 @@ import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Download, FileText, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
 import { generateInvoicePDF } from '@/lib/invoice-pdf'
-import { Skeleton } from '@/components/ui/skeleton'
 
 interface PlayerPaymentsListProps {
   playerId: string
@@ -35,7 +34,7 @@ export function PlayerPaymentsList({ playerId }: PlayerPaymentsListProps) {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          <div key={i} className="h-24 w-full rounded-xl bg-slate-100 animate-pulse" />
         ))}
       </div>
     )

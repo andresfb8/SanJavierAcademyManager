@@ -36,6 +36,7 @@ import {
   Phone,
   Trophy,
   MapPin,
+  Bell,
 } from 'lucide-react'
 import {
   BarChart,

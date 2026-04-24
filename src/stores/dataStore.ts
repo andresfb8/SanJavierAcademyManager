@@ -36,6 +36,7 @@ import type {
   Invoice,
   AppUser,
   Holiday,
+  AttendanceNotice,
 } from '@/types'
 import {
   demoCourts,
@@ -117,7 +118,7 @@ export interface DataState {
   deleteTariff: (id: string) => void
 
   // --- Players CRUD ---
-  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus'>) => void
+  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus'>) => string
   updatePlayer: (id: string, updates: Partial<Player>) => void
   invitePlayer: (id: string) => Promise<void>
   bulkInvitePlayers: (ids: string[]) => Promise<void>
@@ -158,6 +159,7 @@ export interface DataState {
   checkAndAutoGenerateReceipts: () => Promise<void>
   cleanupOrphanedPayments: () => void
   deleteAllPayments: () => Promise<void>
+  bulkGenerateInvoices: (paymentIds: string[]) => Promise<void>
 
   // --- Invoices ---
   addAttendanceRecord: (...args: any[]) => any
@@ -460,6 +462,7 @@ export const useDataStore = create<DataState>()(
           userId,
           userName,
         })
+        return newPlayer.id
       },
 
       updatePlayer: (id, data) => {
@@ -1522,7 +1525,7 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         const { players, club } = get()
         if (!clubId || !club) {
-          toast({ title: 'Error', description: 'Datos incompletos para generar facturas', variant: 'destructive' })
+          toast.error('Datos incompletos para generar facturas')
           return
         }
 
@@ -1577,18 +1580,11 @@ export const useDataStore = create<DataState>()(
             successCount++
           }
 
-          toast({ 
-            title: 'Facturación completada', 
-            description: `Se han generado ${successCount} facturas para ${playerIds.length} jugadores.`,
-          })
+          toast.success(`Se han generado ${successCount} facturas para ${playerIds.length} jugadores.`)
 
         } catch (error) {
           console.error('[DataStore] bulkGenerateInvoices failed:', error)
-          toast({ 
-            title: 'Error en facturación masiva', 
-            description: error instanceof Error ? error.message : 'Error desconocido', 
-            variant: 'destructive' 
-          })
+          toast.error(error instanceof Error ? error.message : 'Error desconocido')
         }
       },
 
@@ -1620,7 +1616,7 @@ export const useDataStore = create<DataState>()(
         }
       },
 
-      addAttendanceNotice: (noticeData) => {
+      addAttendanceNotice: (noticeData: Omit<AttendanceNotice, 'id' | 'createdAt'>) => {
         const newNotice: import('@/types').AttendanceNotice = { 
           ...noticeData, 
           id: generateId(), 

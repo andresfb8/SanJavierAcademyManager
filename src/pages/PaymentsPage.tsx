@@ -14,6 +14,7 @@ import { StatCard } from '@/components/shared/StatCard'
 import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDialog'
 import { useDataStore } from '@/stores/dataStore'
+import { toast } from '@/hooks/use-toast'
 import {
   DollarSign,
   TrendingUp,
@@ -314,7 +315,7 @@ export default function PaymentsPage() {
   const handleBulkGenerateInvoices = () => {
     const toInvoice = filteredPayments.filter(p => p.status === 'pagado' && !p.invoiceId)
     if (toInvoice.length === 0) {
-      toast({ title: 'Atención', description: 'No hay pagos cobrados pendientes de facturar en este mes', variant: 'default' })
+      toast.info('No hay pagos cobrados pendientes de facturar en este mes')
       return
     }
 

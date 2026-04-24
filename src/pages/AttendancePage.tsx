@@ -450,7 +450,7 @@ export default function AttendancePage() {
       return
     }
     const dayName = new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' })
-    const message = `🎾 *Hueco Libre para Recuperación*\n\n¡Hola! Tenemos ${absences} hueco(s) disponible(s) hoy ${dayName} en el grupo *${selectedGroup.name}* (${selectedGroup.scheduleText}).\n\nSi quieres aprovechar tu crédito de recuperación, ¡avísanos ahora! 🚀`
+    const message = `🎾 *Hueco Libre para Recuperación*\n\n¡Hola! Tenemos ${absences} hueco(s) disponible(s) hoy ${dayName} en el grupo *${selectedGroup.name}* (${selectedGroup.schedule}).\n\nSi quieres aprovechar tu crédito de recuperación, ¡avísanos ahora! 🚀`
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, '_blank')
   }

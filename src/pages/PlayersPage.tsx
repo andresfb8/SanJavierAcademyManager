@@ -136,7 +136,7 @@ export default function PlayersPage() {
 
   const handleImport = async (importedPlayers: ImportedPlayer[]) => {
     for (const p of importedPlayers) {
-      const newPlayerId = await addPlayer({
+      await addPlayer({
         firstName: p.firstName,
         lastName: p.lastName,
         dni: p.dni || '',
@@ -157,11 +157,6 @@ export default function PlayersPage() {
         isMinor: p.birthDate ? checkIsMinor(new Date(p.birthDate)) : false,
         notes: undefined,
       })
-      
-      // Si tiene email, invitar automáticamente al portal
-      if (newPlayerId && p.email) {
-        invitePlayer(newPlayerId)
-      }
     }
     setShowImportDialog(false)
   }
