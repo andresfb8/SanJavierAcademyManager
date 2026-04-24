@@ -29,6 +29,7 @@ import ActivityLogPage from '@/pages/ActivityLogPage'
 import InvoicesPage from '@/pages/InvoicesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import FinancialsPage from '@/pages/FinancialsPage'
+import PlayerDashboard from '@/pages/PlayerDashboard'
 
 function RoleRoute({
   children,
@@ -63,7 +64,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { initAuth, isLoading } = useAuthStore()
+  const { initAuth, isLoading, user } = useAuthStore()
 
   useEffect(() => {
     const unsubscribe = initAuth()
@@ -85,7 +86,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/activar/:token" element={<ActivateAccountPage />} />
+        <Route path="/activar-cuenta" element={<ActivateAccountPage />} />
         <Route
           element={
             <ProtectedRoute>
@@ -93,7 +94,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/" element={user?.role === 'jugador' ? <PlayerDashboard /> : <DashboardPage />} />
           <Route path="/jugadores" element={<PlayersPage />} />
           <Route path="/jugadores/:id" element={<PlayerProfilePage />} />
           <Route path="/grupos" element={<GroupsPage />} />

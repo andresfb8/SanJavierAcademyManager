@@ -96,7 +96,7 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { groups, players, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, deletePayment, deleteEventPayment, deletePrivateLessonPayment, generateMonthlyReceipts, addManualPayment } = useDataStore()
+  const { groups, players, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, deletePayment, deleteEventPayment, deletePrivateLessonPayment, generateMonthlyReceipts, addManualPayment, bulkGenerateInvoices } = useDataStore()
   const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
   const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
   payments.push(..._prevPayments)
@@ -311,6 +311,18 @@ export default function PaymentsPage() {
   }
 
   // --- Selection handlers ---
+  const handleBulkGenerateInvoices = () => {
+    const toInvoice = filteredPayments.filter(p => p.status === 'pagado' && !p.invoiceId)
+    if (toInvoice.length === 0) {
+      toast({ title: 'Atención', description: 'No hay pagos cobrados pendientes de facturar en este mes', variant: 'default' })
+      return
+    }
+
+    if (window.confirm(`¿Deseas generar facturas para ${toInvoice.length} pagos agrupados por jugador?`)) {
+      bulkGenerateInvoices(toInvoice.map(p => p.id))
+    }
+  }
+
   const handleTogglePayment = (paymentId: string) => {
     setSelectedPaymentIds((prev) => {
       const next = new Set(prev)
@@ -807,6 +819,16 @@ export default function PaymentsPage() {
                     <span className="sm:hidden">{selectedPaymentIds.size}</span>
                   </Button>
                 )}
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleBulkGenerateInvoices} 
+                  title="Generar facturas de todos los pagos cobrados de este mes"
+                  className="gap-1 border-primary/20 hover:border-primary/40 text-primary"
+                >
+                  <Receipt className="h-4 w-4" />
+                  <span className="hidden sm:inline">Facturar mes</span>
+                </Button>
                 <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
                   <FileText className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Generar cuotas</span>

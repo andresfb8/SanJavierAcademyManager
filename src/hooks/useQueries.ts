@@ -135,6 +135,44 @@ export function useInvoicesQuery(year?: number) {
   })
 }
 
+export function usePlayerPaymentsQuery(playerId: string) {
+  const clubId = getClubId()
+  return useQuery({
+    queryKey: ['playerPayments', clubId, playerId],
+    queryFn: async () => {
+      if (!clubId || !playerId) return []
+      const q = query(collection(db, 'payments'), where('clubId', '==', clubId), where('playerId', '==', playerId))
+      const snap = await getDocs(q)
+      return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Payment))
+        .sort((a, b) => {
+          const ad = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)
+          const bd = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)
+          return bd.getTime() - ad.getTime()
+        })
+    },
+    enabled: !!clubId && !!playerId
+  })
+}
+
+export function usePlayerInvoicesQuery(playerId: string) {
+  const clubId = getClubId()
+  return useQuery({
+    queryKey: ['playerInvoices', clubId, playerId],
+    queryFn: async () => {
+      if (!clubId || !playerId) return []
+      const q = query(collection(db, 'invoices'), where('clubId', '==', clubId), where('playerId', '==', playerId))
+      const snap = await getDocs(q)
+      return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Invoice))
+        .sort((a, b) => {
+          const ad = a.invoiceDate instanceof Date ? a.invoiceDate : new Date(a.invoiceDate)
+          const bd = b.invoiceDate instanceof Date ? b.invoiceDate : new Date(b.invoiceDate)
+          return bd.getTime() - ad.getTime()
+        })
+    },
+    enabled: !!clubId && !!playerId
+  })
+}
+
 // --- FINANCIALS ---
 
 export function useClubTransactionsQuery(year?: number | number[], month?: number) {

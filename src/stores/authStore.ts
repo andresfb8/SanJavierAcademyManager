@@ -7,6 +7,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
+  createUserWithEmailAndPassword,
   type User as FirebaseUser,
 } from 'firebase/auth'
 import {
@@ -31,6 +32,7 @@ interface AuthState {
   resetPassword: (email: string) => Promise<void>
   changePassword: (currentPass: string, newPass: string) => Promise<void>
   setUser: (user: AppUser | null) => void
+  signupPlayer: (email: string, pass: string, playerId: string) => Promise<void>
   initAuth: () => () => void
 }
 
@@ -52,6 +54,7 @@ function clearDataStore(): void {
     invitations: [],
     events: [],
     coachSalaryConfigs: [],
+    attendanceNotices: [],
   })
 }
 
@@ -132,7 +135,7 @@ async function loadUserProfile(
           console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
         }
         // Iniciar listeners en tiempo real
-        _dataUnsubscribe = subscribeToAllData(appUser.clubId, () => {
+        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
           setDataLoading(false)
         })
       })
@@ -174,9 +177,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
     // 2. Limpiar datos del store para el siguiente usuario
     clearDataStore()
-    // 3. Cerrar sesión en Firebase Auth (dispara la rama null de onAuthStateChanged)
-    signOut(auth)
+    // 3. Cerrar sesión en Firebase Auth
+    signOut(auth).catch(err => console.error('[Auth] Logout error:', err))
     set({ user: null, isAuthenticated: false, isDataLoading: false })
+    
+    // 4. Forzar redirección al login para limpiar cualquier estado residual del router
+    window.location.href = '/login'
   },
 
   resetPassword: async (email: string) => {
@@ -194,6 +200,29 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setUser: (user) => {
     set({ user, isAuthenticated: !!user })
+  },
+
+  signupPlayer: async (email, pass, playerId) => {
+    set({ isLoading: true })
+    try {
+      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, pass)
+      
+      // Crear perfil de usuario en Firestore con rol jugador
+      const userDocRef = doc(db, 'users', firebaseUser.uid)
+      await setDoc(userDocRef, {
+        email,
+        displayName: email.split('@')[0],
+        role: 'jugador',
+        clubId: 'club-001',
+        linkedPlayerId: playerId,
+        isActive: true,
+        createdAt: new Date(),
+      })
+      
+      // Note: onAuthStateChanged will handle the rest (loadUserProfile, etc)
+    } finally {
+      set({ isLoading: false })
+    }
   },
 
   initAuth: () => {

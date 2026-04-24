@@ -85,6 +85,7 @@ const ROLE_COLORS: Record<string, string> = {
   director: 'from-amber-500 to-amber-600',
   coordinador: 'from-teal-500 to-teal-600',
   entrenador: 'from-emerald-500 to-emerald-600',
+  jugador: 'from-blue-500 to-blue-600',
 }
 
 export function Sidebar() {
@@ -105,6 +106,11 @@ export function Sidebar() {
     items.some((item) => isItemActive(item.href))
 
   const filterItem = (item: NavItem) => {
+    // Si es jugador, solo permitimos ver el Dashboard (portal)
+    if (user?.role === 'jugador') {
+      return item.href === '/'
+    }
+
     if (item.requiredModule && user?.role) {
       return hasPermission(user.role as UserRole, item.requiredModule, 'read')
     }
@@ -225,17 +231,17 @@ export function Sidebar() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setIsPasswordDialogOpen(true)}
-              className="rounded-lg p-2 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150"
+              className="rounded-xl p-2.5 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150 active:scale-95"
               title="Cambiar contraseña"
             >
-              <KeyRound className="h-4 w-4" />
+              <KeyRound className="h-5 w-5" />
             </button>
             <button
               onClick={logout}
-              className="rounded-lg p-2 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150"
+              className="rounded-xl p-2.5 text-red-500/70 hover:bg-red-500/10 hover:text-red-500 transition-all duration-150 active:scale-95 ml-1"
               title="Cerrar sesión"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
         </div>

@@ -24,6 +24,10 @@ const COLLECTIONS = [
   { name: 'users', stateKey: 'users' },
   { name: 'settings_holidays', stateKey: 'holidays' },
   { name: 'clubTransactions', stateKey: 'clubTransactions' },
+  { name: 'payments', stateKey: 'payments' },
+  { name: 'eventPayments', stateKey: 'eventPayments' },
+  { name: 'privateLessonPayments', stateKey: 'privateLessonPayments' },
+  { name: 'invoices', stateKey: 'invoices' },
 ] as const
 
 /**
@@ -65,12 +69,32 @@ export function normalizeSalaryConfig(doc: Record<string, unknown>): Record<stri
 
 export function subscribeToAllData(
   clubId: string,
+  userRole: string,
   onFirstLoad: () => void
 ): () => void {
   const unsubscribers: Array<() => void> = []
   const loaded = new Set<string>()
+  
+  // Filtrar colecciones según permisos del rol
+  const allowedCollections = COLLECTIONS.filter(coll => {
+    // Reglas de suscripción básicas por rol
+    if (userRole === 'director' || userRole === 'coordinador') return true
+    
+    if (userRole === 'entrenador') {
+      // Entrenadores no ven finanzas ni configs de otros
+      return !['coachSalaryConfigs', 'clubTransactions', 'invitations'].includes(coll.name)
+    }
+    
+    if (userRole === 'jugador' || userRole === 'tutor') {
+      // Jugadores solo ven lo esencial para su portal
+      return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments'].includes(coll.name)
+    }
+    
+    return true
+  })
+
   // +1 for the club document listener
-  const TOTAL = COLLECTIONS.length + 1
+  const TOTAL = allowedCollections.length + 1
   let firstLoadCalled = false
 
   const markLoaded = (name: string) => {
@@ -83,7 +107,7 @@ export function subscribeToAllData(
     }
   }
 
-  for (const { name, stateKey } of COLLECTIONS) {
+  for (const { name, stateKey } of allowedCollections) {
     const q = query(collection(db, name), where('clubId', '==', clubId))
 
     const unsub = onSnapshot(

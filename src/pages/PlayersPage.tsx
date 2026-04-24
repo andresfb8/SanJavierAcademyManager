@@ -132,9 +132,11 @@ export default function PlayersPage() {
     setEditingPlayer(null)
   }
 
-  const handleImport = (importedPlayers: ImportedPlayer[]) => {
+  const { invitePlayer } = useDataStore()
+
+  const handleImport = async (importedPlayers: ImportedPlayer[]) => {
     for (const p of importedPlayers) {
-      addPlayer({
+      const newPlayerId = await addPlayer({
         firstName: p.firstName,
         lastName: p.lastName,
         dni: p.dni || '',
@@ -155,6 +157,11 @@ export default function PlayersPage() {
         isMinor: p.birthDate ? checkIsMinor(new Date(p.birthDate)) : false,
         notes: undefined,
       })
+      
+      // Si tiene email, invitar automáticamente al portal
+      if (newPlayerId && p.email) {
+        invitePlayer(newPlayerId)
+      }
     }
     setShowImportDialog(false)
   }
@@ -230,6 +237,16 @@ export default function PlayersPage() {
               <p className="text-xs text-muted-foreground">
                 {player.isMinor && '👶 Menor · '}{player.dni}
               </p>
+              {player.invitationStatus === 'sent' && (
+                <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded-md">
+                  <Mail className="h-3 w-3" /> Invitación enviada
+                </div>
+              )}
+              {player.invitationStatus === 'active' && (
+                <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-1.5 py-0.5 rounded-md">
+                  <CheckCircle2 className="h-3 w-3" /> Portal Activo
+                </div>
+              )}
             </div>
           </div>
         )
@@ -427,6 +444,21 @@ export default function PlayersPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Invitar al portal */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+              onClick={() => {
+                const { bulkInvitePlayers } = useDataStore.getState()
+                bulkInvitePlayers(Array.from(selectedIds))
+                setSelectedIds(new Set())
+              }}
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Enviar invitaciones
+            </Button>
 
             <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
               Deseleccionar

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,9 @@ import {
   ClipboardList,
   Save,
   Download,
+  RotateCcw,
+  Phone,
+  Share2,
 } from 'lucide-react'
 import { formatDate, generateId } from '@/lib/utils'
 import { downloadXlsx } from '@/lib/excel'
@@ -48,7 +52,7 @@ function toISODate(date: Date | string): string {
 
 export default function AttendancePage() {
   const { user } = useAuthStore()
-  const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches } = useDataStore()
+  const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches, attendanceNotices } = useDataStore()
   const { data: attendance = [] } = useAttendanceQuery()
 
 
@@ -69,6 +73,11 @@ export default function AttendancePage() {
 
   // --- Estado de guardado ---
   const [saved, setSaved] = useState(false)
+
+  // --- Dialog de clase suelta ---
+  const [showOneOffDialog, setShowOneOffDialog] = useState(false)
+  const [selectedOneOffPlayerId, setSelectedOneOffPlayerId] = useState('')
+  const [oneOffPrice, setOneOffPrice] = useState('15')
 
   // --- Dialog de exportacion ---
   const [showExportDialog, setShowExportDialog] = useState(false)
@@ -92,6 +101,15 @@ export default function AttendancePage() {
     () => coaches.find((c) => c.userId === user?.id),
     [coaches, user?.id]
   )
+
+  const [searchParams] = useSearchParams()
+  const urlGroupId = searchParams.get('groupId')
+
+  useEffect(() => {
+    if (urlGroupId) {
+      setSelectedGroupId(urlGroupId)
+    }
+  }, [urlGroupId])
 
   const activeGroups = useMemo(
     () => {
@@ -285,6 +303,36 @@ export default function AttendancePage() {
     if (saved) setSaved(false)
   }
 
+  // Marcar todos como presentes
+  const handleMarkAllPresent = () => {
+    setEntries((prev) => prev.map((e) => ({ ...e, status: 'presente' })))
+    if (saved) setSaved(false)
+  }
+
+  // Anadir clase suelta
+  const handleAddOneOff = () => {
+    if (!selectedOneOffPlayerId || !oneOffPrice) return
+    const player = players.find((p) => p.id === selectedOneOffPlayerId)
+    if (!player) return
+
+    const price = parseFloat(oneOffPrice)
+    if (isNaN(price)) return
+
+    const newEntry: AttendanceEntry = {
+      playerId: player.id,
+      playerName: `${player.firstName} ${player.lastName}`,
+      status: 'presente',
+      isRecovery: false,
+      isOneOff: true,
+      oneOffPrice: price,
+    }
+
+    setEntries((prev) => [...prev, newEntry])
+    setSelectedOneOffPlayerId('')
+    setShowOneOffDialog(false)
+    if (saved) setSaved(false)
+  }
+
   // Guardar registro de asistencia
   const handleSave = () => {
     if (!selectedGroup || entries.length === 0) return
@@ -394,6 +442,19 @@ export default function AttendancePage() {
     setShowExportDialog(false)
   }
 
+  const handleNotifyFreeSlots = () => {
+    if (!selectedGroup) return
+    const absences = entries.filter(e => e.status === 'ausente' || e.status === 'justificado').length
+    if (absences === 0) {
+      alert("No hay huecos libres registrados (marca alumnos como ausentes o justificados primero)")
+      return
+    }
+    const dayName = new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' })
+    const message = `🎾 *Hueco Libre para Recuperación*\n\n¡Hola! Tenemos ${absences} hueco(s) disponible(s) hoy ${dayName} en el grupo *${selectedGroup.name}* (${selectedGroup.scheduleText}).\n\nSi quieres aprovechar tu crédito de recuperación, ¡avísanos ahora! 🚀`
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
+    window.open(whatsappUrl, '_blank')
+  }
+
   const handleOpenExportDialog = () => {
     // Reset export filters when opening
     setExportSelectedGroupIds([])
@@ -423,6 +484,14 @@ export default function AttendancePage() {
     value: p.id,
     label: `${p.firstName} ${p.lastName} (${p.recoveryCredits} cr.)`,
   }))
+
+  const allActivePlayersOptions = players
+    .filter((p) => p.status === 'activo')
+    .map((p) => ({
+      value: p.id,
+      label: `${p.firstName} ${p.lastName}`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 
   // ===================
   // RENDER
@@ -528,14 +597,43 @@ export default function AttendancePage() {
                   <CardTitle className="text-base">
                     Jugadores ({entries.length})
                   </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowRecoveryDialog(true)}
-                  >
-                    <UserPlus className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Anadir recuperacion</span>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleMarkAllPresent}
+                      className="text-green-600 border-green-200 hover:bg-green-50"
+                    >
+                      <CheckCircle className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Todos presentes</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRecoveryDialog(true)}
+                    >
+                      <RotateCcw className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Recuperacion</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowOneOffDialog(true)}
+                    >
+                      <UserPlus className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Clase Suelta</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNotifyFreeSlots}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      title="Notificar huecos libres por WhatsApp"
+                    >
+                      <Share2 className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Notificar Hueco</span>
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -559,15 +657,65 @@ export default function AttendancePage() {
                         className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center px-4 py-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
                       >
                         {/* Nombre */}
-                        <div className="col-span-4 flex items-center gap-2">
-                          <span className="font-medium text-sm">
-                            {entry.playerName}
-                          </span>
-                          {entry.isRecovery && (
-                            <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 border-blue-200">
-                              Recuperacion
-                            </Badge>
-                          )}
+                        <div className="col-span-4 flex items-center justify-between md:justify-start gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">
+                              {entry.playerName}
+                            </span>
+                            {entry.isRecovery && (
+                              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 border-blue-200">
+                                Rec.
+                              </Badge>
+                            )}
+                            {entry.isOneOff && (
+                              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-orange-100 text-orange-700 border-orange-200">
+                                Suelta
+                              </Badge>
+                            )}
+                            {(() => {
+                              const notice = attendanceNotices.find(n => 
+                                n.playerId === entry.playerId && 
+                                n.groupId === selectedGroupId && 
+                                toISODate(n.date) === selectedDate
+                              )
+                              if (!notice) return null
+                              return (
+                                <Badge 
+                                  variant={notice.type === 'absent' ? 'destructive' : 'secondary'} 
+                                  className="text-[10px] px-1.5 py-0 animate-pulse"
+                                  title={notice.notes}
+                                >
+                                  {notice.type === 'absent' ? 'No viene' : 'Viene'}
+                                </Badge>
+                              )
+                            })()}
+                          </div>
+                          
+                          {/* Quick Actions & Info */}
+                          <div className="flex items-center gap-1.5 ml-auto md:ml-2">
+                            {(() => {
+                              const player = players.find(p => p.id === entry.playerId)
+                              if (!player) return null
+                              return (
+                                <>
+                                  {player.medicalNotes && (
+                                    <Badge variant="destructive" className="h-5 w-5 p-0 flex items-center justify-center rounded-full" title={player.medicalNotes}>
+                                      <AlertCircle className="h-3 w-3" />
+                                    </Badge>
+                                  )}
+                                  <a 
+                                    href={`https://wa.me/${player.phone.replace(/\s+/g, '')}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="p-1 hover:bg-green-100 rounded text-green-600 transition-colors"
+                                    title="Enviar WhatsApp"
+                                  >
+                                    <Phone className="h-3.5 w-3.5" />
+                                  </a>
+                                </>
+                              )
+                            })()}
+                          </div>
                         </div>
 
                         {/* Botones de estado */}
@@ -915,6 +1063,57 @@ export default function AttendancePage() {
             >
               <Download className="h-4 w-4 mr-2" />
               Exportar Excel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ============================== */}
+      {/* DIALOG: ANADIR CLASE SUELTA    */}
+      {/* ============================== */}
+      <Dialog open={showOneOffDialog} onOpenChange={setShowOneOffDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Añadir clase suelta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Selecciona un jugador para añadirlo puntualmente a esta clase. 
+              Se generará un cobro pendiente automáticamente.
+            </p>
+            <div className="space-y-2">
+              <Label>Jugador</Label>
+              <Select
+                options={allActivePlayersOptions}
+                placeholder="Seleccionar jugador..."
+                value={selectedOneOffPlayerId}
+                onChange={(e) => setSelectedOneOffPlayerId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Precio de la sesión (€)</Label>
+              <Input
+                type="number"
+                value={oneOffPrice}
+                onChange={(e) => setOneOffPrice(e.target.value)}
+                placeholder="Ej: 15"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowOneOffDialog(false)
+                setSelectedOneOffPlayerId('')
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAddOneOff}
+              disabled={!selectedOneOffPlayerId || !oneOffPrice}
+            >
+              Añadir a la lista
             </Button>
           </DialogFooter>
         </DialogContent>

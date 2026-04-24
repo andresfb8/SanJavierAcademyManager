@@ -10,8 +10,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw } from 'lucide-react'
-import { formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw, Send, CheckCircle2 } from 'lucide-react'
+import { cn, formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
@@ -74,7 +74,7 @@ const attendanceStatusLabels: Record<string, string> = {
 export default function PlayerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { players, enrollments, groups, updatePlayer } = useDataStore()
+  const { players, enrollments, groups, updatePlayer, invitePlayer } = useDataStore()
   const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
   const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
   payments.push(..._prevPayments)
@@ -290,6 +290,25 @@ export default function PlayerProfilePage() {
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={player.status} />
+            {player.email && (
+              <Button 
+                variant={player.invitationStatus === 'active' ? "ghost" : "outline"} 
+                size="sm" 
+                className={cn(
+                  "gap-2",
+                  player.invitationStatus === 'active' && "text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700"
+                )}
+                onClick={() => invitePlayer(player.id)}
+                disabled={player.invitationStatus === 'active'}
+              >
+                {player.invitationStatus === 'active' ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {player.invitationStatus === 'active' ? 'Acceso Activo' : player.invitationStatus === 'sent' ? 'Re-enviar Acceso' : 'Invitar al Portal'}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
               <EditIcon className="h-4 w-4 mr-1" />
               Editar

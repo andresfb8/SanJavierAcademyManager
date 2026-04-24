@@ -61,11 +61,13 @@ import {
   updateEnrollmentStatus,
   generateMonthlyReceiptsAtomic,
   createInvoiceAtomic,
+  unlinkPaymentsFromInvoiceAtomic,
 } from '@/lib/firestoreSync'
 import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
+import { sendPlayerInvitation } from '@/lib/emailService'
 
 // Helper: obtiene el clubId del usuario autenticado para sync con Firestore
 function getClubId(): string | undefined {
@@ -99,6 +101,7 @@ export interface DataState {
   coachSalaryConfigs: CoachSalaryConfig[]
   users: AppUser[]
   holidays: Holiday[]
+  attendanceNotices: AttendanceNotice[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -114,10 +117,12 @@ export interface DataState {
   deleteTariff: (id: string) => void
 
   // --- Players CRUD ---
-  addPlayer: (player: Omit<Player, 'id' | 'createdAt' | 'updatedAt' | 'recoveryCredits'>) => void
-  updatePlayer: (id: string, data: Partial<Player>) => void
-  deletePlayer: (id: string) => void
+  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus'>) => void
+  updatePlayer: (id: string, updates: Partial<Player>) => void
+  invitePlayer: (id: string) => Promise<void>
+  bulkInvitePlayers: (ids: string[]) => Promise<void>
   cancelPlayer: (id: string) => void
+  deletePlayer: (id: string) => void
 
   // --- Coaches CRUD ---
   addCoach: (coach: Omit<Coach, 'id' | 'createdAt'>) => string
@@ -157,10 +162,10 @@ export interface DataState {
   // --- Invoices ---
   addAttendanceRecord: (...args: any[]) => any
   updateAttendanceRecord: (...args: any[]) => any
-  addInvoice: (...args: any[]) => any
-  updateInvoice: (...args: any[]) => any
-  unlinkPaymentsFromInvoice: (...args: any[]) => any
-  deleteInvoice: (...args: any[]) => any
+  addInvoice: (invoiceData: Omit<Invoice, 'id' | 'createdAt'>, newPayments?: Payment[]) => Promise<void>
+  updateInvoice: (id: string, updates: Partial<Invoice>) => Promise<void>
+  unlinkPaymentsFromInvoice: (invoiceId: string) => Promise<void>
+  deleteInvoice: (id: string) => Promise<void>
   addHolidayStore: (...args: any[]) => any
   deleteHolidayStore: (...args: any[]) => any
   updateInvitation: (...args: any[]) => any
@@ -190,6 +195,8 @@ export interface DataState {
   addTransaction: (transaction: Omit<import('@/types').ClubTransaction, 'id' | 'createdAt' | 'clubId' | 'registeredBy'>) => Promise<void>
   updateTransaction: (id: string, data: Partial<import('@/types').ClubTransaction>) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
+  deleteAttendanceNotice: (id: string) => void
+  addAttendanceNotice: (noticeData: Omit<AttendanceNotice, 'id' | 'createdAt'>) => void
 }
 
 const defaultClub: Club = {
@@ -295,6 +302,7 @@ export const useDataStore = create<DataState>()(
       users: [],
       holidays: [],
       clubTransactions: [],
+      attendanceNotices: [],
 
       // --- Financials (P&L) ---
       addTransaction: async (transactionData) => {
@@ -418,10 +426,16 @@ export const useDataStore = create<DataState>()(
 
       addPlayer: (playerData) => {
         const now = new Date()
+        const invitationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        
         const newPlayer: Player = {
           ...playerData,
           id: generateId(),
           recoveryCredits: 0,
+          invitationToken,
+          inviteCode,
+          invitationStatus: 'pending',
           createdAt: now,
           updatedAt: now,
         }
@@ -429,7 +443,13 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         if (clubId) {
           syncDoc('players', newPlayer.id, newPlayer as any, clubId)
-            .then(() => console.info(`[DataStore] addPlayer: ✅ Firestore OK`))
+            .then(() => {
+              console.info(`[DataStore] addPlayer: ✅ Firestore OK`)
+              // Automatically trigger invitation if email is present
+              if (newPlayer.email) {
+                get().invitePlayer(newPlayer.id)
+              }
+            })
             .catch((err) => console.warn(`[DataStore] addPlayer: ❌ Firestore FAILED`, err))
         }
         const { userId, userName } = getCurrentUser()
@@ -520,6 +540,55 @@ export const useDataStore = create<DataState>()(
           userId,
           userName,
         })
+      },
+      
+      invitePlayer: async (playerId) => {
+        const player = get().players.find(p => p.id === playerId)
+        if (!player || !player.email) return
+
+        try {
+          const token = player.invitationToken || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15))
+          await sendPlayerInvitation({ name: player.firstName, email: player.email }, token)
+          
+          get().updatePlayer(playerId, { 
+            invitationToken: token,
+            invitationStatus: 'sent' 
+          })
+          
+          toast.success(`Se ha enviado el acceso a ${player.email}`)
+        } catch (error) {
+          console.error('[DataStore] invitePlayer error:', error)
+          toast.error(`No se pudo enviar a ${player.email}`)
+        }
+      },
+
+      bulkInvitePlayers: async (playerIds) => {
+        const players = get().players.filter(p => playerIds.includes(p.id) && p.email)
+        if (players.length === 0) return
+
+        toast.info(`Procesando ${players.length} correos...`)
+
+        let successCount = 0
+        for (const player of players) {
+          try {
+            const token = player.invitationToken || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15))
+            await sendPlayerInvitation({ name: player.firstName, email: player.email }, token)
+            
+            get().updatePlayer(player.id, { 
+              invitationToken: token,
+              invitationStatus: 'sent' 
+            })
+            successCount++
+          } catch (err) {
+            console.error(`Failed to invite ${player.email}:`, err)
+          }
+        }
+
+        if (successCount > 0) {
+          toast.success(`Se han enviado ${successCount} invitaciones correctamente.`)
+        } else {
+          toast.error("No se pudo enviar ninguna invitación.")
+        }
       },
 
       addCoach: (coachData) => {
@@ -1045,8 +1114,56 @@ export const useDataStore = create<DataState>()(
       addAttendanceRecord: (recordData) => {
         const clubId = getClubId()
         const newRecord: AttendanceRecord = { ...recordData, id: generateId(), createdAt: new Date() }
-        if (clubId) syncDoc('attendance', newRecord.id, newRecord as any, clubId)
+        
+        if (clubId) {
+          syncDoc('attendance', newRecord.id, newRecord as any, clubId)
+          
+          // Side Effects: Process each entry for credits and payments
+          newRecord.records.forEach(entry => {
+            // 1. Recovery Credits Logic
+            if (entry.status === 'justificado' && !entry.isRecovery) {
+              // Earned a credit
+              const player = get().players.find(p => p.id === entry.playerId)
+              if (player) {
+                get().updatePlayer(player.id, { recoveryCredits: (player.recoveryCredits || 0) + 1 })
+              }
+            } else if (entry.isRecovery && entry.status === 'presente') {
+              // Used a credit
+              const player = get().players.find(p => p.id === entry.playerId)
+              if (player && (player.recoveryCredits || 0) > 0) {
+                get().updatePlayer(player.id, { recoveryCredits: player.recoveryCredits - 1 })
+              }
+            }
+            
+            // 2. One-off Class Payment Logic
+            if (entry.isOneOff && entry.oneOffPrice && entry.oneOffPrice > 0) {
+              const { userName } = getCurrentUser()
+              const paymentId = generateId()
+              const newPayment: Payment = {
+                id: paymentId,
+                playerId: entry.playerId,
+                playerName: entry.playerName,
+                groupId: newRecord.groupId,
+                groupName: newRecord.groupName,
+                concept: `Clase Suelta - ${newRecord.groupName} (${new Date(newRecord.date).toLocaleDateString('es-ES')})`,
+                amount: entry.oneOffPrice,
+                status: 'pendiente',
+                category: 'clase_particular',
+                billingMonth: new Date(newRecord.date).getMonth() + 1,
+                billingYear: new Date(newRecord.date).getFullYear(),
+                dueDate: new Date(newRecord.date),
+                autogenerated: true,
+                registeredBy: userName,
+                createdAt: new Date(),
+              }
+              syncDoc('payments', paymentId, newPayment as any, clubId)
+            }
+          })
+        }
+        
         queryClient.invalidateQueries({ queryKey: ['attendance'] })
+        queryClient.invalidateQueries({ queryKey: ['payments'] })
+        queryClient.invalidateQueries({ queryKey: ['players'] })
       },
       updateAttendanceRecord: (id, data) => {
         const clubId = getClubId()
@@ -1345,10 +1462,135 @@ export const useDataStore = create<DataState>()(
       cleanupOrphanedPayments: () => {},
 
       deleteAllPayments: async () => {},
-      addInvoice: (...args: any[]) => {},
-      updateInvoice: (...args: any[]) => {},
-      unlinkPaymentsFromInvoice: (...args: any[]) => {},
-      deleteInvoice: (...args: any[]) => {},
+
+      addInvoice: async (invoiceData: Omit<Invoice, 'id' | 'createdAt'>, newPayments?: Payment[]) => {
+        const clubId = getClubId()
+        if (!clubId) throw new Error('No se encontró el ID del club')
+        
+        const { userId } = getCurrentUser()
+        const invoice: Invoice = {
+          ...invoiceData as any,
+          id: generateId(),
+          createdAt: new Date(),
+          createdBy: userId,
+        }
+
+        const { createInvoiceAtomic } = await import('@/lib/firestoreSync')
+        await createInvoiceAtomic(invoice, invoiceData.paymentIds || [], clubId, newPayments)
+        
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
+        queryClient.invalidateQueries({ queryKey: ['payments'] })
+        queryClient.invalidateQueries({ queryKey: ['eventPayments'] })
+        queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] })
+      },
+
+      updateInvoice: async (id: string, updates: Partial<Invoice>) => {
+        const clubId = getClubId()
+        if (!clubId) return
+        await syncDoc('invoices', id, updates as any, clubId)
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      },
+
+      unlinkPaymentsFromInvoice: async (invoiceId: string) => {
+        const clubId = getClubId()
+        if (!clubId) return
+        
+        const q = query(collection(db, 'invoices'), where('clubId', '==', clubId), where('id', '==', invoiceId))
+        const snap = await getDocs(q)
+        if (snap.empty) return
+        
+        const invoice = snap.docs[0].data() as Invoice
+        const paymentIds = invoice.paymentIds || []
+        
+        await unlinkPaymentsFromInvoiceAtomic(paymentIds)
+        
+        queryClient.invalidateQueries({ queryKey: ['payments'] })
+        queryClient.invalidateQueries({ queryKey: ['eventPayments'] })
+        queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] })
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      },
+
+      deleteInvoice: async (id: string) => {
+        await deleteFirestoreDoc('invoices', id)
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
+        queryClient.invalidateQueries({ queryKey: ['payments'] })
+        queryClient.invalidateQueries({ queryKey: ['eventPayments'] })
+        queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] })
+      },
+
+      bulkGenerateInvoices: async (paymentIds: string[]) => {
+        const clubId = getClubId()
+        const { players, club } = get()
+        if (!clubId || !club) {
+          toast({ title: 'Error', description: 'Datos incompletos para generar facturas', variant: 'destructive' })
+          return
+        }
+
+        try {
+          const { generateInvoiceFromPayments } = await import('@/lib/invoice-utils')
+          const { collection, getDocs, query, where } = await import('firebase/firestore')
+          const { db } = await import('@/lib/firebase')
+          const { fromFirestore } = await import('@/lib/firestoreSync')
+
+          // 1. Obtener todos los pagos involucrados para tener los datos completos
+          const snap = await getDocs(query(collection(db, 'payments'), where('clubId', '==', clubId), where('status', '==', 'pagado')))
+          const allPayments = snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Payment))
+          
+          const eventSnap = await getDocs(query(collection(db, 'eventPayments'), where('clubId', '==', clubId), where('status', '==', 'pagado')))
+          const allEventPayments = eventSnap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as EventPayment))
+          
+          const privateSnap = await getDocs(query(collection(db, 'privateLessonPayments'), where('clubId', '==', clubId), where('status', '==', 'pagado')))
+          const allPrivatePayments = privateSnap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as PrivateLessonPayment))
+
+          const selectedPayments = [...allPayments, ...allEventPayments, ...allPrivatePayments]
+            .filter(p => paymentIds.includes(p.id))
+
+          // 2. Agrupar por jugador
+          const byPlayer: Record<string, typeof selectedPayments> = {}
+          selectedPayments.forEach(p => {
+            if (!byPlayer[p.playerId]) byPlayer[p.playerId] = []
+            byPlayer[p.playerId].push(p)
+          })
+
+          let successCount = 0
+          const playerIds = Object.keys(byPlayer)
+
+          for (const playerId of playerIds) {
+            const player = players.find(p => p.id === playerId)
+            if (!player) continue
+
+            const playerPayments = byPlayer[playerId]
+            const pIds = playerPayments.map(p => p.id)
+
+            const invoiceData = await generateInvoiceFromPayments(
+              pIds,
+              allPayments,
+              allEventPayments,
+              allPrivatePayments,
+              player,
+              club,
+              'FC',
+              { status: 'issued' }
+            )
+
+            await get().addInvoice(invoiceData)
+            successCount++
+          }
+
+          toast({ 
+            title: 'Facturación completada', 
+            description: `Se han generado ${successCount} facturas para ${playerIds.length} jugadores.`,
+          })
+
+        } catch (error) {
+          console.error('[DataStore] bulkGenerateInvoices failed:', error)
+          toast({ 
+            title: 'Error en facturación masiva', 
+            description: error instanceof Error ? error.message : 'Error desconocido', 
+            variant: 'destructive' 
+          })
+        }
+      },
 
 
       // --- Holidays Actions ---
@@ -1376,6 +1618,26 @@ export const useDataStore = create<DataState>()(
           console.error('[DataStore] deleteHoliday: FAILED', error)
           throw error
         }
+      },
+
+      addAttendanceNotice: (noticeData) => {
+        const newNotice: import('@/types').AttendanceNotice = { 
+          ...noticeData, 
+          id: generateId(), 
+          createdAt: new Date() 
+        }
+        set((state) => ({ attendanceNotices: [...state.attendanceNotices, newNotice] }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('attendanceNotices', newNotice.id, newNotice as any, clubId)
+        queryClient.invalidateQueries({ queryKey: ['attendanceNotices'] })
+      },
+
+      deleteAttendanceNotice: (id) => {
+        set((state) => ({
+          attendanceNotices: state.attendanceNotices.filter((n) => n.id !== id),
+        }))
+        deleteFirestoreDoc('attendanceNotices', id)
+        queryClient.invalidateQueries({ queryKey: ['attendanceNotices'] })
       }
     }),
     {
@@ -1407,6 +1669,7 @@ export const useDataStore = create<DataState>()(
         coachSalaryConfigs: state.coachSalaryConfigs,
         users: state.users,
         holidays: state.holidays,
+        attendanceNotices: state.attendanceNotices,
       } as unknown as DataState)
     }
   )

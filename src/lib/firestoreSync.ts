@@ -4,25 +4,26 @@
 // Helpers genéricos de lectura y escritura para sincronización write-through
 // con Firestore. Las escrituras son fire-and-forget para no bloquear la UI.
 
-import { db } from './firebase'
-import {
-  collection,
-  doc,
-  getDocs,
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  writeBatch, 
+  doc, 
+  Timestamp, 
+  serverTimestamp, 
+  increment,
+  runTransaction,
+  limit,
   setDoc,
   deleteDoc,
-  query,
-  where,
-  Timestamp,
-  runTransaction,
-  writeBatch,
   updateDoc as firestoreUpdateDoc,
-  limit,
-  increment,
-  serverTimestamp,
 } from 'firebase/firestore'
+import { db } from './firebase'
 import { toast } from '@/hooks/use-toast'
-import type { Invoice, Payment } from '@/types'
+import type { Invoice, Payment, Enrollment } from '@/types'
+import { MONTHS } from '@/constants'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -439,7 +440,7 @@ export async function generateMonthlyReceiptsAtomic(
         enrollmentId: enrollDoc.id,
         groupId: enrollment.groupId,
         groupName: enrollment.groupName,
-        concept: `Cuota ${enrollment.groupName} (${month}/${year})`,
+        concept: `${MONTHS[month - 1].label} ${year} - ${enrollment.groupName} · Cuota Socio`,
         amount,
         status: 'pendiente',
         category: 'cuota',

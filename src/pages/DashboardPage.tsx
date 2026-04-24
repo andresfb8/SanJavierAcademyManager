@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -8,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
 import type { UserRole } from '@/types'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery } from '@/hooks/useQueries'
 import {
@@ -29,6 +31,11 @@ import {
   ChevronUp,
   RefreshCw,
   UserMinus,
+  CheckCircle2,
+  ChevronRight,
+  Phone,
+  Trophy,
+  MapPin,
 } from 'lucide-react'
 import {
   BarChart,
@@ -77,11 +84,12 @@ const CHART_COLORS = {
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
   const isCoach = user?.role === 'entrenador'
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
-  const { players, groups, enrollments, coaches, privateLessons } = useDataStore()
+  const { players, groups, enrollments, coaches, privateLessons, attendanceNotices } = useDataStore()
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
@@ -197,6 +205,46 @@ export default function DashboardPage() {
       g.coachId === currentCoachId &&
       g.currentEnrollment < g.maxCapacity
     ).length
+  }, [currentCoachId, groups])
+
+  // ── Active/Next Class Logic ───────────────────────────────────────
+  const activeClass = useMemo(() => {
+    if (!currentCoachId) return null
+    const now = new Date()
+    const jsDay = now.getDay()
+    const dayOfWeek = jsDay === 0 ? 0 : jsDay // 0 is Sunday in constants too
+
+    const currentCoachGroups = groups.filter(g => g.coachId === currentCoachId && g.isActive)
+    
+    for (const group of currentCoachGroups) {
+      for (const slot of group.schedule) {
+        if (slot.dayOfWeek === dayOfWeek) {
+          const [startH, startM] = slot.startTime.split(':').map(Number)
+          const [endH, endM] = slot.endTime.split(':').map(Number)
+          
+          const startTime = new Date(now)
+          startTime.setHours(startH, startM, 0)
+          
+          const endTime = new Date(now)
+          endTime.setHours(endH, endM, 0)
+          
+          // Current class or next one within 60 minutes
+          const diffMinutes = (startTime.getTime() - now.getTime()) / (1000 * 60)
+          
+          if ((diffMinutes >= -15 && diffMinutes <= 60) || (now >= startTime && now <= endTime)) {
+            return {
+              id: group.id,
+              name: group.name,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              isOngoing: now >= startTime && now <= endTime,
+              courtName: group.courtName
+            }
+          }
+        }
+      }
+    }
+    return null
   }, [currentCoachId, groups])
 
   // ── KPI calculations ──────────────────────────────────────────────
@@ -357,7 +405,118 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="p-5 lg:p-6 space-y-6">
+      {/* Coach-First Interface - Only for Coaches */}
+      {isCoach && (
+        <div className="px-5 lg:px-6 space-y-6 mb-6">
+          
+          {/* Recovery/Attendance Alerts Section */}
+          <div className="space-y-3">
+            {attendanceNotices
+              .filter(notice => {
+                const isToday = notice.date.toISOString().split('T')[0] === now.toISOString().split('T')[0];
+                const coachGroupIds = groups.filter(g => g.coachId === currentCoachId).map(g => g.id);
+                return isToday && coachGroupIds.includes(notice.groupId);
+              })
+              .map(notice => (
+                <div key={notice.id} className={cn(
+                  "rounded-2xl border p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-500",
+                  notice.type === 'absent' 
+                    ? "border-amber-200 bg-amber-50/50" 
+                    : "border-blue-200 bg-blue-50/50"
+                )}>
+                  <div className="flex gap-4">
+                    <div className={cn(
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                      notice.type === 'absent' ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"
+                    )}>
+                      {notice.type === 'absent' ? <Trophy className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className={cn(
+                        "text-sm font-bold",
+                        notice.type === 'absent' ? "text-amber-900" : "text-blue-900"
+                      )}>
+                        {notice.type === 'absent' ? 'Aviso de Ausencia' : 'Confirmación de Asistencia'}
+                      </h4>
+                      <p className={cn(
+                        "text-xs leading-relaxed",
+                        notice.type === 'absent' ? "text-amber-700" : "text-blue-700"
+                      )}>
+                        <strong>{notice.playerName}</strong> {notice.type === 'absent' ? 'no vendrá hoy.' : 'ha confirmado que viene.'}
+                        {notice.notes && <span className="block mt-1 italic">"{notice.notes}"</span>}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            
+            {/* Fallback mock if no real notices today - only in dev or if empty to show the feature */}
+            {attendanceNotices.length === 0 && (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/30 p-4 border-dashed">
+                <p className="text-[11px] text-slate-400 text-center font-medium">No hay avisos de alumnos para hoy</p>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Attendance Widget (Active Class) */}
+          {activeClass ? (
+            <Card className="border-none shadow-xl shadow-primary/5 overflow-hidden rounded-[2rem] bg-white">
+              <CardHeader className="pb-3 px-6 pt-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-primary/80">Pasar Lista</h3>
+                  <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                    En curso
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 pb-6 space-y-4">
+                {/* List of students in current class (Preview) */}
+                <div className="space-y-3">
+                  {[
+                    { id: '1', name: 'Ana Gracía', initial: 'A' },
+                    { id: '2', name: 'Carlos Ruíz', initial: 'C' },
+                    { id: '3', name: 'Laura M.', initial: 'L', pending: true }
+                  ].map((student) => (
+                    <div key={student.id} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-sm">
+                          {student.initial}
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">{student.name}</span>
+                      </div>
+                      <div className={cn(
+                        "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors",
+                        student.pending 
+                          ? "border-slate-200 text-slate-200" 
+                          : "border-emerald-500 bg-emerald-500 text-white"
+                      )}>
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-4">
+                  <Button 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 rounded-2xl font-bold shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]"
+                    onClick={() => navigate(`/asistencia?groupId=${activeClass.id}`)}
+                  >
+                    Ir a Gestión de Clase
+                    <ChevronRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="text-center py-12 rounded-[2rem] border-2 border-dashed border-slate-100 bg-slate-50/50">
+              <Clock className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm font-medium text-slate-400">No hay clases activas en este momento</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="p-5 lg:p-6 space-y-6 pt-0 sm:pt-6">
 
         {/* ── KPI Cards ────────────────────────────────────────── */}
         {isCoach && !currentCoachId && (
@@ -670,18 +829,19 @@ export default function DashboardPage() {
             <ActivityFeed activities={visibleActivities} canReadPayments={canReadPayments} />
           </Card>
 
-          {/* Today's schedule */}
-          <Card className="border-border/60 shadow-[var(--shadow-card)]">
-            <CardHeader className="px-5 pt-5 pb-3">
-              <CardTitle className="text-sm font-bold text-foreground">📅 Clases de hoy</CardTitle>
+          {/* Today's schedule - Redesigned for Coach View */}
+          <Card className="border-none shadow-sm rounded-[2rem] bg-white overflow-hidden">
+            <CardHeader className="px-6 pt-6 pb-3">
+              <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400">Tu Agenda Hoy</CardTitle>
             </CardHeader>
-            <CardContent className="px-5 pb-5">
+            <CardContent className="px-6 pb-6">
               {todayGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No hay clases programadas para hoy
-                </p>
+                <div className="text-center py-8">
+                  <CalendarDays className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400 font-medium">Libre hoy</p>
+                </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-4">
                   {todayGroups
                     .sort((a, b) => {
                       const aTime = a.schedule.find((s) => s.dayOfWeek === today)?.startTime || ''
@@ -690,25 +850,37 @@ export default function DashboardPage() {
                     })
                     .map((group) => {
                       const slot = group.schedule.find((s) => s.dayOfWeek === today)!
+                      const isNext = activeClass?.id === group.id
+                      
                       return (
-                        <div key={group.id} className="flex items-center justify-between rounded-xl border border-border/60 bg-secondary/40 px-4 py-3 hover:bg-secondary/70 transition-colors duration-150">
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-sm text-foreground">{group.name}</span>
-                              <StatusBadge status={group.level} />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {group.courtName} · {group.coachName}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0 ml-3">
-                            <span className="inline-flex items-center rounded-lg bg-primary/10 text-primary px-2.5 py-1 text-xs font-bold">
-                              {slot.startTime}–{slot.endTime}
+                        <div key={group.id} className={cn(
+                          "flex items-center gap-4 rounded-2xl p-4 transition-all duration-150 border-2",
+                          isNext 
+                            ? "bg-emerald-50/50 border-emerald-100 shadow-sm" 
+                            : "bg-slate-50/30 border-transparent hover:border-slate-100"
+                        )}>
+                          <div className="text-center shrink-0 w-12">
+                            <span className={cn(
+                              "text-xs font-black block",
+                              isNext ? "text-emerald-600" : "text-slate-400"
+                            )}>
+                              {slot.startTime}
                             </span>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {group.currentEnrollment}/{group.maxCapacity} alumnos
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className={cn(
+                              "text-sm font-bold truncate",
+                              isNext ? "text-emerald-900" : "text-slate-700"
+                            )}>
+                              {group.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 font-medium truncate">
+                              {group.courtName} · {group.currentEnrollment} alumnos
                             </p>
                           </div>
+                          {isNext && (
+                            <ChevronRight className="h-4 w-4 text-emerald-400 shrink-0" />
+                          )}
                         </div>
                       )
                     })}

@@ -151,6 +151,11 @@ export interface Player {
   recoveryCredits: number
   // Metadata
   notes?: string
+  // Invitation & Portal fields
+  invitationToken?: string
+  invitationStatus?: 'pending' | 'sent' | 'active'
+  portalUid?: string // Firebase Auth UID linked to this player
+  inviteCode?: string // Simple code for manual linking
   userId?: string
   createdAt: Date
   updatedAt: Date
@@ -230,6 +235,8 @@ export interface AttendanceEntry {
   playerName: string
   status: AttendanceStatus
   isRecovery: boolean
+  isOneOff?: boolean
+  oneOffPrice?: number
   originalGroupId?: string
   notes?: string
 }
@@ -241,6 +248,20 @@ export interface AttendanceRecord {
   date: Date
   records: AttendanceEntry[]
   coachId: string
+  createdAt: Date
+}
+
+// --- Avisos de Asistencia (Pupil Notices) ---
+export type NoticeType = 'absent' | 'present'
+
+export interface AttendanceNotice {
+  id: string
+  playerId: string
+  playerName: string
+  groupId: string
+  date: Date
+  type: NoticeType
+  notes?: string
   createdAt: Date
 }
 

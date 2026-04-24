@@ -81,6 +81,16 @@ service cloud.firestore {
       allow update: if hasRole('director') && resource.data.clubId == getClubId() && incomingBelongsToClub();
       allow delete: if hasRole('director') && resource.data.clubId == getClubId();
     }
+    
+    // ─── Clubs Collection ───────────────────────────────────────────────
+    
+    match /clubs/{clubId} {
+      // Any member of the club can read its configuration.
+      allow read: if isAuthenticated() && clubId == getClubId();
+      
+      // Only directors can update club info.
+      allow update: if hasRole('director') && clubId == getClubId();
+    }
 
     // ─── Players Collection ─────────────────────────────────────────────
 
