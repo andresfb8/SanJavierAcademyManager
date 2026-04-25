@@ -76,10 +76,10 @@ const defaultKpiConfig: KpiConfig = {
 
 // Chart theme tokens
 const CHART_COLORS = {
-  primary: '#0e7490',
+  primary: '#0891b2',
   secondary: '#f59e0b',
   success: '#10b981',
-  danger: '#f43f5e',
+  danger: '#ef4444',
   grid: '#f1f5f9',
   tooltip: { background: '#ffffff', border: '#e2e8f0' },
 }

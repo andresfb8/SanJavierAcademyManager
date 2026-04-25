@@ -196,13 +196,13 @@ export function Sidebar() {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Logo area */}
-      <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border shrink-0">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground font-black text-base select-none shadow-sm">
+      <div className="flex h-20 items-center gap-3 px-6 border-b border-sidebar-border/50 shrink-0">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sidebar-primary to-cyan-600 text-sidebar-primary-foreground font-black text-lg select-none shadow-lg shadow-sidebar-primary/20">
           🎾
         </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-[15px] font-bold text-sidebar-foreground tracking-tight">San Javier</span>
-          <span className="text-[11px] text-sidebar-foreground/50 font-medium tracking-wide">Academy Manager</span>
+        <div className="flex flex-col leading-none">
+          <span className="text-[16px] font-extrabold text-sidebar-foreground tracking-tight font-jakarta">San Javier</span>
+          <span className="text-[10px] text-sidebar-foreground/40 font-bold uppercase tracking-widest mt-0.5">Academy Manager</span>
         </div>
       </div>
 
