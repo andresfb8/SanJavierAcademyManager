@@ -56,3 +56,14 @@ export function normalizeText(text: string): string {
     .replace(/\p{Mn}/gu, '')
     .toLowerCase()
 }
+/**
+ * Asegura que el valor sea un objeto Date, manejando Timestamps de Firestore
+ */
+export function ensureDate(date: any): Date {
+  if (!date) return new Date()
+  if (date instanceof Date) return date
+  if (date?.toDate && typeof date.toDate === 'function') return date.toDate()
+  if (typeof date === 'string' || typeof date === 'number') return new Date(date)
+  if (date?.seconds !== undefined) return new Date(date.seconds * 1000)
+  return new Date(date)
+}

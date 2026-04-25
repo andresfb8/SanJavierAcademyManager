@@ -525,8 +525,7 @@ export default function PaymentsPage() {
                   title="Avisar por WhatsApp"
                   onClick={() => {
                     const phone = player?.phone ?? player?.guardian?.phone ?? ''
-                    const clubName = club?.name ?? 'Club de Padel San Javier'
-                    const msg = `Hola ${payment.playerName}, te recordamos desde ${clubName} que tienes un recibo pendiente de ${monthLabel} por importe de ${formatCurrency(payment.amount)}. Por favor, realiza el pago cuando puedas. ¡Gracias!`
+                    const msg = getWhatsAppReminderMessage(payment.playerId, payment.playerName)
                     setWhatsAppPayload({ phone, message: msg, recipientName: payment.playerName })
                   }}
                 >
@@ -780,6 +779,25 @@ export default function PaymentsPage() {
       Pendiente: r.pendiente,
     }))
   }, [annualSummary])
+
+  const getWhatsAppReminderMessage = (playerId: string, playerName: string) => {
+    const playerPending = allPendingPayments.filter(p => p.playerId === playerId)
+    const clubName = club?.name ?? 'Club de Padel San Javier'
+    
+    if (playerPending.length === 0) return ''
+
+    let totalDebt = 0
+    let message = `Hola ${playerName}, te recordamos desde ${clubName} que tienes los siguientes recibos pendientes:\n\n`
+    
+    playerPending.forEach(p => {
+      const monthLabel = MONTHS.find((m) => m.value === p.billingMonth)?.label ?? p.billingMonth
+      message += `- ${monthLabel} ${p.billingYear}: ${formatCurrency(p.amount)} (${p.concept})\n`
+      totalDebt += p.amount
+    })
+
+    message += `\n*Total pendiente: ${formatCurrency(totalDebt)}*\n\nPor favor, realiza el pago cuando puedas. ¡Gracias!`
+    return message
+  }
 
   return (
     <div>
@@ -1228,8 +1246,7 @@ export default function PaymentsPage() {
                               onClick={() => {
                                 const player = players.find(p => p.id === row.playerId)
                                 const phone = player?.phone ?? player?.guardian?.phone ?? ''
-                                const clubName = club?.name ?? 'Club de Padel San Javier'
-                                const msg = `Hola ${row.playerName}, te recordamos desde ${clubName} que tienes recibos pendientes por un importe total de ${formatCurrency(row.totalDebt)}. Por favor, realiza el pago cuando puedas. ¡Gracias!`
+                                const msg = getWhatsAppReminderMessage(row.playerId, row.playerName)
                                 setWhatsAppPayload({ phone, message: msg, recipientName: row.playerName })
                               }}
                             >

@@ -509,6 +509,44 @@ export async function createInvoiceAtomic(
   clubId: string,
   newPayments?: Payment[]
 ): Promise<void> {
+  // ─── DIAGNOSTIC LOGGING ────────────────────────────────────────────
+  // Import auth to get current user UID and verify it matches Firestore expectations
+  const { auth } = await import('./firebase')
+  const currentUser = auth.currentUser
+  console.log('[createInvoiceAtomic] DIAGNOSTIC:', {
+    invoiceClubId: clubId,
+    invoiceId: invoice.id,
+    invoiceSeries: invoice.series,
+    authUID: currentUser?.uid ?? 'NOT AUTHENTICATED',
+    authEmail: currentUser?.email ?? 'N/A',
+    paymentIds,
+  })
+
+  // Also check if we can read the user doc to verify permissions context
+  try {
+    const { doc: fsDoc, getDoc: fsGetDoc } = await import('firebase/firestore')
+    if (currentUser) {
+      const userSnap = await fsGetDoc(fsDoc(db, 'users', currentUser.uid))
+      if (userSnap.exists()) {
+        const userData = userSnap.data()
+        // Log each field as a plain string so it's visible without expanding the object
+        console.log(`[createInvoiceAtomic] USER role="${userData.role}" clubId="${userData.clubId}" isActive=${userData.isActive}`)
+        console.log(`[createInvoiceAtomic] All user fields: ${JSON.stringify(userData)}`)
+        if (userData.clubId !== clubId) {
+          console.error(`[createInvoiceAtomic] ⚠️ MISMATCH: user.clubId="${userData.clubId}" !== transaction clubId="${clubId}"`)
+        }
+        if (userData.role !== 'director' && userData.role !== 'coordinador') {
+          console.error(`[createInvoiceAtomic] ⚠️ ROLE NOT ADMIN: role="${userData.role}" (must be 'director' or 'coordinador')`)
+        }
+      } else {
+        console.error('[createInvoiceAtomic] ⚠️ User document DOES NOT EXIST in Firestore for UID:', currentUser.uid)
+      }
+    }
+  } catch (diagErr) {
+    console.error('[createInvoiceAtomic] Diagnostic check failed:', diagErr)
+  }
+  // ─── END DIAGNOSTIC ────────────────────────────────────────────────
+
   return runTransaction(db, async (transaction) => {
     // Paso 1: Verificar que ningún pago tenga invoiceId (TODAS LAS LECTURAS PRIMERO)
     const paymentCollections = ['payments', 'eventPayments', 'privateLessonPayments']

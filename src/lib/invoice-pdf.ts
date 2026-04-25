@@ -4,8 +4,9 @@
 // Genera PDFs de facturas según estándares fiscales españoles
 // con desglose de IVA y formato profesional
 
-import jsPDF from 'jspdf'
+import { jsPDF } from 'jspdf'
 import type { Invoice, Club } from '@/types'
+import { ensureDate } from './utils'
 
 // --- Constantes de diseño (reutilizadas de pdf-reports.ts) ---
 
@@ -40,8 +41,8 @@ function formatCurrencyPdf(amount: number): string {
   }) + ' €'
 }
 
-function formatDatePdf(date: Date): string {
-  const d = date instanceof Date ? date : new Date(date)
+function formatDatePdf(date: any): string {
+  const d = ensureDate(date)
   const day = String(d.getDate()).padStart(2, '0')
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const year = d.getFullYear()
@@ -49,11 +50,12 @@ function formatDatePdf(date: Date): string {
 }
 
 function truncateText(doc: jsPDF, text: string, maxWidth: number): string {
-  const textWidth = doc.getTextWidth(text)
-  if (textWidth <= maxWidth) return text
+  const safeText = text || ''
+  const textWidth = doc.getTextWidth(safeText)
+  if (textWidth <= maxWidth) return safeText
 
   // Truncar y añadir elipsis
-  let truncated = text
+  let truncated = safeText
   while (doc.getTextWidth(truncated + '...') > maxWidth && truncated.length > 0) {
     truncated = truncated.slice(0, -1)
   }
@@ -77,7 +79,7 @@ function drawInvoiceHeader(
   doc.setFontSize(FONT_SIZE.title)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(COLORS.headerBg.r, COLORS.headerBg.g, COLORS.headerBg.b)
-  doc.text(club.name, MARGIN, y)
+  doc.text(club?.name || 'Factura', MARGIN, y)
   y += 6
 
   doc.setFontSize(FONT_SIZE.normal)
@@ -160,7 +162,7 @@ function drawCustomerInfo(
   doc.setFont('helvetica', 'normal')
 
   // Nombre
-  doc.text(invoice.playerName, MARGIN, y)
+  doc.text(invoice.playerName || 'Cliente', MARGIN, y)
   y += 5
 
   // NIF
@@ -410,23 +412,28 @@ function drawLegalFooter(
  * Genera y descarga un PDF de factura en formato español
  */
 export function generateInvoicePDF(invoice: Invoice, club: Club): void {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  })
+  try {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
 
-  let y = MARGIN
+    let y = MARGIN
 
-  // Dibujar todas las secciones
-  y = drawInvoiceHeader(doc, club, invoice, y)
-  y = drawCustomerInfo(doc, invoice, y)
-  y = drawInvoiceTable(doc, invoice, y)
-  y = drawVATSummary(doc, invoice, y)
-  y = drawInvoiceTotals(doc, invoice, y)
-  drawLegalFooter(doc, invoice, y)
+    // Dibujar todas las secciones
+    y = drawInvoiceHeader(doc, club, invoice, y)
+    y = drawCustomerInfo(doc, invoice, y)
+    y = drawInvoiceTable(doc, invoice, y)
+    y = drawVATSummary(doc, invoice, y)
+    y = drawInvoiceTotals(doc, invoice, y)
+    drawLegalFooter(doc, invoice, y)
 
-  // Descargar
-  const fileName = `${invoice.invoiceNumber.replace(/\//g, '-')}.pdf`
-  doc.save(fileName)
+    // Descargar
+    const fileName = `${invoice.invoiceNumber.replace(/\//g, '-')}.pdf`
+    doc.save(fileName)
+  } catch (error) {
+    console.error('[generateInvoicePDF] Error al generar el PDF:', error)
+    alert('No se pudo generar el PDF. Verifica que los datos del club y la factura estén completos en Configuración.')
+  }
 }
