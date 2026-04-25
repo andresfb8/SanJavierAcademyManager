@@ -428,7 +428,7 @@ export default function DashboardPage() {
                   <div className="flex gap-4">
                     <div className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                      notice.type === 'absent' ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"
+                      notice.type === 'absent' ? "bg-amber-100 text-amber-700" : "bg-cyan-100 text-cyan-700"
                     )}>
                       {notice.type === 'absent' ? <Trophy className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
                     </div>
@@ -499,7 +499,7 @@ export default function DashboardPage() {
 
                 <div className="pt-4">
                   <Button 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 rounded-2xl font-bold shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 rounded-xl font-bold shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]"
                     onClick={() => navigate(`/asistencia?groupId=${activeClass.id}`)}
                   >
                     Ir a Gestión de Clase
@@ -537,48 +537,48 @@ export default function DashboardPage() {
                 title="Horas Trabajadas (Este Mes)"
                 value={`${coachHoursThisMonth}h`}
                 icon={Clock}
-                iconClassName="bg-blue-100 text-blue-600"
-                accentColor="#2563eb"
+                iconClassName="bg-cyan-50 text-cyan-600"
+                accentColor="#0891b2"
                 className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Jugadores Asignados"
                 value={coachAssignedPlayers}
                 icon={Users}
-                iconClassName="bg-green-100 text-green-600"
-                accentColor="#16a34a"
+                iconClassName="bg-emerald-50 text-emerald-600"
+                accentColor="#10b981"
                 className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Grupos Totales"
                 value={coachTotalGroups}
                 icon={GraduationCap}
-                iconClassName="bg-purple-100 text-purple-600"
-                accentColor="#9333ea"
+                iconClassName="bg-indigo-50 text-indigo-600"
+                accentColor="#6366f1"
                 className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Clases Particulares"
                 value={coachTotalPrivateLessons}
                 icon={CalendarDays}
-                iconClassName="bg-orange-100 text-orange-600"
-                accentColor="#ea580c"
+                iconClassName="bg-amber-50 text-amber-600"
+                accentColor="#f59e0b"
                 className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Clases Hoy"
                 value={coachClassesToday}
                 icon={CalendarCheck}
-                iconClassName="bg-indigo-100 text-indigo-600"
-                accentColor="#4f46e5"
+                iconClassName="bg-rose-50 text-rose-600"
+                accentColor="#ef4444"
                 className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
               <StatCard
                 title="Grupos Incompletos"
                 value={coachIncompleteGroups}
                 icon={AlertCircle}
-                iconClassName="bg-amber-100 text-amber-600"
-                accentColor="#d97706"
+                iconClassName="bg-slate-50 text-slate-600"
+                accentColor="#64748b"
                 className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
               />
             </>
@@ -590,8 +590,8 @@ export default function DashboardPage() {
                   title="Jugadores activos"
                   value={activePlayers}
                   icon={Users}
-                  iconClassName="bg-primary/10 text-primary"
-                  accentColor="#0e7490"
+                  iconClassName="bg-cyan-50 text-cyan-600"
+                  accentColor="#0891b2"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
@@ -601,8 +601,8 @@ export default function DashboardPage() {
                   value={formatCurrency(currentRevenue)}
                   icon={DollarSign}
                   trend={{ value: revenueDiff, label: 'vs mes anterior' }}
-                  iconClassName="bg-primary/10 text-primary"
-                  accentColor="#0e7490"
+                  iconClassName="bg-cyan-50 text-cyan-600"
+                  accentColor="#0891b2"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
@@ -612,8 +612,8 @@ export default function DashboardPage() {
                   value={formatCurrency(currentPending)}
                   icon={AlertCircle}
                   trend={{ value: pendingDiff, label: 'vs mes anterior' }}
-                  iconClassName="bg-primary/10 text-primary"
-                  accentColor="#0e7490"
+                  iconClassName="bg-cyan-50 text-cyan-600"
+                  accentColor="#0891b2"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}

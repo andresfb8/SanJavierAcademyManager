@@ -1152,12 +1152,12 @@ export default function PaymentsPage() {
                           <span className="font-medium text-sm">{row.monthLabel}</span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className="text-sm font-semibold text-green-700">
+                          <span className="text-sm font-semibold text-success">
                             {formatCurrency(row.ingresos)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className="text-sm text-yellow-700">
+                          <span className="text-sm font-medium text-amber-600">
                             {formatCurrency(row.pendiente)}
                           </span>
                         </TableCell>
@@ -1175,12 +1175,12 @@ export default function PaymentsPage() {
                         <span className="font-bold text-sm">TOTAL</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="text-sm font-bold text-green-700">
+                        <span className="text-sm font-bold text-success">
                           {formatCurrency(annualTotals.totalIngresos)}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="text-sm font-bold text-yellow-700">
+                        <span className="text-sm font-bold text-amber-600">
                           {formatCurrency(annualTotals.totalPendiente)}
                         </span>
                       </TableCell>
@@ -1233,7 +1233,7 @@ export default function PaymentsPage() {
                             {MONTHS.find(m => m.value === row.oldestMonth)?.label} {row.oldestYear}
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-sm font-bold text-destructive">
+                            <span className="text-[15px] font-extrabold text-destructive tracking-tight">
                               {formatCurrency(row.totalDebt)}
                             </span>
                           </TableCell>
@@ -1284,9 +1284,9 @@ export default function PaymentsPage() {
                   <span className="text-muted-foreground">Concepto</span>
                   <span className="font-medium">{paymentToMark.concept}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Importe</span>
-                  <span className="font-semibold text-green-700">
+                  <span className="text-lg font-black text-success">
                     {formatCurrency(paymentToMark.amount)}
                   </span>
                 </div>
