@@ -61,43 +61,54 @@ export default function PrivateLessonDetailPage() {
     [privateLessonPayments, id]
   )
 
-  // Migration, cleanup and repair effect
+  // Comprehensive synchronization effect: Handles price changes, player additions/removals
   useEffect(() => {
     if (!lesson || !isFetched) return
     
-    // 1. MIGRATION: If there are players but no individual payments, create them
-    if (lesson.playerIds.length > 0 && lessonPayments.length === 0) {
-      const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
-      const perPlayer = lesson.price / Math.max(lesson.playerIds.length, 1)
-      
-      // Safety: Only add if perPlayer is a valid positive number
-      if (perPlayer >= 0) {
-        for (let i = 0; i < lesson.playerIds.length; i++) {
-          addPrivateLessonPayment({
-            lessonId: lesson.id,
-            lessonDate,
-            playerId: lesson.playerIds[i],
-            playerName: lesson.playerNames[i] || 'Jugador',
-            amount: perPlayer || 0,
-            status: lesson.isPaid ? 'pagado' : 'pendiente',
-          })
-        }
-      }
-      return
-    }
-
-    // 2. CLEANUP & REPAIR: Handle duplicates and 0€ prices
-    const playerPaymentsMap: Record<string, typeof lessonPayments> = {}
+    const perPlayerCalculated = lesson.price / Math.max(lesson.playerIds.length, 1)
+    const playerPaymentsMap: Record<string, any[]> = {}
+    
     lessonPayments.forEach(p => {
       if (!playerPaymentsMap[p.playerId]) playerPaymentsMap[p.playerId] = []
       playerPaymentsMap[p.playerId].push(p)
     })
 
-    const perPlayerCalculated = lesson.price / Math.max(lesson.playerIds.length, 1)
+    // 1. CREATE MISSING PAYMENTS: For players in the lesson without any payment record
+    lesson.playerIds.forEach((pid, idx) => {
+      if (!playerPaymentsMap[pid]) {
+        const playerName = lesson.playerNames[idx] || 'Jugador'
+        const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
+        
+        console.log(`[Sync] Creating missing payment for player ${playerName} (${pid})`)
+        addPrivateLessonPayment({
+          lessonId: lesson.id,
+          lessonDate,
+          playerId: pid,
+          playerName,
+          amount: perPlayerCalculated,
+          status: 'pendiente',
+        })
+      }
+    })
 
+    // 2. CLEANUP ORPHANED & DUPLICATE PAYMENTS
     Object.entries(playerPaymentsMap).forEach(([playerId, payments]) => {
-      // DUPLICATE REMOVAL
+      const isInLesson = lesson.playerIds.includes(playerId)
+
+      // If player was removed from lesson, delete their pending payments
+      if (!isInLesson) {
+        payments.forEach(p => {
+          if (p.status === 'pendiente') {
+            console.log(`[Sync] Deleting orphaned payment ${p.id} for removed player ${p.playerName}`)
+            deleteFirestoreDoc('privateLessonPayments', p.id)
+          }
+        })
+        return
+      }
+
+      // Handle duplicates (legacy or race conditions)
       if (payments.length > 1) {
+        console.log(`[Sync] Removing duplicate payments for player ${playerId}`)
         const sorted = [...payments].sort((a, b) => {
           if (a.status === 'pagado' && b.status !== 'pagado') return -1
           if (b.status === 'pagado' && a.status !== 'pagado') return 1
@@ -107,24 +118,23 @@ export default function PrivateLessonDetailPage() {
         })
 
         const [toKeep, ...toDelete] = sorted
-        toDelete.forEach(p => {
-          deleteFirestoreDoc('privateLessonPayments', p.id)
-        })
+        toDelete.forEach(p => deleteFirestoreDoc('privateLessonPayments', p.id))
         
-        // After cleanup, check if the one we kept needs a price repair
-        if (toKeep.amount === 0 && perPlayerCalculated > 0) {
+        // Sync the one we kept if it's pending
+        if (toKeep.status === 'pendiente' && Math.abs(toKeep.amount - perPlayerCalculated) > 0.01) {
           useDataStore.getState().updatePrivateLessonPayment(toKeep.id, { amount: perPlayerCalculated })
         }
       } 
-      // PRICE REPAIR (for non-duplicates with 0€)
+      // 3. SYNC PRICE FOR EXISTING PENDING PAYMENTS
       else if (payments.length === 1) {
         const p = payments[0]
-        if (p.amount === 0 && perPlayerCalculated > 0) {
+        if (p.status === 'pendiente' && Math.abs(p.amount - perPlayerCalculated) > 0.01) {
+          console.log(`[Sync] Updating amount for ${p.playerName}: ${p.amount} -> ${perPlayerCalculated}`)
           useDataStore.getState().updatePrivateLessonPayment(p.id, { amount: perPlayerCalculated })
         }
       }
     })
-  }, [lesson?.id, isFetched, lessonPayments.length, lesson?.price]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lesson?.id, isFetched, lessonPayments.length, lesson?.price, JSON.stringify(lesson?.playerIds)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
 
