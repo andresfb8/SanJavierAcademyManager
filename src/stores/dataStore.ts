@@ -37,6 +37,9 @@ import type {
   AppUser,
   Holiday,
   AttendanceNotice,
+  Voucher,
+  VoucherType,
+  VoucherStatus,
 } from '@/types'
 import {
   demoCourts,
@@ -103,6 +106,7 @@ export interface DataState {
   users: AppUser[]
   holidays: Holiday[]
   attendanceNotices: AttendanceNotice[]
+  vouchers: Voucher[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -199,6 +203,11 @@ export interface DataState {
   deleteTransaction: (id: string) => Promise<void>
   deleteAttendanceNotice: (id: string) => void
   addAttendanceNotice: (noticeData: Omit<AttendanceNotice, 'id' | 'createdAt'>) => void
+
+  // --- Vouchers ---
+  addVoucher: (voucherData: Omit<Voucher, 'id' | 'createdAt'>) => void
+  updateVoucher: (id: string, data: Partial<Voucher>) => void
+  deleteVoucher: (id: string) => void
 }
 
 const defaultClub: Club = {
@@ -305,6 +314,35 @@ export const useDataStore = create<DataState>()(
       holidays: [],
       clubTransactions: [],
       attendanceNotices: [],
+      vouchers: [],
+
+      // --- Vouchers ---
+      addVoucher: (voucherData) => {
+        const newVoucher: Voucher = { ...voucherData, id: generateId(), createdAt: new Date() }
+        set((state) => ({ vouchers: [...state.vouchers, newVoucher] }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('vouchers', newVoucher.id, newVoucher as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'payment_manual', // Reuse payment_manual for now
+          description: `Se creó un bono de tipo ${voucherData.type} para ${voucherData.playerName}`,
+          relatedEntityId: newVoucher.id,
+          userId,
+          userName,
+        })
+      },
+      updateVoucher: (id, data) => {
+        set((state) => ({
+          vouchers: state.vouchers.map((v) => (v.id === id ? { ...v, ...data } : v)),
+        }))
+        const clubId = getClubId()
+        const updated = get().vouchers.find((v) => v.id === id)
+        if (clubId && updated) syncDoc('vouchers', id, updated as any, clubId)
+      },
+      deleteVoucher: (id) => {
+        set((state) => ({ vouchers: state.vouchers.filter((v) => v.id !== id) }))
+        deleteFirestoreDoc('vouchers', id)
+      },
 
       // --- Financials (P&L) ---
       addTransaction: async (transactionData) => {

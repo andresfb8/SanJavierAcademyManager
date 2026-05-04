@@ -265,6 +265,25 @@ export interface AttendanceNotice {
   createdAt: Date
 }
 
+// --- Bonos (Vouchers) ---
+export type VoucherType = '1_class' | '5_classes' | '10_classes' | 'monthly'
+export type VoucherStatus = 'active' | 'exhausted' | 'expired' | 'pending_payment'
+
+export interface Voucher {
+  id: string
+  playerId: string
+  playerName: string
+  type: VoucherType
+  totalClasses: number
+  usedClasses: number
+  price: number
+  status: VoucherStatus
+  paymentMethod?: PaymentMethod
+  paymentId?: string
+  expiresAt?: Date
+  createdAt: Date
+}
+
 // --- Pago ---
 export type PaymentStatus = 'pendiente' | 'pagado' | 'cancelado'
 export type PaymentMethod = 'transferencia' | 'efectivo' | 'domiciliacion' | 'tarjeta'

@@ -15,6 +15,8 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
+import { calculateEventSalary } from '@/lib/salary-utils'
+
 
 interface PayrollCloseDialogProps {
   open: boolean
@@ -72,14 +74,7 @@ export function PayrollCloseDialog({ open, onOpenChange, year, month, onSuccess 
 
         const eventosTotal = eventosDelMes.reduce((acc, ev) => {
           if (!ev.coachIds.includes(coach.id)) return acc
-          const totalIngs = eventPayments
-            .filter((ep) => ep.eventId === ev.id && ep.status === 'pagado')
-            .reduce((s, ep) => s + ep.amount, 0)
-          const totalGsts = (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0)
-          const neto = Math.max(0, totalIngs - totalGsts)
-          const n = ev.coachIds.length || 1
-          if (config.eventPaymentType === 'percentage') return acc + (neto * ((config.eventRate || 0) / 100)) / n
-          return acc + (config.eventRate || 0) / n
+          return acc + calculateEventSalary(ev, eventPayments, config)
         }, 0)
 
         const bonuses = config.bonuses || 0

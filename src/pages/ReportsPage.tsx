@@ -19,6 +19,8 @@ import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery,
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ExcelJS from 'exceljs'
+import { calculateEventSalary } from '@/lib/salary-utils'
+
 import {
   Dialog,
   DialogContent,
@@ -250,14 +252,7 @@ export default function ReportsPage() {
 
         const eventosTotal = eventosDelMes.reduce((acc, ev) => {
           if (!ev.coachIds.includes(coach.id)) return acc
-          const totalIngs = eventPayments
-            .filter((ep) => ep.eventId === ev.id && ep.status === 'pagado')
-            .reduce((s, ep) => s + ep.amount, 0)
-          const totalGsts = (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0)
-          const neto = Math.max(0, totalIngs - totalGsts)
-          const n = ev.coachIds.length || 1
-          if (config.eventPaymentType === 'percentage') return acc + (neto * ((config.eventRate || 0) / 100)) / n
-          return acc + (config.eventRate || 0) / n
+          return acc + calculateEventSalary(ev, eventPayments, config)
         }, 0)
 
         const bonuses = config.bonuses || 0

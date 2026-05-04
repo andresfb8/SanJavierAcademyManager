@@ -582,27 +582,21 @@ export default function AttendancePage() {
               <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1 hidden sm:inline-flex">
                 Entrenador: {selectedGroup.coachName}
               </Badge>
-              {entries.length > 0 && (
-                <div className="w-full sm:w-auto sm:ml-auto flex gap-2 mt-1 sm:mt-0">
-                  <Badge variant="success">{presentCount} Presentes</Badge>
-                  <Badge variant="destructive">{absentCount} Ausentes</Badge>
-                  <Badge variant="warning">{justifiedCount} Justificados</Badge>
-                </div>
-              )}
             </div>
 
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
+              <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary/80" />
                     Jugadores ({entries.length})
                   </CardTitle>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleMarkAllPresent}
-                      className="text-green-600 border-green-200 hover:bg-green-50"
+                      className="text-green-600 border-green-200 hover:bg-green-50 rounded-full"
                     >
                       <CheckCircle className="h-4 w-4 sm:mr-2" />
                       <span className="hidden sm:inline">Todos presentes</span>
@@ -611,14 +605,16 @@ export default function AttendancePage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setShowRecoveryDialog(true)}
+                      className="rounded-full"
                     >
                       <RotateCcw className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Recuperacion</span>
+                      <span className="hidden sm:inline">Recuperación</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setShowOneOffDialog(true)}
+                      className="rounded-full"
                     >
                       <UserPlus className="h-4 w-4 sm:mr-2" />
                       <span className="hidden sm:inline">Clase Suelta</span>
@@ -627,7 +623,7 @@ export default function AttendancePage() {
                       variant="outline"
                       size="sm"
                       onClick={handleNotifyFreeSlots}
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50 rounded-full"
                       title="Notificar huecos libres por WhatsApp"
                     >
                       <Share2 className="h-4 w-4 sm:mr-2" />
@@ -635,8 +631,30 @@ export default function AttendancePage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Resumen Visual de Asistencia (Bloques) */}
+                {entries.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+                    <div className="rounded-xl bg-green-50 p-3 text-center border border-green-100 shadow-sm">
+                      <div className="text-2xl font-black text-green-700">{presentCount}</div>
+                      <div className="text-[10px] font-bold uppercase text-green-600/70 tracking-wider">Presentes</div>
+                    </div>
+                    <div className="rounded-xl bg-red-50 p-3 text-center border border-red-100 shadow-sm">
+                      <div className="text-2xl font-black text-red-700">{absentCount}</div>
+                      <div className="text-[10px] font-bold uppercase text-red-600/70 tracking-wider">Ausentes</div>
+                    </div>
+                    <div className="rounded-xl bg-yellow-50 p-3 text-center border border-yellow-100 shadow-sm">
+                      <div className="text-2xl font-black text-yellow-700">{justifiedCount}</div>
+                      <div className="text-[10px] font-bold uppercase text-yellow-600/70 tracking-wider">Justificados</div>
+                    </div>
+                    <div className="rounded-xl bg-blue-50 p-3 text-center border border-blue-100 shadow-sm">
+                      <div className="text-2xl font-black text-blue-700">{recoveryCount}</div>
+                      <div className="text-[10px] font-bold uppercase text-blue-600/70 tracking-wider">Recuperaciones</div>
+                    </div>
+                  </div>
+                )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 {entries.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
                     No hay jugadores inscritos en este grupo.

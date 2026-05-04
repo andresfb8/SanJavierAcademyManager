@@ -99,8 +99,11 @@ export function Sidebar() {
     setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
   }
 
-  const isItemActive = (href: string) =>
-    href === '/' ? location.pathname === '/' : location.pathname.startsWith(href)
+  const isItemActive = (href: string) => {
+    if (href === '/') return location.pathname === '/'
+    if (location.pathname === href) return true
+    return location.pathname.startsWith(`${href}/`)
+  }
 
   const isGroupActive = (items: NavItem[]) =>
     items.some((item) => isItemActive(item.href))
@@ -125,20 +128,16 @@ export function Sidebar() {
         to={item.href}
         onClick={() => setMobileOpen(false)}
         className={cn(
-          'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+          'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
           isActive
-            ? 'bg-sidebar-accent text-sidebar-primary'
+            ? 'bg-primary text-white shadow-md'
             : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
         )}
       >
-        {/* Active left-border indicator */}
-        {isActive && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-sidebar-primary" />
-        )}
         <item.icon
           className={cn(
             'h-[18px] w-[18px] shrink-0 transition-colors duration-150',
-            isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80'
+            isActive ? 'text-white' : 'text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80'
           )}
         />
         <span className="truncate">{item.name}</span>
@@ -251,25 +250,64 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-40 rounded-xl bg-sidebar-background p-2.5 text-sidebar-foreground shadow-lg lg:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      {/* Mobile Bottom Nav */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] lg:hidden">
+        <NavLink
+          to="/"
+          onClick={() => setMobileOpen(false)}
+          className={({ isActive }) => cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
+            isActive ? "text-primary" : "text-slate-500 hover:text-slate-900"
+          )}
+        >
+          <LayoutDashboard className="h-5 w-5" />
+          <span>Inicio</span>
+        </NavLink>
+        <NavLink
+          to="/grupos"
+          onClick={() => setMobileOpen(false)}
+          className={({ isActive }) => cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
+            isActive ? "text-primary" : "text-slate-500 hover:text-slate-900"
+          )}
+        >
+          <GraduationCap className="h-5 w-5" />
+          <span>Clases</span>
+        </NavLink>
+        <NavLink
+          to="/asistencia"
+          onClick={() => setMobileOpen(false)}
+          className={({ isActive }) => cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
+            isActive ? "text-primary" : "text-slate-500 hover:text-slate-900"
+          )}
+        >
+          <ClipboardCheck className="h-5 w-5" />
+          <span>Asistencia</span>
+        </NavLink>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
+            mobileOpen ? "text-primary" : "text-slate-500 hover:text-slate-900"
+          )}
+        >
+          <Menu className="h-5 w-5" />
+          <span>Menú</span>
+        </button>
+      </div>
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-72 bg-sidebar-background animate-slide-in-left">
+          <div className="fixed inset-y-0 right-0 z-50 w-72 bg-sidebar-background shadow-2xl animate-in slide-in-from-right-full duration-300">
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute right-3 top-4 rounded-lg p-1.5 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              className="absolute right-3 top-4 z-50 rounded-lg p-1.5 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -279,7 +317,7 @@ export function Sidebar() {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-72 lg:flex-col bg-sidebar-background">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-72 lg:flex-col bg-sidebar-background border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
         {sidebarContent}
       </aside>
 

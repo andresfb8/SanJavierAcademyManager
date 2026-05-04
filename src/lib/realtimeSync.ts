@@ -28,6 +28,9 @@ const COLLECTIONS = [
   { name: 'eventPayments', stateKey: 'eventPayments' },
   { name: 'privateLessonPayments', stateKey: 'privateLessonPayments' },
   { name: 'invoices', stateKey: 'invoices' },
+  { name: 'attendance', stateKey: 'attendance' },
+  { name: 'attendanceNotices', stateKey: 'attendanceNotices' },
+  { name: 'vouchers', stateKey: 'vouchers' },
 ] as const
 
 /**
@@ -87,7 +90,7 @@ export function subscribeToAllData(
     
     if (userRole === 'jugador' || userRole === 'tutor') {
       // Jugadores solo ven lo esencial para su portal
-      return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments'].includes(coll.name)
+      return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments', 'attendanceNotices', 'vouchers'].includes(coll.name)
     }
     
     return true

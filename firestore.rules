@@ -145,8 +145,7 @@ service cloud.firestore {
     // ─── Coaches Collection ─────────────────────────────────────────────
 
     match /coaches/{coachId} {
-      allow read: if isAdmin() && (belongsToClub() || resource.data.clubId == null) ||
-        (hasRole('entrenador') && belongsToClub() && resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && (belongsToClub() || resource.data.clubId == null);
       allow create: if isAdmin() && (incomingBelongsToClub() || request.resource.data.clubId == null);
       allow update: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
       allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
@@ -336,5 +335,18 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
+  
+    // --- Attendance Notices ---
+    match /attendanceNotices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (hasRole('jugador') || hasRole('tutor') || hasRole('entrenador') || isAdmin());
+    }
+
+    // --- Vouchers ---
+    match /vouchers/{voucherId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() || hasRole('entrenador');
+    }
   }
 }
+

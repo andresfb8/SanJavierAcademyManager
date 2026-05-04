@@ -128,9 +128,15 @@ export default function DashboardPage() {
 
   // ── Coach identification ──────────────────────────────────────────
   const currentCoachId = useMemo(() => {
-    if (!isCoach || !user?.id) return null
-    return coaches.find(c => c.userId === user.id)?.id ?? null
-  }, [isCoach, user?.id, coaches])
+    if (!isCoach || !user) return null
+    // Intenta buscar por ID de usuario vinculado
+    let coach = coaches.find(c => c.userId === user.id)
+    // Si no está vinculado por ID, busca por email como respaldo (muy importante)
+    if (!coach && user.email) {
+      coach = coaches.find(c => c.email?.toLowerCase() === user.email?.toLowerCase())
+    }
+    return coach?.id ?? null
+  }, [isCoach, user?.id, user?.email, coaches])
 
   // ── Coach-specific KPIs ───────────────────────────────────────────
   const coachHoursThisMonth = useMemo(() => {
@@ -412,11 +418,16 @@ export default function DashboardPage() {
           
           {/* Recovery/Attendance Alerts Section */}
           <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Avisos de Asistencia</h3>
+
             {attendanceNotices
               .filter(notice => {
-                const isToday = notice.date.toISOString().split('T')[0] === now.toISOString().split('T')[0];
+                const noticeDate = notice.date instanceof Date ? notice.date : new Date(notice.date as unknown as string);
+                const noticeLocal = new Date(noticeDate.getTime() - noticeDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                const nowLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                const isTodayOrUpcoming = noticeLocal >= nowLocal;
                 const coachGroupIds = groups.filter(g => g.coachId === currentCoachId).map(g => g.id);
-                return isToday && coachGroupIds.includes(notice.groupId);
+                return isTodayOrUpcoming && coachGroupIds.includes(notice.groupId);
               })
               .map(notice => (
                 <div key={notice.id} className={cn(
@@ -471,30 +482,81 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="px-6 pb-6 space-y-4">
-                {/* List of students in current class (Preview) */}
-                <div className="space-y-3">
-                  {[
-                    { id: '1', name: 'Ana Gracía', initial: 'A' },
-                    { id: '2', name: 'Carlos Ruíz', initial: 'C' },
-                    { id: '3', name: 'Laura M.', initial: 'L', pending: true }
-                  ].map((student) => (
-                    <div key={student.id} className="flex items-center justify-between group">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-sm">
-                          {student.initial}
-                        </div>
-                        <span className="text-sm font-bold text-slate-700">{student.name}</span>
+                {/* Visual Summary */}
+                {(() => {
+                  const enrolled = enrollments.filter(e => e.groupId === activeClass.id && e.isActive);
+                  const record = attendance.find(a => a.groupId === activeClass.id && new Date(a.date).toDateString() === now.toDateString());
+                  const present = record ? record.records.filter(r => r.status === 'presente').length : 0;
+                  const absent = record ? record.records.filter(r => r.status === 'ausente').length : 0;
+                  const justified = record ? record.records.filter(r => r.status === 'justificado').length : 0;
+                  const pending = enrolled.length - present - absent - justified;
+
+                  return (
+                    <div className="flex gap-2">
+                      <div className="flex-1 rounded-lg bg-green-50 p-2 text-center border border-green-100">
+                        <div className="text-lg font-black text-green-700">{present}</div>
+                        <div className="text-[10px] font-bold uppercase text-green-600/70">Presentes</div>
                       </div>
-                      <div className={cn(
-                        "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors",
-                        student.pending 
-                          ? "border-slate-200 text-slate-200" 
-                          : "border-emerald-500 bg-emerald-500 text-white"
-                      )}>
-                        <CheckCircle2 className="h-4 w-4" />
+                      <div className="flex-1 rounded-lg bg-red-50 p-2 text-center border border-red-100">
+                        <div className="text-lg font-black text-red-700">{absent}</div>
+                        <div className="text-[10px] font-bold uppercase text-red-600/70">Ausentes</div>
+                      </div>
+                      <div className="flex-1 rounded-lg bg-yellow-50 p-2 text-center border border-yellow-100">
+                        <div className="text-lg font-black text-yellow-700">{justified}</div>
+                        <div className="text-[10px] font-bold uppercase text-yellow-600/70">Justif.</div>
+                      </div>
+                      <div className="flex-1 rounded-lg bg-slate-50 p-2 text-center border border-slate-100">
+                        <div className="text-lg font-black text-slate-700">{pending}</div>
+                        <div className="text-[10px] font-bold uppercase text-slate-500/70">Pendientes</div>
                       </div>
                     </div>
-                  ))}
+                  );
+                })()}
+
+                {/* List of students in current class (Preview) */}
+                <div className="space-y-3">
+                  {(() => {
+                    const enrolled = enrollments.filter(e => e.groupId === activeClass.id && e.isActive);
+                    const record = attendance.find(a => a.groupId === activeClass.id && new Date(a.date).toDateString() === now.toDateString());
+                    
+                    return enrolled.slice(0, 4).map((enrollment) => {
+                      const student = players.find(p => p.id === enrollment.playerId);
+                      if (!student) return null;
+                      
+                      const studentRecord = record?.records.find(r => r.playerId === student.id);
+                      const isPending = !studentRecord || studentRecord.status === 'pendiente';
+                      
+                      return (
+                        <div key={student.id} className="flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-sm">
+                              {student.firstName[0]}
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">
+                              {student.firstName} {student.lastName.split(' ')[0]}
+                            </span>
+                          </div>
+                          <div className={cn(
+                            "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors",
+                            isPending 
+                              ? "border-slate-200 text-slate-200" 
+                              : studentRecord.status === 'presente'
+                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                : studentRecord.status === 'justificado'
+                                  ? "border-yellow-500 bg-yellow-500 text-white"
+                                  : "border-red-500 bg-red-500 text-white"
+                          )}>
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                        </div>
+                      )
+                    });
+                  })()}
+                  {enrollments.filter(e => e.groupId === activeClass.id && e.isActive).length > 4 && (
+                    <div className="text-center pt-2 text-xs font-medium text-slate-400">
+                      + {enrollments.filter(e => e.groupId === activeClass.id && e.isActive).length - 4} alumnos más
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4">

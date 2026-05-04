@@ -50,6 +50,8 @@ import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/authStore'
 import { useEventPaymentsQuery } from '@/hooks/useQueries'
+import { calculateEventSalary } from '@/lib/salary-utils'
+
 
 // ==========================================
 // CoachesPage - Gestion de personal (entrenadores y coordinadores)
@@ -192,18 +194,7 @@ export default function CoachesPage() {
     )
 
     const eventsSalary = monthEvents.reduce((acc, ev) => {
-      const totalIngresos = eventPayments
-        .filter((ep) => ep.eventId === ev.id && ep.status === 'pagado')
-        .reduce((s, ep) => s + ep.amount, 0)
-      const totalGastos = (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0)
-      const beneficioNeto = Math.max(0, totalIngresos - totalGastos)
-      const numCoaches = ev.coachIds.length || 1
-
-      if (config.eventPaymentType === 'percentage') {
-        return acc + (beneficioNeto * ((config.eventRate || 0) / 100)) / numCoaches
-      } else {
-        return acc + (config.eventRate || 0) / numCoaches
-      }
+      return acc + calculateEventSalary(ev, eventPayments, config)
     }, 0)
 
     return groupsSalary + lessonsSalary + eventsSalary + (config.bonuses || 0)
@@ -897,7 +888,7 @@ export default function CoachesPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>{form.eventPaymentType === 'fixed' ? 'Cantidad fija (€/evento)' : 'Porcentaje de recaudación (%)'}</Label>
+                    <Label>{form.eventPaymentType === 'fixed' ? 'Cantidad fija (€/evento)' : 'Porcentaje de Beneficio Neto (%)'}</Label>
                     <Input
                       type="number"
                       value={form.eventRate}

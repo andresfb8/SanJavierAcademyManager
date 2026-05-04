@@ -31,8 +31,17 @@ import {
   IdCard,
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
-
+import { 
+  usePaymentsQuery, 
+  useEventPaymentsQuery, 
+  usePrivateLessonPaymentsQuery, 
+  useAttendanceQuery, 
+  useActivitiesQuery, 
+  useEvaluationsQuery, 
+  useMatchReportsQuery, 
+  useInvoicesQuery 
+} from '@/hooks/useQueries'
+import { calculateEventSalary } from '@/lib/salary-utils'
 
 // ==========================================
 // CoachProfilePage - Perfil del entrenador
@@ -45,7 +54,7 @@ export default function CoachProfilePage() {
 
   const { coaches, groups, coachSalaryConfigs, privateLessons, events } = useDataStore()
   const { data: evaluations = [] } = useEvaluationsQuery()
-
+  const { data: eventPayments = [] } = useEventPaymentsQuery()
 
   const coach = useMemo(
     () => coaches.find((c) => c.id === id) ?? null,
@@ -109,18 +118,13 @@ export default function CoachProfilePage() {
        }
     }, 0)
 
-    // 3. Events salary -> Need to get events for the month that the coach is in.
+    // 3. Events salary
     const eventsSalary = monthlyEvents.reduce((acc, ev) => {
-       if (salaryConfig.eventPaymentType === 'fixed') {
-         return acc + (salaryConfig.eventRate || 0)
-       } else {
-         const totalCollected = ev.price * ev.attendeePlayerIds.length
-         return acc + (totalCollected * ((salaryConfig.eventRate || 0) / 100))
-       }
+      return acc + calculateEventSalary(ev, eventPayments, salaryConfig)
     }, 0)
     
     return groupsSalary + lessonsSalary + eventsSalary + (salaryConfig.bonuses || 0)
-  }, [salaryConfig, coachGroups, monthlyPrivateLessons, monthlyEvents])
+  }, [salaryConfig, coachGroups, monthlyPrivateLessons, monthlyEvents, eventPayments])
 
   // Guarda
   if (!coach) {
@@ -207,6 +211,76 @@ export default function CoachProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Clases de Hoy (Quick Actions Widget) */}
+        {(() => {
+          const today = new Date().getDay()
+          const todayGroups = coachGroups.filter(g => 
+            g.isActive && g.schedule.some(s => s.dayOfWeek === today)
+          ).sort((a, b) => {
+            const timeA = a.schedule.find(s => s.dayOfWeek === today)?.startTime || '23:59'
+            const timeB = b.schedule.find(s => s.dayOfWeek === today)?.startTime || '23:59'
+            return timeA.localeCompare(timeB)
+          })
+
+          if (todayGroups.length === 0) return null
+
+          return (
+            <Card className="border-none shadow-xl shadow-primary/5 rounded-[2rem] bg-white overflow-hidden">
+              <CardHeader className="pb-4 px-6 pt-6 bg-slate-50 border-b border-slate-100">
+                <CardTitle className="text-base font-black uppercase tracking-wider text-primary/80 flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Clases de Hoy
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100">
+                  {todayGroups.map(group => {
+                    const schedule = group.schedule.find(s => s.dayOfWeek === today)
+                    if (!schedule) return null
+                    
+                    return (
+                      <div key={group.id} className="p-4 sm:p-6 hover:bg-slate-50/50 transition-colors">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-emerald-100 text-emerald-700 flex flex-col items-center justify-center shrink-0">
+                              <span className="text-sm font-black">{schedule.startTime.split(':')[0]}</span>
+                              <span className="text-[10px] font-bold uppercase">{schedule.startTime.split(':')[1]}</span>
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-slate-800">{group.name}</h3>
+                              <p className="text-sm font-medium text-slate-500">
+                                {schedule.startTime} - {schedule.endTime} · Pista {group.courtName}
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <Badge variant="secondary" className="text-[10px] uppercase font-bold">{group.level}</Badge>
+                                <Badge variant="outline" className="text-[10px] uppercase font-bold text-emerald-600 border-emerald-200 bg-emerald-50">
+                                  {group.currentEnrollment} / {group.maxCapacity} alumnos
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
+                            <Button 
+                              size="sm" 
+                              className="rounded-full shadow-md hover:shadow-lg transition-all"
+                              onClick={() => navigate(`/asistencia?groupId=${group.id}`)}
+                            >
+                              Pasar Lista
+                            </Button>
+                            <Button size="sm" variant="outline" className="rounded-full">Traspasar</Button>
+                            <Button size="sm" variant="outline" className="rounded-full text-amber-600 border-amber-200 hover:bg-amber-50">Bloquear</Button>
+                            <Button size="sm" variant="outline" className="rounded-full text-red-600 border-red-200 hover:bg-red-50">Cancelar</Button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })()}
 
         {/* Tabs */}
         <Tabs defaultValue="grupos">
@@ -419,7 +493,7 @@ export default function CoachProfilePage() {
                           </p>
                           <p className="text-lg font-semibold">
                             {formatCurrency(monthlyEvents.reduce((acc, ev) => {
-                               return acc + (salaryConfig.eventPaymentType === 'fixed' ? (salaryConfig.eventRate || 0) : ((ev.price * ev.attendeePlayerIds.length) * ((salaryConfig.eventRate || 0) / 100)))
+                               return acc + calculateEventSalary(ev, eventPayments, salaryConfig)
                             }, 0))}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">

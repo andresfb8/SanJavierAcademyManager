@@ -15,7 +15,8 @@ import {
   Trophy,
   ChevronRight,
   CreditCard,
-  MessageCircle
+  MessageCircle,
+  Ticket
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { useAttendanceQuery } from '@/hooks/useQueries'
@@ -24,11 +25,13 @@ import { useState } from 'react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { PlayerPaymentsList } from '@/components/player/PlayerPaymentsList'
 import { RefreshCw } from 'lucide-react'
+import { VoucherCard } from '@/components/vouchers/VoucherCard'
 
 export default function PlayerDashboard() {
   const { user } = useAuthStore()
-  const { groups, enrollments, coaches, attendanceNotices, addAttendanceNotice, deleteAttendanceNotice } = useDataStore()
+  const { groups, enrollments, coaches, attendanceNotices, addAttendanceNotice, deleteAttendanceNotice, vouchers } = useDataStore()
   const [showPayments, setShowPayments] = useState(false)
+  const [showVouchers, setShowVouchers] = useState(false)
   
   const studentId = user?.linkedPlayerId
   
@@ -39,40 +42,67 @@ export default function PlayerDashboard() {
   const now = new Date()
   const today = now.getDay() || 7 // 1-7 (Lunes-Domingo)
   
-  // Find next class today or soon
-  const nextClass = useMemo(() => {
-    // Look for classes today that haven't started yet
-    const todayClasses = myGroups
-      .map(g => ({ group: g, slot: g.schedule.find(s => s.dayOfWeek === today) }))
-      .filter(item => item.slot)
-      .sort((a, b) => (a.slot?.startTime || '').localeCompare(b.slot?.startTime || ''))
-    
-    return todayClasses[0] || null
-  }, [myGroups, today])
+  // Find next class within 7 days
+  const nextClassData = useMemo(() => {
+    let nextClassObj = null
+    let minDiffMs = Infinity
 
-  // Get attendance status for today's class
-  const todayDateStr = now.toISOString().split('T')[0]
+    for (let i = 0; i < 7; i++) {
+      const targetDate = new Date()
+      targetDate.setDate(targetDate.getDate() + i)
+      const targetDay = targetDate.getDay() || 7
+      
+      for (const group of myGroups) {
+        const slots = group.schedule.filter(s => s.dayOfWeek === targetDay)
+        for (const slot of slots) {
+          const [hours, minutes] = slot.startTime.split(':').map(Number)
+          const classTime = new Date(targetDate)
+          classTime.setHours(hours, minutes, 0, 0)
+          
+          const diffMs = classTime.getTime() - new Date().getTime()
+          // Only consider classes in the future
+          if (diffMs > 0 && diffMs < minDiffMs) {
+            minDiffMs = diffMs
+            nextClassObj = {
+              group,
+              slot,
+              classDate: classTime,
+              diffHours: diffMs / (1000 * 60 * 60)
+            }
+          }
+        }
+      }
+    }
+    return nextClassObj
+  }, [myGroups])
+
+  // Get attendance status for the calculated next class date
+  const nextClassDateStr = nextClassData ? nextClassData.classDate.toISOString().split('T')[0] : ''
   const currentNotice = attendanceNotices.find(n => 
     n.playerId === studentId && 
-    n.groupId === nextClass?.group.id && 
-    n.date.toISOString().split('T')[0] === todayDateStr
+    n.groupId === nextClassData?.group.id && 
+    n.date.toISOString().split('T')[0] === nextClassDateStr
   )
 
   const handleAttendanceNotice = (type: 'present' | 'absent') => {
-    if (!studentId || !nextClass) return
+    if (!studentId || !nextClassData) return
     
-    // Clear existing notice if same type (toggle off)
-    if (currentNotice?.type === type) {
+    // Si la plaza ya fue ocupada y queremos volver a decir "Sí, voy", habría que verificar (Pendiente Fase 4 / validación).
+    // Por ahora permitimos cambiar si estamos a tiempo.
+
+    if (currentNotice) {
       deleteAttendanceNotice(currentNotice.id)
-      return
+      // Si hizo clic en el mismo que ya estaba marcado, solo lo borramos (desmarcar)
+      if (currentNotice.type === type) {
+        return
+      }
     }
 
-    // Create or update notice
     const newNotice: Omit<AttendanceNotice, 'id' | 'createdAt'> = {
       playerId: studentId,
       playerName: user?.displayName || 'Alumno',
-      groupId: nextClass.group.id,
-      date: new Date(todayDateStr),
+      groupId: nextClassData.group.id,
+      date: new Date(nextClassDateStr),
       type,
     }
     
@@ -96,7 +126,7 @@ export default function PlayerDashboard() {
         </div>
 
         {/* Next Class Widget */}
-        {nextClass ? (
+        {nextClassData ? (
           <Card className="border-none shadow-xl shadow-emerald-900/5 rounded-[2rem] overflow-hidden bg-white">
             <div className="bg-emerald-600 p-6 text-white">
               <div className="flex items-center justify-between mb-4">
@@ -105,58 +135,81 @@ export default function PlayerDashboard() {
                 </Badge>
                 <div className="flex items-center gap-1 text-emerald-100 text-xs font-bold">
                   <Clock className="h-3 w-3" />
-                  {nextClass.slot?.startTime} - {nextClass.slot?.endTime}
+                  {formatDate(nextClassData.classDate)} · {nextClassData.slot.startTime}
                 </div>
               </div>
-              <h2 className="text-xl font-black mb-1">{nextClass.group.name}</h2>
+              <h2 className="text-xl font-black mb-1">{nextClassData.group.name}</h2>
               <div className="flex items-center gap-4 text-emerald-100 text-xs">
                 <div className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
-                  {nextClass.group.courtName}
+                  {nextClassData.group.courtName}
                 </div>
                 <div className="flex items-center gap-1">
                   <User className="h-3 w-3" />
-                  {nextClass.group.coachName}
+                  {nextClassData.group.coachName}
                 </div>
               </div>
             </div>
             
             <CardContent className="p-6 space-y-4">
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">¿Asistirás a clase?</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  variant="outline"
-                  className={cn(
-                    "h-14 rounded-2xl border-2 font-bold transition-all",
-                    currentNotice?.type === 'present' 
-                      ? "bg-emerald-50 border-emerald-500 text-emerald-700" 
-                      : "border-slate-100 text-slate-600 hover:bg-slate-50"
+              {nextClassData.diffHours <= 48 ? (
+                <>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">¿Asistirás a clase?</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant="outline"
+                      className={cn(
+                        "h-14 rounded-2xl border-2 font-bold transition-all",
+                        currentNotice?.type === 'present' 
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-700" 
+                          : "border-slate-100 text-slate-600 hover:bg-slate-50"
+                      )}
+                      onClick={() => handleAttendanceNotice('present')}
+                    >
+                      <CheckCircle2 className={cn("h-5 w-5 mr-2", currentNotice?.type === 'present' ? "text-emerald-500" : "text-slate-300")} />
+                      Sí, voy
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className={cn(
+                        "h-14 rounded-2xl border-2 font-bold transition-all",
+                        currentNotice?.type === 'absent' 
+                          ? "bg-amber-50 border-amber-500 text-amber-700" 
+                          : "border-slate-100 text-slate-600 hover:bg-slate-50"
+                      )}
+                      onClick={() => handleAttendanceNotice('absent')}
+                    >
+                      <XCircle className={cn("h-5 w-5 mr-2", currentNotice?.type === 'absent' ? "text-amber-500" : "text-slate-300")} />
+                      No puedo
+                    </Button>
+                  </div>
+                  
+                  {currentNotice?.type === 'absent' && (
+                    <div className="bg-amber-50 rounded-xl p-3 flex gap-3 items-start animate-in fade-in zoom-in-95 duration-300 mt-4">
+                      <MessageCircle className="h-4 w-4 text-amber-500 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-[11px] text-amber-700 font-medium leading-relaxed">
+                          Hemos avisado a tu entrenador para liberar la plaza.
+                        </p>
+                        {nextClassData.diffHours >= 24 && (
+                          <p className="text-[10px] text-amber-600 font-bold">
+                            ¡Has cancelado con +24h! Recibirás un crédito de recuperación.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   )}
-                  onClick={() => handleAttendanceNotice('present')}
-                >
-                  <CheckCircle2 className={cn("h-5 w-5 mr-2", currentNotice?.type === 'present' ? "text-emerald-500" : "text-slate-300")} />
-                  Sí, voy
-                </Button>
-                <Button 
-                  variant="outline"
-                  className={cn(
-                    "h-14 rounded-2xl border-2 font-bold transition-all",
-                    currentNotice?.type === 'absent' 
-                      ? "bg-amber-50 border-amber-500 text-amber-700" 
-                      : "border-slate-100 text-slate-600 hover:bg-slate-50"
-                  )}
-                  onClick={() => handleAttendanceNotice('absent')}
-                >
-                  <XCircle className={cn("h-5 w-5 mr-2", currentNotice?.type === 'absent' ? "text-amber-500" : "text-slate-300")} />
-                  No puedo
-                </Button>
-              </div>
-              
-              {currentNotice?.type === 'absent' && (
-                <div className="bg-amber-50 rounded-xl p-3 flex gap-3 items-start animate-in fade-in zoom-in-95 duration-300">
-                  <MessageCircle className="h-4 w-4 text-amber-500 mt-0.5" />
-                  <p className="text-[11px] text-amber-700 font-medium">
-                    Hemos avisado a tu entrenador. Si avisaste con antelación, recibirás un crédito de recuperación.
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Clock className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-400">
+                    Faltan {Math.floor(nextClassData.diffHours / 24)} días para tu clase.
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    La confirmación se abrirá 48 horas antes.
                   </p>
                 </div>
               )}
@@ -193,6 +246,22 @@ export default function PlayerDashboard() {
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Pagos</p>
           </Card>
         </div>
+
+        <Card 
+          className="border-none shadow-sm rounded-3xl bg-white p-5 cursor-pointer active:scale-95 transition-all flex items-center justify-between"
+          onClick={() => setShowVouchers(true)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center">
+              <Ticket className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Mis Bonos</p>
+              <p className="text-sm font-bold text-slate-700">Ver clases restantes</p>
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-300" />
+        </Card>
 
         {/* Weekly Schedule */}
         <div className="space-y-4">
@@ -231,6 +300,38 @@ export default function PlayerDashboard() {
           </div>
           <div className="px-5 pb-20 h-full overflow-y-auto">
             {studentId && <PlayerPaymentsList playerId={studentId} />}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Vouchers Sheet */}
+      <Sheet open={showVouchers} onOpenChange={setShowVouchers}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-[2.5rem] p-0 overflow-hidden border-none bg-slate-50">
+          <div className="p-6 pb-2">
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+            <h2 className="text-xl font-black text-slate-800 mb-1">Mis Bonos</h2>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Clases disponibles y consumidas</p>
+          </div>
+          <div className="px-5 pb-20 h-full overflow-y-auto space-y-4">
+            {studentId && (() => {
+              const myVouchers = vouchers.filter(v => v.playerId === studentId)
+              if (myVouchers.length === 0) {
+                return (
+                  <div className="text-center py-10 bg-white rounded-3xl border border-slate-100 shadow-sm">
+                    <Ticket className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-500">No tienes bonos activos.</p>
+                    <p className="text-xs text-slate-400 mt-1">Contacta con la academia para comprar uno.</p>
+                  </div>
+                )
+              }
+              return (
+                <div className="space-y-3">
+                  {myVouchers.map(voucher => (
+                    <VoucherCard key={voucher.id} voucher={voucher} />
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </SheetContent>
       </Sheet>

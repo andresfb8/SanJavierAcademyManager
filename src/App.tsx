@@ -30,6 +30,7 @@ import InvoicesPage from '@/pages/InvoicesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import FinancialsPage from '@/pages/FinancialsPage'
 import PlayerDashboard from '@/pages/PlayerDashboard'
+import FreeSlotsPage from '@/pages/FreeSlotsPage'
 
 function RoleRoute({
   children,
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/grupos" element={<GroupsPage />} />
           <Route path="/grupos/:id" element={<GroupDetailPage />} />
           <Route path="/asistencia" element={<AttendancePage />} />
+          <Route path="/huecos" element={<FreeSlotsPage />} />
           <Route path="/agenda" element={<AgendaPage />} />
           <Route path="/eventos" element={<EventsActivitiesPage />} />
           <Route path="/eventos/:id" element={<EventDetailPage />} />

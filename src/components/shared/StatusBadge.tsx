@@ -9,20 +9,20 @@ interface StatusBadgeProps {
 // Each entry: "dot-color bg text-color"
 // Each entry: "dot-color bg text-color"
 const defaultColorMap: Record<string, { dot: string; badge: string }> = {
-  activo: { dot: 'bg-emerald-500', badge: 'bg-emerald-50/50 text-emerald-700 ring-emerald-600/10' },
-  lista_espera: { dot: 'bg-amber-500', badge: 'bg-amber-50/50 text-amber-700 ring-amber-600/10' },
-  baja: { dot: 'bg-rose-500', badge: 'bg-rose-50/50 text-rose-700 ring-rose-600/10' },
-  presente: { dot: 'bg-emerald-500', badge: 'bg-emerald-50/50 text-emerald-700 ring-emerald-600/10' },
-  ausente: { dot: 'bg-rose-500', badge: 'bg-rose-50/50 text-rose-700 ring-rose-600/10' },
-  justificado: { dot: 'bg-amber-500', badge: 'bg-amber-50/50 text-amber-700 ring-amber-600/10' },
-  pendiente: { dot: 'bg-amber-500', badge: 'bg-amber-50/50 text-amber-700 ring-amber-600/10' },
-  pagado: { dot: 'bg-emerald-500', badge: 'bg-emerald-50/50 text-emerald-700 ring-emerald-600/10' },
-  cancelado: { dot: 'bg-slate-400', badge: 'bg-slate-50/50 text-slate-600 ring-slate-600/10' },
-  iniciacion: { dot: 'bg-emerald-500', badge: 'bg-emerald-50/50 text-emerald-700 ring-emerald-600/10' },
-  intermedio: { dot: 'bg-cyan-500', badge: 'bg-cyan-50/50 text-cyan-700 ring-cyan-600/10' },
-  avanzado: { dot: 'bg-indigo-500', badge: 'bg-indigo-50/50 text-indigo-700 ring-indigo-600/10' },
-  competicion: { dot: 'bg-rose-500', badge: 'bg-rose-50/50 text-rose-700 ring-rose-600/10' },
-  menores: { dot: 'bg-amber-500', badge: 'bg-amber-50/50 text-amber-700 ring-amber-600/10' },
+  activo: { dot: 'bg-green-500', badge: 'bg-green-100 text-green-800 ring-green-600/10' },
+  lista_espera: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 ring-yellow-600/10' },
+  baja: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-800 ring-red-600/10' },
+  presente: { dot: 'bg-green-500', badge: 'bg-green-100 text-green-800 ring-green-600/10' },
+  ausente: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-800 ring-red-600/10' },
+  justificado: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 ring-yellow-600/10' },
+  pendiente: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 ring-yellow-600/10' },
+  pagado: { dot: 'bg-green-500', badge: 'bg-green-100 text-green-800 ring-green-600/10' },
+  cancelado: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-800 ring-red-600/10' },
+  iniciacion: { dot: 'bg-green-500', badge: 'bg-green-100 text-green-800 ring-green-600/10' },
+  intermedio: { dot: 'bg-blue-500', badge: 'bg-blue-100 text-blue-800 ring-blue-600/10' },
+  avanzado: { dot: 'bg-indigo-500', badge: 'bg-indigo-100 text-indigo-800 ring-indigo-600/10' },
+  competicion: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-800 ring-red-600/10' },
+  menores: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 ring-yellow-600/10' },
 }
 
 const labelMap: Record<string, string> = {
