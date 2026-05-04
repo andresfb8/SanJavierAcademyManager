@@ -524,7 +524,7 @@ export default function DashboardPage() {
                       if (!student) return null;
                       
                       const studentRecord = record?.records.find(r => r.playerId === student.id);
-                      const isPending = !studentRecord || studentRecord.status === 'pendiente';
+                      const isPending = !studentRecord;
                       
                       return (
                         <div key={student.id} className="flex items-center justify-between group">

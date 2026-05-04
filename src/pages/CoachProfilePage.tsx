@@ -39,7 +39,8 @@ import {
   useActivitiesQuery, 
   useEvaluationsQuery, 
   useMatchReportsQuery, 
-  useInvoicesQuery 
+  useInvoicesQuery,
+  useClubTransactionsQuery
 } from '@/hooks/useQueries'
 import { calculateEventSalary } from '@/lib/salary-utils'
 
@@ -55,6 +56,7 @@ export default function CoachProfilePage() {
   const { coaches, groups, coachSalaryConfigs, privateLessons, events } = useDataStore()
   const { data: evaluations = [] } = useEvaluationsQuery()
   const { data: eventPayments = [] } = useEventPaymentsQuery()
+  const { data: allTransactions = [] } = useClubTransactionsQuery()
 
   const coach = useMemo(
     () => coaches.find((c) => c.id === id) ?? null,
@@ -100,6 +102,13 @@ export default function CoachProfilePage() {
         new Date(ev.date).getFullYear() === now.getFullYear()
     )
   }, [events, id])
+
+  const coachPayrolls = useMemo(() => {
+    if (!id) return []
+    return allTransactions
+      .filter(t => t.category === 'nomina' && t.relatedId === id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [allTransactions, id])
 
   const estimatedSalary = useMemo(() => {
     if (!salaryConfig) return 0
@@ -519,6 +528,54 @@ export default function CoachProfilePage() {
                     <p className="text-sm text-muted-foreground text-center py-6">
                       No se ha configurado el salario. Edita el perfil desde la pagina de Personal para configurar las tarifas.
                     </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Historial de Nóminas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Historial de Nóminas (Cierres)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {coachPayrolls.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No hay registros de nóminas cerradas para este entrenador.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {coachPayrolls.map((payroll) => (
+                        <div 
+                          key={payroll.id} 
+                          className="flex items-center justify-between p-3 rounded-lg border bg-slate-50/30"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                              <Calendar className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">
+                                {payroll.concept}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Pagado el {formatDate(payroll.date)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-black text-slate-900">
+                              {formatCurrency(payroll.amount)}
+                            </p>
+                            <Badge variant="outline" className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
+                              Confirmado
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

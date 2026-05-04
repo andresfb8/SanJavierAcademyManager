@@ -5,9 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, MapPin, Clock, Users, ArrowRight, Sparkles } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
+import { useAttendanceQuery } from '@/hooks/useQueries'
+import { AttendanceEntry } from '@/types'
 
 export default function FreeSlotsPage() {
-  const { groups, attendance } = useDataStore()
+  const { groups } = useDataStore()
+  const { data: attendance = [] } = useAttendanceQuery()
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
 
   // Calculate free slots based on absences and group capacity
@@ -36,8 +39,8 @@ export default function FreeSlotsPage() {
       if (record) {
         // If there's a record, the free spots are (maxCapacity - present - pending) 
         // which equals (maxCapacity - totalEnrolled) + (absent + justified)
-        const present = record.records.filter(r => r.status === 'presente').length
-        absentees = record.records.filter(r => r.status === 'ausente' || r.status === 'justificado').length
+        const present = record.records.filter((r: AttendanceEntry) => r.status === 'presente').length
+        absentees = record.records.filter((r: AttendanceEntry) => r.status === 'ausente' || r.status === 'justificado').length
         takenSpots = present // Simplifying: only present people take spots
       }
 
@@ -58,7 +61,7 @@ export default function FreeSlotsPage() {
       }
     })
 
-    return slots.sort((a, b) => a.time.localeCompare(b.time))
+    return slots.sort((a: any, b: any) => a.time.localeCompare(b.time))
   }, [groups, attendance, selectedDate])
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
