@@ -340,13 +340,15 @@ export default function PaymentsPage() {
 
   // --- Selection handlers ---
   const handleBulkGenerateInvoices = () => {
-    const toInvoice = filteredPayments.filter(p => p.status === 'pagado' && !p.invoiceId)
+    // Buscamos todos los pagos cobrados que NO tengan factura, independientemente del mes seleccionado
+    const toInvoice = allPayments.filter(p => p.status === 'pagado' && !p.invoiceId)
+    
     if (toInvoice.length === 0) {
-      toast.info('No hay pagos cobrados pendientes de facturar en este mes')
+      toast.info('No hay cobros pendientes de facturar')
       return
     }
 
-    if (window.confirm(`¿Deseas generar facturas para ${toInvoice.length} pagos agrupados por jugador?`)) {
+    if (window.confirm(`¿Deseas generar facturas para ${toInvoice.length} cobros pendientes de facturar (agrupados por jugador)?`)) {
       bulkGenerateInvoices(toInvoice.map(p => p.id))
     }
   }
@@ -869,11 +871,11 @@ export default function PaymentsPage() {
                   size="sm" 
                   variant="outline"
                   onClick={handleBulkGenerateInvoices} 
-                  title="Generar facturas de todos los pagos cobrados de este mes"
+                  title="Generar facturas de todos los cobros que aún no tienen factura"
                   className="gap-1 border-primary/20 hover:border-primary/40 text-primary"
                 >
                   <Receipt className="h-4 w-4" />
-                  <span className="hidden sm:inline">Facturar mes</span>
+                  <span className="hidden sm:inline">Facturar Pendientes</span>
                 </Button>
                 <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
                   <FileText className="h-4 w-4 mr-1" />
