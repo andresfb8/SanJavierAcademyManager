@@ -18,7 +18,7 @@ interface StatCardProps {
   accentColor?: string
 }
 
-export function StatCard({ title, value, description, icon: Icon, trend, className, iconClassName, accentColor }: StatCardProps) {
+export function StatCard({ title, value, description, info, icon: Icon, trend, className, iconClassName, accentColor }: StatCardProps) {
   return (
     <Card className={cn('hover-lift border-border/40 shadow-sm relative overflow-hidden bg-white/60 backdrop-blur-sm', className)}>
       {/* Subtle background glow */}
