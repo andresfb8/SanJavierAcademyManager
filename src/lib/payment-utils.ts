@@ -21,6 +21,20 @@ export interface NormalizedPayment {
 }
 
 /**
+ * Helper to ensure an amount is a valid number, handling strings with commas
+ */
+export function safeParseAmount(val: any): number {
+  if (val === null || val === undefined) return 0
+  if (typeof val === 'number') return val
+  if (typeof val === 'string') {
+    const sanitized = val.replace(',', '.').trim()
+    const parsed = parseFloat(sanitized)
+    return isNaN(parsed) ? 0 : parsed
+  }
+  return 0
+}
+
+/**
  * Normaliza los 3 tipos de pago del sistema en un array comun
  * para calculos financieros unificados (dashboard, estadisticas, etc.)
  */
@@ -39,7 +53,7 @@ export function normalizeAllPayments(
       playerId: p.playerId,
       playerName: p.playerName,
       concept: p.concept,
-      amount: p.amount,
+      amount: safeParseAmount(p.amount),
       status: p.status,
       billingMonth: p.billingMonth,
       billingYear: p.billingYear,
@@ -74,7 +88,7 @@ export function normalizeAllPayments(
       playerId: ep.playerId,
       playerName: ep.playerName,
       concept: ep.eventName,
-      amount: ep.amount,
+      amount: safeParseAmount(ep.amount),
       status: ep.status,
       billingMonth: d.getMonth() + 1,
       billingYear: d.getFullYear(),
@@ -106,7 +120,7 @@ export function normalizeAllPayments(
       playerId: plp.playerId,
       playerName: plp.playerName,
       concept: `Clase particular (${d.toLocaleDateString('es-ES')})`,
-      amount: plp.amount,
+      amount: safeParseAmount(plp.amount),
       status: plp.status,
       billingMonth: d.getMonth() + 1,
       billingYear: d.getFullYear(),

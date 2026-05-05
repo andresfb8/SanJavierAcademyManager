@@ -269,8 +269,8 @@ export default function DashboardPage() {
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
   const allPayments = useMemo(
-    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
-    [payments, eventPayments, privateLessonPayments]
+    () => normalizeAllPayments(allBasePayments, eventPayments, privateLessonPayments ?? []),
+    [allBasePayments, eventPayments, privateLessonPayments]
   )
 
   const currentMonthAllPayments = allPayments.filter(
@@ -285,35 +285,35 @@ export default function DashboardPage() {
       const d = t.date instanceof Date ? t.date : new Date(t.date)
       return t.type === 'ingreso' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear
     })
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0)
 
   const prevManualIncome = transactions
     .filter(t => {
       const d = t.date instanceof Date ? t.date : new Date(t.date)
       return t.type === 'ingreso' && d.getMonth() + 1 === prevMonth && d.getFullYear() === prevYear
     })
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0)
 
   const currentRevenue = currentMonthAllPayments
     .filter((p) => p.status === 'pagado')
-    .reduce((sum, p) => sum + p.amount, 0) + currentManualIncome
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0) + currentManualIncome
 
   const prevRevenue = prevMonthAllPayments
     .filter((p) => p.status === 'pagado')
-    .reduce((sum, p) => sum + p.amount, 0) + prevManualIncome
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0) + prevManualIncome
   const revenueDiff = prevRevenue > 0 ? Math.round(((currentRevenue - prevRevenue) / prevRevenue) * 100) : 0
 
   const currentPending = currentMonthAllPayments
     .filter((p) => p.status === 'pendiente')
-    .reduce((sum, p) => sum + p.amount, 0)
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   const prevPending = prevMonthAllPayments
     .filter((p) => p.status === 'pendiente')
-    .reduce((sum, p) => sum + p.amount, 0)
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   const pendingDiff = prevPending > 0 ? Math.round(((currentPending - prevPending) / prevPending) * 100) : 0
 
   const totalCurrentMonth = currentMonthAllPayments
     .filter((p) => p.status !== 'cancelado')
-    .reduce((sum, p) => sum + p.amount, 0)
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   const collectionRate = totalCurrentMonth > 0 ? Math.round((currentRevenue / totalCurrentMonth) * 100) : 0
 
   const monthStart = new Date(currentYear, currentMonth - 1, 1)

@@ -224,13 +224,13 @@ export default function PaymentsPage() {
   const ingresosMes = useMemo(() => {
     return currentMonthAllPayments
       .filter((p) => p.status === 'pagado')
-      .reduce((sum, p) => sum + p.amount, 0)
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   }, [currentMonthAllPayments])
 
   const ingresosMesAnterior = useMemo(() => {
     return previousMonthAllPayments
       .filter((p) => p.status === 'pagado')
-      .reduce((sum, p) => sum + p.amount, 0)
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   }, [previousMonthAllPayments])
 
   const ingresosTrend = useMemo(() => {
@@ -241,7 +241,7 @@ export default function PaymentsPage() {
   const pendienteCobro = useMemo(() => {
     return currentMonthAllPayments
       .filter((p) => p.status === 'pendiente')
-      .reduce((sum, p) => sum + p.amount, 0)
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   }, [currentMonthAllPayments])
 
   const tasaCobro = useMemo(() => {
@@ -260,10 +260,10 @@ export default function PaymentsPage() {
       )
       const ingresos = monthPayments
         .filter((p) => p.status === 'pagado')
-        .reduce((sum, p) => sum + p.amount, 0)
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
       const pendiente = monthPayments
         .filter((p) => p.status === 'pendiente')
-        .reduce((sum, p) => sum + p.amount, 0)
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
       const total = monthPayments.length
       const pagados = monthPayments.filter((p) => p.status === 'pagado').length
       const tasa = total > 0 ? Math.round((pagados / total) * 100) : 0
@@ -280,9 +280,9 @@ export default function PaymentsPage() {
   }, [allPayments, selectedYear])
 
   const annualTotals = useMemo(() => {
-    const totalIngresos = annualSummary.reduce((sum, r) => sum + r.ingresos, 0)
-    const totalPendiente = annualSummary.reduce((sum, r) => sum + r.pendiente, 0)
-    const totalRecibos = annualSummary.reduce((sum, r) => sum + r.recibos, 0)
+    const totalIngresos = annualSummary.reduce((sum, r) => sum + Number(r.ingresos || 0), 0)
+    const totalPendiente = annualSummary.reduce((sum, r) => sum + Number(r.pendiente || 0), 0)
+    const totalRecibos = annualSummary.reduce((sum, r) => sum + Number(r.recibos || 0), 0)
     const totalPagados = annualSummary.reduce((sum, r) => {
       const monthPayments = allPayments.filter(
         (p) => p.billingMonth === r.month && p.billingYear === selectedYear && p.status === 'pagado'

@@ -146,7 +146,7 @@ export default function FinancialsPage() {
   const ingresosCuotas = useMemo(
     () => payments
         .filter((p) => p.status === 'pagado' && p.billingMonth === month && p.billingYear === year)
-        .reduce((s, p) => s + p.amount, 0),
+        .reduce((s, p) => s + Number(p.amount || 0), 0),
     [payments, month, year]
   )
 
@@ -163,13 +163,13 @@ export default function FinancialsPage() {
     () => eventosDelMes.reduce((acc, ev) => {
         return acc + eventPayments
             .filter((ep) => ep.eventId === ev.id && ep.status === 'pagado')
-            .reduce((s, ep) => s + ep.amount, 0)
+            .reduce((s, ep) => s + Number(ep.amount || 0), 0)
       }, 0),
     [eventosDelMes, eventPayments]
   )
 
   const gastosEventos = useMemo(
-    () => eventosDelMes.reduce((acc, ev) => acc + (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0), 0),
+    () => eventosDelMes.reduce((acc, ev) => acc + (ev.expenses ?? []).reduce((s, ex) => s + Number(ex.amount || 0), 0), 0),
     [eventosDelMes]
   )
 
@@ -186,14 +186,14 @@ export default function FinancialsPage() {
     () => clasesDelMes.reduce((acc, lesson) => {
         return acc + privateLessonPayments
             .filter((lp) => lp.lessonId === lesson.id && lp.status === 'pagado')
-            .reduce((s, lp) => s + lp.amount, 0)
+            .reduce((s, lp) => s + Number(lp.amount || 0), 0)
       }, 0),
     [clasesDelMes, privateLessonPayments]
   )
   
   // -- Transacciones manuales del mes --
-  const extrasIngresos = useMemo(() => transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + t.amount, 0), [transactions])
-  const extrasGastos = useMemo(() => transactions.filter(t => t.type === 'gasto').reduce((sum, t) => sum + t.amount, 0), [transactions])
+  const extrasIngresos = useMemo(() => transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + Number(t.amount || 0), 0), [transactions])
+  const extrasGastos = useMemo(() => transactions.filter(t => t.type === 'gasto').reduce((sum, t) => sum + Number(t.amount || 0), 0), [transactions])
 
   const totalIngresos = ingresosCuotas + ingresosEventos + ingresosClases + extrasIngresos
   const totalGastos = gastosEventos + extrasGastos
