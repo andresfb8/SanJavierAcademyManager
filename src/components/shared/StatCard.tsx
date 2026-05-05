@@ -20,12 +20,14 @@ interface StatCardProps {
 
 export function StatCard({ title, value, description, info, icon: Icon, trend, className, iconClassName, accentColor }: StatCardProps) {
   return (
-    <Card className={cn('hover-lift border-border/40 shadow-sm relative overflow-hidden bg-white/60 backdrop-blur-sm', className)}>
-      {/* Subtle background glow */}
-      <div 
-        className="absolute -right-4 -top-4 h-24 w-24 rounded-full opacity-5 blur-2xl"
-        style={{ backgroundColor: accentColor || 'var(--color-primary)' }}
-      />
+    <Card className={cn('hover-lift border-border/40 shadow-sm relative bg-white/60 backdrop-blur-sm', className)}>
+      {/* Container for background glow to allow clipping while card remains overflow-visible */}
+      <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
+        <div 
+          className="absolute -right-4 -top-4 h-24 w-24 rounded-full opacity-5 blur-2xl"
+          style={{ backgroundColor: accentColor || 'var(--color-primary)' }}
+        />
+      </div>
       
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
