@@ -503,7 +503,11 @@ export default function DashboardPage() {
       
       const activeAtEnd = playersActiveInMonth.length - bajas
       const rotationDivisor = activeAtEnd + bajas
-      const rotationIndex = rotationDivisor > 0 ? Math.round(((altas + bajas) / rotationDivisor) * 100) : 0
+      
+      // Omitir rotación de Febrero 2026 por ser el mes de inicio (datos no representativos que distorsionan la escala)
+      const isStartMonth = m === 2 && y === 2026
+      
+      const rotationIndex = (rotationDivisor > 0 && !isStartMonth) ? Math.round(((altas + bajas) / rotationDivisor) * 100) : 0
       const churnRate = rotationDivisor > 0 ? Math.round((bajas / rotationDivisor) * 100) : 0
 
       // --- CÁLCULO DE OCUPACIÓN HISTÓRICA PRECISO ---
