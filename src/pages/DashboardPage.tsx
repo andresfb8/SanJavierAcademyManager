@@ -347,10 +347,13 @@ export default function DashboardPage() {
 
   // ── Occupancy calculation ─────────────────────────────────────────
   const occupancyStats = useMemo(() => {
-    const activeGroupsList = groups.filter(g => g.isActive)
-    const totalCapacity = activeGroupsList.reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
-    const totalOccupied = activeGroupsList.reduce((sum, g) => sum + (g.currentEnrollment || 0), 0)
-    const rate = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0
+    // Solo grupos de clases activos actualmente
+    const classGroups = groups.filter(g => g.isActive)
+    const totalCapacity = classGroups.reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
+    const totalOccupied = classGroups.reduce((sum, g) => sum + (g.currentEnrollment || 0), 0)
+    
+    // Capamos al 100% para evitar valores extraños si hay sobre-inscripción puntual
+    const rate = totalCapacity > 0 ? Math.min(100, Math.round((totalOccupied / totalCapacity) * 100)) : 0
     return { totalCapacity, totalOccupied, rate }
   }, [groups])
 
@@ -439,15 +442,30 @@ export default function DashboardPage() {
       const rotationIndex = rotationDivisor > 0 ? Math.round(((altas + bajas) / rotationDivisor) * 100) : 0
       const churnRate = rotationDivisor > 0 ? Math.round((bajas / rotationDivisor) * 100) : 0
 
-      const totalCapacity = groups.filter(g => g.isActive).reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
+      // --- CÁLCULO DE OCUPACIÓN HISTÓRICA PRECISO ---
+      // 1. Identificar grupos que estaban activos en ESTE mes específico
+      const groupsInMonth = groups.filter(g => {
+        const gStart = g.startDate instanceof Date ? g.startDate : new Date(g.startDate)
+        const gEnd = g.endDate ? (g.endDate instanceof Date ? g.endDate : new Date(g.endDate)) : null
+        // El grupo estaba activo si empezó antes de que acabe el mes y no terminó antes de que empiece el mes
+        return g.isActive && gStart <= monthEnd && (!gEnd || gEnd >= monthStart)
+      })
+
+      const monthCapacity = groupsInMonth.reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
+      
+      // 2. Contar inscripciones activas en ESTE mes para ESOS grupos
       const occupiedInMonth = enrollments.filter(e => {
-        const player = players.find(p => p.id === e.playerId)
-        if (!player) return false
-        const regDate = player.registrationDate instanceof Date ? player.registrationDate : new Date(player.registrationDate)
-        const canDate = player.cancellationDate ? (player.cancellationDate instanceof Date ? player.cancellationDate : new Date(player.cancellationDate)) : null
-        return regDate <= monthEnd && (!canDate || canDate > monthEnd)
+        // Solo inscripciones a los grupos activos en este mes
+        if (!groupsInMonth.some(g => g.id === e.groupId)) return false
+
+        const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+        const eEnd = e.unenrollmentDate ? (e.unenrollmentDate instanceof Date ? e.unenrollmentDate : new Date(e.unenrollmentDate)) : null
+        
+        // La inscripción estaba activa en este mes
+        return e.isActive && eStart <= monthEnd && (!eEnd || eEnd >= monthStart)
       }).length
-      const occupancyRate = totalCapacity > 0 ? Math.round((occupiedInMonth / totalCapacity) * 100) : 0
+
+      const occupancyRate = monthCapacity > 0 ? Math.min(100, Math.round((occupiedInMonth / monthCapacity) * 100)) : 0
 
       return {
         name: MONTH_NAMES[d.getMonth()],
