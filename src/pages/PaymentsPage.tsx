@@ -130,7 +130,8 @@ export default function PaymentsPage() {
       privateLessonPayments.filter(p => p.status === 'pendiente'),
       events
     ),
-  }, [allBasePayments, eventPayments, privateLessonPayments, events])
+    [allBasePayments, eventPayments, privateLessonPayments, events]
+  )
 
 
   const now = new Date()
