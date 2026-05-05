@@ -69,9 +69,11 @@ const defaultKpiConfig: KpiConfig = {
   waitingList: true,
   rotationIndex: true,
   churnRate: true,
+  occupancyRate: true,
   attendanceChart: true,
   levelChart: true,
   financialChart: true,
+  evolutionChart: true,
 }
 
 // Chart theme tokens
@@ -343,6 +345,15 @@ export default function DashboardPage() {
     return todayGroups.filter(g => g.coachId === currentCoachId).length
   }, [currentCoachId, todayGroups])
 
+  // ── Occupancy calculation ─────────────────────────────────────────
+  const occupancyStats = useMemo(() => {
+    const activeGroupsList = groups.filter(g => g.isActive)
+    const totalCapacity = activeGroupsList.reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
+    const totalOccupied = activeGroupsList.reduce((sum, g) => sum + (g.currentEnrollment || 0), 0)
+    const rate = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0
+    return { totalCapacity, totalOccupied, rate }
+  }, [groups])
+
   // ── Chart data ────────────────────────────────────────────────────
   const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
   const attendanceData = useMemo(() => {
@@ -393,6 +404,35 @@ export default function DashboardPage() {
       pendiente: monthPayments.filter((p) => p.status === 'pendiente').reduce((sum, p) => sum + p.amount, 0),
     }
   })
+
+  const evolutionData = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(currentYear, currentMonth - 1 - (11 - i), 1)
+      const m = d.getMonth() + 1
+      const y = d.getFullYear()
+      
+      const monthPayments = allPayments.filter(p => p.billingMonth === m && p.billingYear === y)
+      const revenue = monthPayments.filter(p => p.status === 'pagado').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      
+      const monthEnd = new Date(y, m, 0, 23, 59, 59)
+      const activeInMonth = players.filter(p => {
+        const regDate = p.registrationDate instanceof Date ? p.registrationDate : new Date(p.registrationDate)
+        const canDate = p.cancellationDate ? (p.cancellationDate instanceof Date ? p.cancellationDate : new Date(p.cancellationDate)) : null
+        return regDate <= monthEnd && (!canDate || canDate > monthEnd)
+      }).length
+
+      const totalBilled = monthPayments.filter(p => p.status !== 'cancelado').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      const rate = totalBilled > 0 ? Math.round((revenue / totalBilled) * 100) : 0
+
+      return {
+        name: MONTH_NAMES[d.getMonth()],
+        fullLabel: `${MONTH_NAMES[d.getMonth()]} ${y}`,
+        ingresos: revenue,
+        jugadores: activeInMonth,
+        ratio: rate
+      }
+    })
+  }, [allPayments, players, currentMonth, currentYear])
 
   const visibleActivities = useMemo(() => {
     let filtered = activities
@@ -773,6 +813,17 @@ export default function DashboardPage() {
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
                 />
               )}
+              {kpiConfig.occupancyRate && (
+                <StatCard
+                  title="Tasa de ocupación"
+                  value={`${occupancyStats.rate}%`}
+                  description={`${occupancyStats.totalOccupied} / ${occupancyStats.totalCapacity} plazas`}
+                  icon={CalendarCheck}
+                  iconClassName="bg-primary/10 text-primary"
+                  accentColor="#0e7490"
+                  className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
+                />
+              )}
             </>
           )}
         </div>
@@ -869,6 +920,82 @@ export default function DashboardPage() {
               </Card>
             )}
           </div>
+        )}
+
+        {/* ── Charts row 3: Evolution ──────────────────────────── */}
+        {!isCoach && kpiConfig.evolutionChart && (
+          <Card className="border-border/60 shadow-[var(--shadow-card)]">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-5 pt-5">
+              <div>
+                <CardTitle className="text-sm font-bold text-foreground">📈 Evolución histórica (12 meses)</CardTitle>
+                {chartCollapsed.evolutionChart && (
+                  <p className="text-xs text-muted-foreground">Minimizado</p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-muted-foreground"
+                onClick={() => toggleChartCollapsed('evolutionChart')}
+              >
+                {chartCollapsed.evolutionChart ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
+            </CardHeader>
+            {!chartCollapsed.evolutionChart && (
+              <CardContent className="px-5 pb-5 pt-4">
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={evolutionData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_COLORS.grid} />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748b', fontSize: 11 }} 
+                      />
+                      <YAxis 
+                        yId="left"
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                        tickFormatter={(v) => `${v}€`}
+                      />
+                      <YAxis 
+                        yId="right"
+                        orientation="right"
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                      />
+                      <Tooltip {...tooltipStyle} />
+                      <Legend 
+                        verticalAlign="top" 
+                        align="right" 
+                        iconType="circle"
+                        wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
+                      />
+                      <Bar 
+                        yId="left"
+                        dataKey="ingresos" 
+                        name="Ingresos" 
+                        fill={CHART_COLORS.primary} 
+                        radius={[4, 4, 0, 0]} 
+                        barSize={20}
+                      />
+                      <Bar 
+                        yId="right"
+                        dataKey="jugadores" 
+                        name="Jugadores" 
+                        fill={CHART_COLORS.secondary} 
+                        radius={[4, 4, 0, 0]} 
+                        barSize={20}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            )}
+          </Card>
         )}
 
         {/* ── Financial chart ──────────────────────────────────── */}
@@ -998,6 +1125,7 @@ export default function DashboardPage() {
                 { key: 'waitingList', label: 'Lista de espera', financial: false },
                 { key: 'rotationIndex', label: 'Índice de rotación', financial: false },
                 { key: 'churnRate', label: 'Ratio de abandono (Churn)', financial: false },
+                { key: 'occupancyRate', label: 'Tasa de ocupación', financial: false },
               ].filter((item) => !item.financial || isAdmin).map((item) => (
                 <div key={item.key} className="flex items-center gap-3">
                   <Checkbox
@@ -1016,6 +1144,7 @@ export default function DashboardPage() {
                   { key: 'attendanceChart', label: 'Asistencia semanal', financial: false },
                   { key: 'levelChart', label: 'Distribución por nivel', financial: false },
                   { key: 'financialChart', label: 'Resumen financiero', financial: true },
+                  { key: 'evolutionChart', label: 'Evolución histórica', financial: false },
                 ].filter((item) => !item.financial || isAdmin).map((item) => (
                   <div key={item.key} className="flex items-center gap-3 mb-3">
                     <Checkbox
