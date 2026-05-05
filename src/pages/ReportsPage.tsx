@@ -35,6 +35,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table'
 
 // ==========================================
@@ -76,7 +77,7 @@ export default function ReportsPage() {
   const [selectedYear, setSelectedYear] = useState(defaults.year)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false)
-  const [detailsView, setDetailsView] = useState<'altas_bajas' | 'morosos' | 'grupos' | null>(null)
+  const [detailsView, setDetailsView] = useState<'altas_bajas' | 'morosos' | 'grupos' | 'ingresos_eventos' | null>(null)
 
   const { 
     players, 
@@ -817,7 +818,25 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{groupChanges.length}</p>
+              <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <FileText className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Eventos</p>
+                      <p className="text-lg font-bold">{formatCurrency(ingresosEventos)}</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs h-7"
+                    onClick={() => setDetailsView('ingresos_eventos')}
+                  >
+                    Ver detalle
+                  </Button>
+                </div>
               <p className="text-xs text-muted-foreground mt-1">
                 grupos con movimientos
                 {groupChanges.length > 0 && ` · ${groupChanges[0].name} lidera`}
@@ -981,6 +1000,59 @@ export default function ReportsPage() {
               </Table>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">No hubo movimientos en grupos este mes.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={detailsView === 'ingresos_eventos'} onOpenChange={(open) => !open && setDetailsView(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalle de Ingresos por Eventos ({monthLabel} {year})</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Estos son todos los cobros recibidos este mes categorizados como "Eventos".
+            </p>
+            {currentMonthAllPayments.filter(p => p.source === 'evento' && p.status === 'pagado').length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha Pago</TableHead>
+                    <TableHead>Jugador</TableHead>
+                    <TableHead>Concepto</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentMonthAllPayments
+                    .filter(p => p.source === 'evento' && p.status === 'pagado')
+                    .sort((a, b) => {
+                      const da = a.paidDate ? new Date(a.paidDate).getTime() : 0
+                      const db = b.paidDate ? new Date(b.paidDate).getTime() : 0
+                      return db - da
+                    })
+                    .map(p => (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-xs">
+                          {p.paidDate ? (p.paidDate instanceof Date ? p.paidDate : new Date(p.paidDate)).toLocaleDateString('es-ES') : '-'}
+                        </TableCell>
+                        <TableCell className="font-medium">{p.playerName}</TableCell>
+                        <TableCell>{p.concept}</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(p.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-right font-bold">TOTAL EVENTOS</TableCell>
+                    <TableCell className="text-right font-bold text-lg text-primary">
+                      {formatCurrency(ingresosEventos)}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            ) : (
+              <p className="text-center py-8 text-muted-foreground">No hay ingresos de eventos este mes.</p>
             )}
           </div>
         </DialogContent>
