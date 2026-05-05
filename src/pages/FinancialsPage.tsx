@@ -108,10 +108,18 @@ export default function FinancialsPage() {
   const year = parseInt(selectedYear)
   const month = parseInt(selectedMonth)
 
-  // Consultas (ahora desde el Store en tiempo real)
-  const payments = useMemo(() => {
-    return allBasePayments.filter(p => p.billingYear === year && p.billingMonth === month)
-  }, [allBasePayments, year, month])
+  // =====================================
+  // DATA NORMALIZATION (Shared with Dashboard/Payments)
+  // =====================================
+  const allPayments = useMemo(
+    () => normalizeAllPayments(allBasePayments, eventPayments, privateLessonPayments ?? []),
+    [allBasePayments, eventPayments, privateLessonPayments]
+  )
+
+  const currentMonthAllPayments = useMemo(
+    () => allPayments.filter(p => p.billingMonth === month && p.billingYear === year),
+    [allPayments, month, year]
+  )
 
   const transactions = useMemo(() => {
     return allTransactions.filter(t => {
@@ -139,18 +147,32 @@ export default function FinancialsPage() {
   })
 
   // =====================================
-  // CALCULOS
+  // CALCULOS (Sincronizados con Dashboard)
   // =====================================
 
-  // -- Ingresos de cuotas del mes --
+  // -- Ingresos por tipo --
   const ingresosCuotas = useMemo(
-    () => payments
-        .filter((p) => p.status === 'pagado' && p.billingMonth === month && p.billingYear === year)
+    () => currentMonthAllPayments
+        .filter((p) => p.status === 'pagado' && (p.source === 'cuota' || p.source === 'manual'))
         .reduce((s, p) => s + Number(p.amount || 0), 0),
-    [payments, month, year]
+    [currentMonthAllPayments]
   )
 
-  // -- Ingresos y Gastos de eventos del mes --
+  const ingresosEventos = useMemo(
+    () => currentMonthAllPayments
+        .filter((p) => p.status === 'pagado' && p.source === 'evento')
+        .reduce((s, p) => s + Number(p.amount || 0), 0),
+    [currentMonthAllPayments]
+  )
+
+  const ingresosClases = useMemo(
+    () => currentMonthAllPayments
+        .filter((p) => p.status === 'pagado' && p.source === 'clase_particular')
+        .reduce((s, p) => s + Number(p.amount || 0), 0),
+    [currentMonthAllPayments]
+  )
+  
+  // -- Gastos de eventos (Basado en fecha del evento) --
   const eventosDelMes = useMemo(
     () => events.filter((ev) => {
         const d = ev.date instanceof Date ? ev.date : new Date(ev.date)
@@ -159,38 +181,11 @@ export default function FinancialsPage() {
     [events, month, year]
   )
 
-  const ingresosEventos = useMemo(
-    () => eventosDelMes.reduce((acc, ev) => {
-        return acc + eventPayments
-            .filter((ep) => ep.eventId === ev.id && ep.status === 'pagado')
-            .reduce((s, ep) => s + Number(ep.amount || 0), 0)
-      }, 0),
-    [eventosDelMes, eventPayments]
-  )
-
   const gastosEventos = useMemo(
     () => eventosDelMes.reduce((acc, ev) => acc + (ev.expenses ?? []).reduce((s, ex) => s + Number(ex.amount || 0), 0), 0),
     [eventosDelMes]
   )
 
-  // -- Ingresos de clases particulares del mes --
-  const clasesDelMes = useMemo(
-    () => privateLessons.filter((pl) => {
-        const d = pl.date instanceof Date ? pl.date : new Date(pl.date)
-        return d.getMonth() + 1 === month && d.getFullYear() === year
-      }),
-    [privateLessons, month, year]
-  )
-
-  const ingresosClases = useMemo(
-    () => clasesDelMes.reduce((acc, lesson) => {
-        return acc + privateLessonPayments
-            .filter((lp) => lp.lessonId === lesson.id && lp.status === 'pagado')
-            .reduce((s, lp) => s + Number(lp.amount || 0), 0)
-      }, 0),
-    [clasesDelMes, privateLessonPayments]
-  )
-  
   // -- Transacciones manuales del mes --
   const extrasIngresos = useMemo(() => transactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + Number(t.amount || 0), 0), [transactions])
   const extrasGastos = useMemo(() => transactions.filter(t => t.type === 'gasto').reduce((sum, t) => sum + Number(t.amount || 0), 0), [transactions])
