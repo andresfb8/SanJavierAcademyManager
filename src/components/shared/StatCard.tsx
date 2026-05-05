@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 interface StatCardProps {
   title: string
   value: string | number
+  description?: string
   icon: React.ElementType
   trend?: {
     value: number
@@ -15,7 +16,7 @@ interface StatCardProps {
   accentColor?: string
 }
 
-export function StatCard({ title, value, icon: Icon, trend, className, iconClassName, accentColor }: StatCardProps) {
+export function StatCard({ title, value, description, icon: Icon, trend, className, iconClassName, accentColor }: StatCardProps) {
   return (
     <Card className={cn('hover-lift border-border/40 shadow-sm relative overflow-hidden bg-white/60 backdrop-blur-sm', className)}>
       {/* Subtle background glow */}
@@ -33,6 +34,11 @@ export function StatCard({ title, value, icon: Icon, trend, className, iconClass
             <p className="text-3xl font-extrabold text-foreground tracking-tighter leading-none font-jakarta">
               {value}
             </p>
+            {description && (
+              <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
+                {description}
+              </p>
+            )}
             {trend && (
               <div className="flex items-center gap-1.5 pt-1">
                 <div className={cn(
