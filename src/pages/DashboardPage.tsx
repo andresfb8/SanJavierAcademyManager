@@ -15,7 +15,7 @@ import { useAuthStore, hasPermission } from '@/stores/authStore'
 import type { UserRole } from '@/types'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery } from '@/hooks/useQueries'
+import { useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 import {
   Users,
   DollarSign,
@@ -90,20 +90,28 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'director' || user?.role === 'coordinador'
   const isCoach = user?.role === 'entrenador'
   const canReadPayments = hasPermission(user?.role as UserRole, 'payments', 'read')
-  const { players, groups, enrollments, coaches, privateLessons, attendanceNotices } = useDataStore()
+  const { 
+    players, 
+    groups, 
+    enrollments, 
+    coaches,
+    privateLessons,
+    attendanceNotices,
+    activities,
+    clubTransactions: transactions,
+    payments: allBasePayments,
+    eventPayments,
+    privateLessonPayments,
+    attendance
+  } = useDataStore()
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
 
-  const { data: paymentsCurrentYear = [] } = usePaymentsQuery(currentYear)
-  const { data: paymentsPrevYear = [] } = usePaymentsQuery(currentYear - 1)
-  const payments = [...paymentsCurrentYear, ...paymentsPrevYear]
-  
-  const { data: eventPayments = [] } = useEventPaymentsQuery()
-  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
-  const { data: attendance = [] } = useAttendanceQuery()
-  const { data: activities = [] } = useActivitiesQuery(100)
+  const payments = useMemo(() => {
+    return allBasePayments.filter(p => p.billingYear === currentYear || p.billingYear === currentYear - 1)
+  }, [allBasePayments, currentYear])
 
   const [showKpiDialog, setShowKpiDialog] = useState(false)
   const [kpiConfig, setKpiConfig] = useState<KpiConfig>(() => {
@@ -272,12 +280,27 @@ export default function DashboardPage() {
     (p) => p.billingMonth === prevMonth && p.billingYear === prevYear
   )
 
+  const currentManualIncome = transactions
+    .filter(t => {
+      const d = t.date instanceof Date ? t.date : new Date(t.date)
+      return t.type === 'ingreso' && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear
+    })
+    .reduce((sum, t) => sum + t.amount, 0)
+
+  const prevManualIncome = transactions
+    .filter(t => {
+      const d = t.date instanceof Date ? t.date : new Date(t.date)
+      return t.type === 'ingreso' && d.getMonth() + 1 === prevMonth && d.getFullYear() === prevYear
+    })
+    .reduce((sum, t) => sum + t.amount, 0)
+
   const currentRevenue = currentMonthAllPayments
     .filter((p) => p.status === 'pagado')
-    .reduce((sum, p) => sum + p.amount, 0)
+    .reduce((sum, p) => sum + p.amount, 0) + currentManualIncome
+
   const prevRevenue = prevMonthAllPayments
     .filter((p) => p.status === 'pagado')
-    .reduce((sum, p) => sum + p.amount, 0)
+    .reduce((sum, p) => sum + p.amount, 0) + prevManualIncome
   const revenueDiff = prevRevenue > 0 ? Math.round(((currentRevenue - prevRevenue) / prevRevenue) * 100) : 0
 
   const currentPending = currentMonthAllPayments

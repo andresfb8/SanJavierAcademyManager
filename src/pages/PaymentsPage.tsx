@@ -54,7 +54,7 @@ import {
 } from '@tanstack/react-table'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { downloadXlsxAoa } from '@/lib/excel'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery, useAllPendingNormalizedPaymentsQuery } from '@/hooks/useQueries'
+import { useAttendanceQuery } from '@/hooks/useQueries'
 
 
 type ViewMode = 'mensual' | 'anual' | 'morosidad'
@@ -97,14 +97,38 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { groups, players, club, markPaymentPaid, markEventPaymentPaid, markPrivateLessonPaymentPaid, revertPaymentPaidStatus, deletePayment, deleteEventPayment, deletePrivateLessonPayment, generateMonthlyReceipts, addManualPayment, bulkGenerateInvoices } = useDataStore()
-  const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
-  const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
-  payments.push(..._prevPayments)
-  const { data: eventPayments = [] } = useEventPaymentsQuery()
-  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
-  const { data: invoices = [] } = useInvoicesQuery()
-  const { data: allPendingPayments = [] } = useAllPendingNormalizedPaymentsQuery()
+  const { 
+    groups, 
+    players, 
+    club, 
+    markPaymentPaid, 
+    markEventPaymentPaid, 
+    markPrivateLessonPaymentPaid, 
+    revertPaymentPaidStatus, 
+    deletePayment, 
+    deleteEventPayment, 
+    deletePrivateLessonPayment, 
+    generateMonthlyReceipts, 
+    addManualPayment, 
+    bulkGenerateInvoices,
+    payments: allBasePayments,
+    eventPayments,
+    privateLessonPayments,
+    invoices
+  } = useDataStore()
+
+  const payments = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    return allBasePayments.filter(p => p.billingYear === currentYear || p.billingYear === currentYear - 1)
+  }, [allBasePayments])
+
+  const allPendingPayments = useMemo(() => {
+    return normalizeAllPayments(
+      allBasePayments.filter(p => p.status === 'pendiente'),
+      eventPayments.filter(p => p.status === 'pendiente'),
+      privateLessonPayments.filter(p => p.status === 'pendiente')
+    )
+  }, [allBasePayments, eventPayments, privateLessonPayments])
 
 
   const now = new Date()

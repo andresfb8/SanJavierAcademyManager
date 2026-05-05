@@ -15,7 +15,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useClubTransactionsQuery } from '@/hooks/useQueries'
+import { useAttendanceQuery, useActivitiesQuery } from '@/hooks/useQueries'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ExcelJS from 'exceljs'
@@ -77,18 +77,36 @@ export default function ReportsPage() {
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false)
   const [detailsView, setDetailsView] = useState<'altas_bajas' | 'morosos' | 'grupos' | null>(null)
 
-  const { players, groups, coaches, enrollments, events, coachSalaryConfigs, privateLessons, club } =
-    useDataStore()
+  const { 
+    players, 
+    groups, 
+    coaches, 
+    enrollments, 
+    events, 
+    coachSalaryConfigs, 
+    privateLessons, 
+    club,
+    payments: allBasePayments,
+    eventPayments,
+    privateLessonPayments,
+    clubTransactions: allTransactions
+  } = useDataStore()
 
   const year = parseInt(selectedYear)
   const month = parseInt(selectedMonth)
   const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? selectedMonth
 
-  // Queries
-  const { data: payments = [] } = usePaymentsQuery(year, month)
-  const { data: eventPayments = [] } = useEventPaymentsQuery()
-  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
-  const { data: transactions = [] } = useClubTransactionsQuery(year, month)
+  // Consultas (Store en tiempo real)
+  const payments = useMemo(() => {
+    return allBasePayments.filter(p => p.billingYear === year && p.billingMonth === month)
+  }, [allBasePayments, year, month])
+
+  const transactions = useMemo(() => {
+    return allTransactions.filter(t => {
+      const d = t.date instanceof Date ? t.date : new Date(t.date)
+      return d.getFullYear() === year && d.getMonth() + 1 === month
+    })
+  }, [allTransactions, year, month])
 
   // =====================================
   // COMPUTED DATA FOR PREVIEW

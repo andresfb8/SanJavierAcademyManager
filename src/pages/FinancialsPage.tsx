@@ -17,10 +17,8 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { 
-  usePaymentsQuery, 
-  useEventPaymentsQuery, 
-  usePrivateLessonPaymentsQuery,
-  useClubTransactionsQuery 
+  useAttendanceQuery,
+  useActivitiesQuery 
 } from '@/hooks/useQueries'
 import {
   Table,
@@ -96,16 +94,33 @@ export default function FinancialsPage() {
   const [isPayrollDialogOpen, setIsPayrollDialogOpen] = useState(false)
 
   const { success, error } = useToast()
-  const { events, privateLessons, addTransaction, deleteTransaction } = useDataStore()
+  const { 
+    events, 
+    privateLessons, 
+    addTransaction, 
+    deleteTransaction,
+    payments: allBasePayments,
+    eventPayments,
+    privateLessonPayments,
+    clubTransactions: allTransactions
+  } = useDataStore()
 
   const year = parseInt(selectedYear)
   const month = parseInt(selectedMonth)
 
-  // Consultas
-  const { data: payments = [] } = usePaymentsQuery(year, month)
-  const { data: eventPayments = [] } = useEventPaymentsQuery()
-  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
-  const { data: transactions = [], isLoading: isLoadingTransactions } = useClubTransactionsQuery(year, month)
+  // Consultas (ahora desde el Store en tiempo real)
+  const payments = useMemo(() => {
+    return allBasePayments.filter(p => p.billingYear === year && p.billingMonth === month)
+  }, [allBasePayments, year, month])
+
+  const transactions = useMemo(() => {
+    return allTransactions.filter(t => {
+      const d = t.date instanceof Date ? t.date : new Date(t.date)
+      return d.getFullYear() === year && d.getMonth() + 1 === month
+    })
+  }, [allTransactions, year, month])
+
+  const isLoadingTransactions = false // Ya no es asíncrono desde el punto de vista del componente
 
   // Dialog State
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false)

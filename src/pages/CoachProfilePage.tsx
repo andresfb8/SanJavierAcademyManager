@@ -32,15 +32,10 @@ import {
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { 
-  usePaymentsQuery, 
-  useEventPaymentsQuery, 
-  usePrivateLessonPaymentsQuery, 
   useAttendanceQuery, 
   useActivitiesQuery, 
-  useEvaluationsQuery, 
   useMatchReportsQuery, 
-  useInvoicesQuery,
-  useClubTransactionsQuery
+  useInvoicesQuery
 } from '@/hooks/useQueries'
 import { calculateEventSalary } from '@/lib/salary-utils'
 
@@ -53,10 +48,16 @@ export default function CoachProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const { coaches, groups, coachSalaryConfigs, privateLessons, events } = useDataStore()
-  const { data: evaluations = [] } = useEvaluationsQuery()
-  const { data: eventPayments = [] } = useEventPaymentsQuery()
-  const { data: allTransactions = [] } = useClubTransactionsQuery()
+  const { 
+    coaches, 
+    groups, 
+    coachSalaryConfigs, 
+    privateLessons, 
+    events,
+    eventPayments,
+    clubTransactions: allTransactions,
+    evaluations
+  } = useDataStore()
 
   const coach = useMemo(
     () => coaches.find((c) => c.id === id) ?? null,
