@@ -1005,10 +1005,10 @@ export default function DashboardPage() {
                       />
                       <Tooltip {...tooltipStyle} />
                       <Legend 
-                        verticalAlign="top" 
-                        align="right" 
+                        verticalAlign="bottom" 
+                        align="center" 
                         iconType="circle"
-                        wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }}
                       />
                       <Bar 
                         yAxisId="left"
@@ -1051,10 +1051,10 @@ export default function DashboardPage() {
                         />
                         <Tooltip {...tooltipStyle} formatter={(v) => [`${v}%`, '']} />
                         <Legend 
-                          verticalAlign="top" 
-                          align="right" 
+                          verticalAlign="bottom" 
+                          align="center" 
                           iconType="circle"
-                          wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
+                          wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }}
                         />
                         <Bar 
                           dataKey="ratioCobro" 
