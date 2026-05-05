@@ -20,6 +20,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ExcelJS from 'exceljs'
 import { calculateEventSalary } from '@/lib/salary-utils'
+import { normalizeAllPayments } from '@/lib/payment-utils'
 
 import {
   Dialog,
@@ -146,21 +147,21 @@ export default function ReportsPage() {
   const ingresosCuotas = useMemo(
     () => currentMonthAllPayments
       .filter((p) => p.status === 'pagado' && (p.source === 'cuota' || p.source === 'manual'))
-      .reduce((s, p) => s + Number(p.amount || 0), 0),
+      .reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     [currentMonthAllPayments]
   )
 
   const ingresosEventos = useMemo(
     () => currentMonthAllPayments
       .filter((p) => p.status === 'pagado' && p.source === 'evento')
-      .reduce((s, p) => s + Number(p.amount || 0), 0),
+      .reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     [currentMonthAllPayments]
   )
 
   const ingresosClases = useMemo(
     () => currentMonthAllPayments
       .filter((p) => p.status === 'pagado' && p.source === 'clase_particular')
-      .reduce((s, p) => s + Number(p.amount || 0), 0),
+      .reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     [currentMonthAllPayments]
   )
 
@@ -177,10 +178,20 @@ export default function ReportsPage() {
   const gastosEventos = useMemo(
     () =>
       eventosDelMes.reduce(
-        (acc, ev) => acc + (ev.expenses ?? []).reduce((s, ex) => s + Number(ex.amount || 0), 0),
+        (acc: number, ev: any) => acc + (ev.expenses ?? []).reduce((s: number, ex: any) => s + Number(ex.amount || 0), 0),
         0
       ),
     [eventosDelMes]
+  )
+
+  // -- Clases particulares del mes (para nóminas) --
+  const clasesDelMes = useMemo(
+    () =>
+      privateLessons.filter((pl) => {
+        const d = pl.date instanceof Date ? pl.date : new Date(pl.date)
+        return d.getMonth() + 1 === month && d.getFullYear() === year
+      }),
+    [privateLessons, month, year]
   )
 
   // -- Transacciones manuales del mes --
@@ -191,19 +202,12 @@ export default function ReportsPage() {
   const totalGastos = gastosEventos + extrasGastos
   const beneficioNetoTotal = totalIngresos - totalGastos
 
-  // -- Morosidad (pagos pendientes vencidos antes de fin de mes) --
+  // -- Morosidad (pagos pendientes de este mes) --
   const morosos = useMemo(() => {
-    const endOfMonth = new Date(year, month, 0) // último día del mes
-    return payments.filter(
-      (p) =>
-        p.status === 'pendiente' &&
-        p.billingMonth === month &&
-        p.billingYear === year &&
-        new Date(p.dueDate) <= endOfMonth
-    )
-  }, [payments, month, year])
+    return currentMonthAllPayments.filter((p) => p.status === 'pendiente')
+  }, [currentMonthAllPayments])
 
-  const totalMorosidad = morosos.reduce((s, p) => s + Number(p.amount || 0), 0)
+  const totalMorosidad = morosos.reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
 
   // -- Grupos con más cambios del mes --
   const groupChanges = useMemo(() => {
@@ -249,12 +253,12 @@ export default function ReportsPage() {
         const grupos = adultGroups * (config.ratePerGroupAdults || 0) + minorGroups * (config.ratePerGroupMinors || 0)
 
         const monthLessons = clasesDelMes.filter((pl) => pl.coachId === coach.id)
-        const clases = monthLessons.reduce((acc, lesson) => {
+        const clases = monthLessons.reduce((acc: number, lesson: any) => {
           if (config.privateLessonPaymentType === 'fixed') return acc + (config.privateLessonRate || 0)
           return acc + lesson.price * ((config.privateLessonRate || 0) / 100)
         }, 0)
 
-        const eventosTotal = eventosDelMes.reduce((acc, ev) => {
+        const eventosTotal = eventosDelMes.reduce((acc: number, ev: any) => {
           if (!ev.coachIds.includes(coach.id)) return acc
           return acc + calculateEventSalary(ev, eventPayments, config)
         }, 0)
@@ -416,7 +420,7 @@ export default function ReportsPage() {
         autoTable(doc, {
           startY: y,
           head: [['Jugador', 'Concepto', 'Vencimiento', 'Importe']],
-          body: morosos.map((p) => [
+          body: morosos.map((p: any) => [
             p.playerName,
             p.concept,
             (p.dueDate instanceof Date ? p.dueDate : new Date(p.dueDate)).toLocaleDateString('es-ES'),
@@ -584,7 +588,7 @@ export default function ReportsPage() {
         { header: 'Vencimiento', key: 'vencimiento', width: 20 },
         { header: 'Importe (€)', key: 'importe', width: 15 },
       ]
-      morosos.forEach(p => {
+      morosos.forEach((p: any) => {
         wsMorosos.addRow({
           jugador: p.playerName,
           concepto: p.concept,
@@ -929,7 +933,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {morosos.map(p => (
+                  {morosos.map((p: any) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.playerName}</TableCell>
                       <TableCell>{p.concept}</TableCell>

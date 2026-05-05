@@ -20,6 +20,7 @@ import {
   useAttendanceQuery,
   useActivitiesQuery 
 } from '@/hooks/useQueries'
+import { normalizeAllPayments } from '@/lib/payment-utils'
 import {
   Table,
   TableBody,
@@ -153,22 +154,22 @@ export default function FinancialsPage() {
   // -- Ingresos por tipo --
   const ingresosCuotas = useMemo(
     () => currentMonthAllPayments
-        .filter((p) => p.status === 'pagado' && (p.source === 'cuota' || p.source === 'manual'))
-        .reduce((s, p) => s + Number(p.amount || 0), 0),
+        .filter((p: any) => p.status === 'pagado' && (p.source === 'cuota' || p.source === 'manual'))
+        .reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     [currentMonthAllPayments]
   )
 
   const ingresosEventos = useMemo(
     () => currentMonthAllPayments
-        .filter((p) => p.status === 'pagado' && p.source === 'evento')
-        .reduce((s, p) => s + Number(p.amount || 0), 0),
+        .filter((p: any) => p.status === 'pagado' && p.source === 'evento')
+        .reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     [currentMonthAllPayments]
   )
 
   const ingresosClases = useMemo(
     () => currentMonthAllPayments
-        .filter((p) => p.status === 'pagado' && p.source === 'clase_particular')
-        .reduce((s, p) => s + Number(p.amount || 0), 0),
+        .filter((p: any) => p.status === 'pagado' && p.source === 'clase_particular')
+        .reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     [currentMonthAllPayments]
   )
   
