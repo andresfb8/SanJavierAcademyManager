@@ -1,11 +1,13 @@
 import { cn } from '@/lib/utils'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, HelpCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tooltip } from '@/components/ui/tooltip'
 
 interface StatCardProps {
   title: string
   value: string | number
   description?: string
+  info?: string
   icon: React.ElementType
   trend?: {
     value: number
@@ -28,9 +30,16 @@ export function StatCard({ title, value, description, icon: Icon, trend, classNa
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2 flex-1 min-w-0">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest font-jakarta">
-              {title}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest font-jakarta">
+                {title}
+              </p>
+              {info && (
+                <Tooltip content={info}>
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+                </Tooltip>
+              )}
+            </div>
             <p className="text-3xl font-extrabold text-foreground tracking-tighter leading-none font-jakarta">
               {value}
             </p>

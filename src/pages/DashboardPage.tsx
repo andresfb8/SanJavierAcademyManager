@@ -422,17 +422,45 @@ export default function DashboardPage() {
       }).length
 
       const totalBilled = monthPayments.filter(p => p.status !== 'cancelado').reduce((sum, p) => sum + Number(p.amount || 0), 0)
-      const rate = totalBilled > 0 ? Math.round((revenue / totalBilled) * 100) : 0
+      const collectionRate = totalBilled > 0 ? Math.round((revenue / totalBilled) * 100) : 0
+
+      const monthStart = new Date(y, m - 1, 1)
+      const altas = players.filter(p => {
+        const regDate = p.registrationDate instanceof Date ? p.registrationDate : new Date(p.registrationDate)
+        return regDate >= monthStart && regDate <= monthEnd
+      }).length
+      const bajas = players.filter(p => {
+        if (!p.cancellationDate) return false
+        const canDate = p.cancellationDate instanceof Date ? p.cancellationDate : new Date(p.cancellationDate)
+        return canDate >= monthStart && canDate <= monthEnd
+      }).length
+      
+      const rotationDivisor = activeInMonth + bajas
+      const rotationIndex = rotationDivisor > 0 ? Math.round(((altas + bajas) / rotationDivisor) * 100) : 0
+      const churnRate = rotationDivisor > 0 ? Math.round((bajas / rotationDivisor) * 100) : 0
+
+      const totalCapacity = groups.filter(g => g.isActive).reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
+      const occupiedInMonth = enrollments.filter(e => {
+        const player = players.find(p => p.id === e.playerId)
+        if (!player) return false
+        const regDate = player.registrationDate instanceof Date ? player.registrationDate : new Date(player.registrationDate)
+        const canDate = player.cancellationDate ? (player.cancellationDate instanceof Date ? player.cancellationDate : new Date(player.cancellationDate)) : null
+        return regDate <= monthEnd && (!canDate || canDate > monthEnd)
+      }).length
+      const occupancyRate = totalCapacity > 0 ? Math.round((occupiedInMonth / totalCapacity) * 100) : 0
 
       return {
         name: MONTH_NAMES[d.getMonth()],
         fullLabel: `${MONTH_NAMES[d.getMonth()]} ${y}`,
         ingresos: revenue,
         jugadores: activeInMonth,
-        ratio: rate
+        ratioCobro: collectionRate,
+        rotacion: rotationIndex,
+        abandono: churnRate,
+        ocupacion: occupancyRate
       }
     })
-  }, [allPayments, players, currentMonth, currentYear])
+  }, [allPayments, players, groups, enrollments, currentMonth, currentYear])
 
   const visibleActivities = useMemo(() => {
     let filtered = activities
@@ -715,6 +743,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Jugadores activos"
                   value={activePlayers}
+                  info="Número total de alumnos con estado 'Activo' en el sistema."
                   icon={Users}
                   iconClassName="bg-cyan-50 text-cyan-600"
                   accentColor="#0891b2"
@@ -725,6 +754,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Ingresos este mes"
                   value={formatCurrency(currentRevenue)}
+                  info="Suma de todos los pagos marcados como 'Pagado' en el mes en curso, incluyendo ingresos manuales."
                   icon={DollarSign}
                   trend={{ value: revenueDiff, label: 'vs mes anterior' }}
                   iconClassName="bg-cyan-50 text-cyan-600"
@@ -736,6 +766,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Pagos pendientes"
                   value={formatCurrency(currentPending)}
+                  info="Total de importes de pagos que aún están en estado 'Pendiente' para el mes en curso."
                   icon={AlertCircle}
                   trend={{ value: pendingDiff, label: 'vs mes anterior' }}
                   iconClassName="bg-cyan-50 text-cyan-600"
@@ -747,6 +778,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Grupos activos"
                   value={activeGroups}
+                  info="Cantidad de grupos que tienen el estado 'Activo'."
                   icon={GraduationCap}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
@@ -757,6 +789,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Ratio de cobro"
                   value={`${collectionRate}%`}
+                  info="Porcentaje de dinero cobrado respecto al total facturado (cobrado + pendiente). Mide la eficiencia de la recaudación."
                   icon={TrendingUp}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
@@ -797,6 +830,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Índice de rotación"
                   value={`${rotationIndex}%`}
+                  info="Mide el movimiento total de alumnos (altas + bajas) respecto al volumen total. Un índice alto indica mucha variabilidad en el alumnado."
                   icon={RefreshCw}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
@@ -807,6 +841,7 @@ export default function DashboardPage() {
                 <StatCard
                   title="Ratio de abandono"
                   value={`${churnRate}%`}
+                  info="Porcentaje de alumnos que han causado baja respecto al total de alumnos activos en el mes."
                   icon={UserMinus}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
@@ -818,6 +853,7 @@ export default function DashboardPage() {
                   title="Tasa de ocupación"
                   value={`${occupancyStats.rate}%`}
                   description={`${occupancyStats.totalOccupied} / ${occupancyStats.totalCapacity} plazas`}
+                  info="Porcentaje de plazas ocupadas respecto a la capacidad máxima de todos los grupos activos."
                   icon={CalendarCheck}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
@@ -992,6 +1028,65 @@ export default function DashboardPage() {
                       />
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">📈 Ratios de Gestión (%)</p>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={evolutionData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_COLORS.grid} />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 11 }} 
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 11 }}
+                          tickFormatter={(v) => `${v}%`}
+                          domain={[0, 100]}
+                        />
+                        <Tooltip {...tooltipStyle} formatter={(v) => [`${v}%`, '']} />
+                        <Legend 
+                          verticalAlign="top" 
+                          align="right" 
+                          iconType="circle"
+                          wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
+                        />
+                        <Bar 
+                          dataKey="ratioCobro" 
+                          name="Ratio Cobro" 
+                          fill={CHART_COLORS.success} 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={12}
+                        />
+                        <Bar 
+                          dataKey="ocupacion" 
+                          name="Ocupación" 
+                          fill={CHART_COLORS.primary} 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={12}
+                        />
+                        <Bar 
+                          dataKey="rotacion" 
+                          name="Rotación" 
+                          fill={CHART_COLORS.secondary} 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={12}
+                        />
+                        <Bar 
+                          dataKey="abandono" 
+                          name="Abandono" 
+                          fill={CHART_COLORS.danger} 
+                          radius={[4, 4, 0, 0]} 
+                          barSize={12}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </CardContent>
             )}
