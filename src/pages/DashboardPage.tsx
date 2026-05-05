@@ -102,7 +102,8 @@ export default function DashboardPage() {
     payments: allBasePayments,
     eventPayments,
     privateLessonPayments,
-    attendance
+    attendance,
+    events
   } = useDataStore()
 
   const now = new Date()

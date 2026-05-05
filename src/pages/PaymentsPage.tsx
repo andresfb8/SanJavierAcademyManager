@@ -114,7 +114,8 @@ export default function PaymentsPage() {
     payments: allBasePayments,
     eventPayments,
     privateLessonPayments,
-    invoices
+    invoices,
+    events
   } = useDataStore()
 
   const payments = useMemo(() => {
@@ -122,13 +123,14 @@ export default function PaymentsPage() {
     return allBasePayments.filter(p => p.billingYear === currentYear || p.billingYear === currentYear - 1)
   }, [allBasePayments])
 
-  const allPendingPayments = useMemo(() => {
-    return normalizeAllPayments(
+  const allPendingPayments = useMemo(
+    () => normalizeAllPayments(
       allBasePayments.filter(p => p.status === 'pendiente'),
       eventPayments.filter(p => p.status === 'pendiente'),
-      privateLessonPayments.filter(p => p.status === 'pendiente')
-    )
-  }, [allBasePayments, eventPayments, privateLessonPayments])
+      privateLessonPayments.filter(p => p.status === 'pendiente'),
+      events
+    ),
+  }, [allBasePayments, eventPayments, privateLessonPayments, events])
 
 
   const now = new Date()
