@@ -954,14 +954,14 @@ export default function DashboardPage() {
                         tick={{ fill: '#64748b', fontSize: 11 }} 
                       />
                       <YAxis 
-                        yId="left"
+                        yAxisId="left"
                         axisLine={false} 
                         tickLine={false} 
                         tick={{ fill: '#64748b', fontSize: 11 }}
                         tickFormatter={(v) => `${v}€`}
                       />
                       <YAxis 
-                        yId="right"
+                        yAxisId="right"
                         orientation="right"
                         axisLine={false} 
                         tickLine={false} 
@@ -975,7 +975,7 @@ export default function DashboardPage() {
                         wrapperStyle={{ fontSize: '11px', paddingBottom: '20px' }}
                       />
                       <Bar 
-                        yId="left"
+                        yAxisId="left"
                         dataKey="ingresos" 
                         name="Ingresos" 
                         fill={CHART_COLORS.primary} 
@@ -983,7 +983,7 @@ export default function DashboardPage() {
                         barSize={20}
                       />
                       <Bar 
-                        yId="right"
+                        yAxisId="right"
                         dataKey="jugadores" 
                         name="Jugadores" 
                         fill={CHART_COLORS.secondary} 
