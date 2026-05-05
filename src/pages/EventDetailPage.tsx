@@ -548,9 +548,20 @@ export default function EventDetailPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm font-medium">
-                            {formatCurrency(payment?.amount ?? event.price)}
-                          </span>
+                          <div className="flex items-center gap-1 w-24">
+                            <Input
+                              type="number"
+                              className="h-8 text-xs px-2"
+                              defaultValue={payment?.amount ?? event.price}
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value) || 0
+                                if (payment && val !== payment.amount) {
+                                  updateEventPayment(payment.id, { amount: val })
+                                }
+                              }}
+                            />
+                            <Euro className="h-3 w-3 text-muted-foreground shrink-0" />
+                          </div>
                         </TableCell>
                         {!isCoachWithoutAccess && (
                           <TableCell className="text-right">
