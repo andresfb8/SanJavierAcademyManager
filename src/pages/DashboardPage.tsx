@@ -269,8 +269,8 @@ export default function DashboardPage() {
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
   const allPayments = useMemo(
-    () => normalizeAllPayments(allBasePayments, eventPayments, privateLessonPayments ?? []),
-    [allBasePayments, eventPayments, privateLessonPayments]
+    () => normalizeAllPayments(allBasePayments, eventPayments, privateLessonPayments ?? [], events),
+    [allBasePayments, eventPayments, privateLessonPayments, events]
   )
 
   const currentMonthAllPayments = allPayments.filter(

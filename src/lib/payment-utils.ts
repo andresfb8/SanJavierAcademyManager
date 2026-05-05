@@ -1,4 +1,4 @@
-import type { Payment, EventPayment, PrivateLessonPayment, PaymentStatus, PaymentMethod } from '@/types'
+import type { Payment, EventPayment, PrivateLessonPayment, PaymentStatus, PaymentMethod, AcademyEvent } from '@/types'
 
 // Tipo unificado para agregar todos los flujos de pago en un formato comun
 export interface NormalizedPayment {
@@ -42,6 +42,7 @@ export function normalizeAllPayments(
   payments: Payment[],
   eventPayments: EventPayment[],
   privateLessonPayments: PrivateLessonPayment[],
+  events: AcademyEvent[] = []
 ): NormalizedPayment[] {
   const normalized: NormalizedPayment[] = []
 
@@ -67,10 +68,11 @@ export function normalizeAllPayments(
     })
   }
 
-  // Pagos de eventos
   for (const ep of eventPayments) {
+    const event = events.find(e => e.id === ep.eventId)
+    const refDate = event?.date ?? ep.paidDate ?? ep.createdAt
+    
     let d: Date
-    const refDate = ep.paidDate ?? ep.createdAt
     if (refDate instanceof Date) {
       d = refDate
     } else if (typeof refDate === 'string') {

@@ -186,8 +186,8 @@ export default function PaymentsPage() {
 
   // Unificar todos los pagos para KPIs globales y tabla principal
   const allPayments = useMemo(
-    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? []),
-    [payments, eventPayments, privateLessonPayments]
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments ?? [], events),
+    [payments, eventPayments, privateLessonPayments, events]
   )
 
   // Filtered payments (para vista mensual — incluye los 3 origenes de pago)

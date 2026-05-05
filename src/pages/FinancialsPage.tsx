@@ -113,8 +113,8 @@ export default function FinancialsPage() {
   // DATA NORMALIZATION (Shared with Dashboard/Payments)
   // =====================================
   const allPayments = useMemo(
-    () => normalizeAllPayments(allBasePayments, eventPayments, privateLessonPayments ?? []),
-    [allBasePayments, eventPayments, privateLessonPayments]
+    () => normalizeAllPayments(allBasePayments, eventPayments, privateLessonPayments ?? [], events),
+    [allBasePayments, eventPayments, privateLessonPayments, events]
   )
 
   const currentMonthAllPayments = useMemo(
