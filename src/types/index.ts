@@ -422,6 +422,7 @@ export interface AcademyEvent {
   coachNames: string[]
   attendeePlayerIds: string[]
   attendeePlayerNames: string[]
+  attendeePrices?: Record<string, number> // Individual prices for attendees
   price: number
   vatRate: VatRate     // Tipo de IVA (default 21 para eventos)
   maxCapacity?: number

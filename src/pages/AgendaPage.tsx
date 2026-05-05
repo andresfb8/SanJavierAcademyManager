@@ -106,9 +106,24 @@ export default function AgendaPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const isEntrenador = user?.role === 'entrenador'
-  const { club, groups, courts, coaches, players, privateLessons, addPrivateLesson, updatePrivateLesson, deletePrivateLesson, addPrivateLessonPayment, updatePrivateLessonPayment, events, addEvent, addEventPayment } = useDataStore()
-  const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
-  const { data: attendance = [] } = useAttendanceQuery()
+  const {
+    club,
+    groups,
+    courts,
+    coaches,
+    players,
+    privateLessons,
+    events,
+    privateLessonPayments,
+    attendance,
+    addPrivateLesson,
+    updatePrivateLesson,
+    deletePrivateLesson,
+    addPrivateLessonPayment,
+    updatePrivateLessonPayment,
+    addEvent,
+    addEventPayment
+  } = useDataStore()
 
 
   const currentCoachId = useMemo(() => {
@@ -160,6 +175,7 @@ export default function AgendaPage() {
   const [evGuestNames, setEvGuestNames] = useState<string[]>([])
   const [evGuestInput, setEvGuestInput] = useState('')
   const [eventPlayerSearch, setEventPlayerSearch] = useState('')
+  const [evAttendeePrices, setEvAttendeePrices] = useState<Record<string, string>>({})
 
   // Metodos de pago por jugador en detalle de leccion
   const [lessonPaymentMethods, setLessonPaymentMethods] = useState<Record<string, string>>({})
@@ -204,10 +220,7 @@ export default function AgendaPage() {
 
         // Calcular estadísticas de asistencia para esta fecha
         const attendanceForDate = attendance.find(a => {
-          const recordDate = a.date instanceof Date
-            ? a.date.toISOString().split('T')[0]
-            : new Date(a.date).toISOString().split('T')[0]
-          return a.groupId === group.id && recordDate === toInputDate(selectedDate)
+          return a.groupId === group.id && isSameDay(new Date(a.date), selectedDate)
         })
 
         const attendanceStats = attendanceForDate ? {
@@ -285,6 +298,7 @@ export default function AgendaPage() {
     setEvPlayerIds([]); setEvPrice(''); setEvDescription(''); setEvMaxCapacity('')
     setEvGuestNames([]); setEvGuestInput('')
     setEventPlayerSearch('')
+    setEvAttendeePrices({})
     setEventDialogOpen(true)
   }
 
@@ -297,8 +311,19 @@ export default function AgendaPage() {
   function toggleEvCoach(coachId: string) {
     setEvCoachIds((prev) => prev.includes(coachId) ? prev.filter((id) => id !== coachId) : [...prev, coachId])
   }
-  function toggleEvPlayer(playerId: string) {
-    setEvPlayerIds((prev) => prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId])
+  function toggleEvPlayer(id: string) {
+    setEvPlayerIds((prev) => {
+      const isSelected = prev.includes(id)
+      if (isSelected) {
+        const next = prev.filter((x) => x !== id)
+        const nextPrices = { ...evAttendeePrices }
+        delete nextPrices[id]
+        setEvAttendeePrices(nextPrices)
+        return next
+      } else {
+        return [...prev, id]
+      }
+    })
   }
 
   // Helpers invitados clase particular
@@ -378,36 +403,62 @@ export default function AgendaPage() {
     const selectedPlayers = players.filter((p) => evPlayerIds.includes(p.id))
     const selectedCourts = activeCourts.filter((c) => evCourtIds.includes(c.id))
     const eventPrice = parseFloat(evPrice) || 0
-    const evGuestIds = evGuestNames.map((_, i) => `guest-${Date.now()}-${i}`)
+    const guestIds = evGuestNames.map((_, i) => `guest-${Date.now()}-${i}`)
+    
+    // Mapear los precios de los asistentes
+    const attendeePrices: Record<string, number> = {}
+    
+    // Jugadores registrados
+    for (const pid of evPlayerIds) {
+      const customPrice = evAttendeePrices[pid]
+      attendeePrices[pid] = customPrice ? parseFloat(customPrice) : eventPrice
+    }
+    
+    // Invitados
+    for (let i = 0; i < evGuestNames.length; i++) {
+      const gid = guestIds[i]
+      const tmpGid = `guest-tmp-${i}`
+      const customPrice = evAttendeePrices[tmpGid]
+      attendeePrices[gid] = customPrice ? parseFloat(customPrice) : eventPrice
+    }
+
     const eventId = addEvent({
       name: evName, type: evType, date: new Date(evDate + 'T00:00:00'),
       startTime: evStartTime, endTime: evEndTime,
       courtIds: evCourtIds, courtNames: selectedCourts.map((c) => c.name),
       coachIds: evCoachIds, coachNames: selectedCoaches.map((c) => `${c.firstName} ${c.lastName}`),
-      attendeePlayerIds: [...evPlayerIds, ...evGuestIds],
+      attendeePlayerIds: [...evPlayerIds, ...guestIds],
       attendeePlayerNames: [...selectedPlayers.map((p) => `${p.firstName} ${p.lastName}`), ...evGuestNames],
-      price: eventPrice, vatRate: (club?.defaultVatRateEvents ?? 21), maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
+      price: eventPrice,
+      attendeePrices, // Precios personalizados
+      vatRate: (club?.defaultVatRateEvents ?? 21), 
+      maxCapacity: evMaxCapacity ? parseInt(evMaxCapacity) : undefined,
       description: evDescription || undefined, isActive: true,
     })
+
     // Crear pagos para jugadores reales
-    for (const p of selectedPlayers) {
-      addEventPayment({
-        eventId,
-        eventName: evName,
-        playerId: p.id,
-        playerName: `${p.firstName} ${p.lastName}`,
-        amount: eventPrice,
-        status: 'pendiente',
-      })
+    for (const pid of evPlayerIds) {
+      const player = selectedPlayers.find(p => p.id === pid)
+      if (player) {
+        addEventPayment({
+          eventId,
+          eventName: evName,
+          playerId: pid,
+          playerName: `${player.firstName} ${player.lastName}`,
+          amount: attendeePrices[pid],
+          status: 'pendiente',
+        })
+      }
     }
     // Crear pagos para invitados
     for (let i = 0; i < evGuestNames.length; i++) {
+      const gid = guestIds[i]
       addEventPayment({
         eventId,
         eventName: evName,
-        playerId: evGuestIds[i],
+        playerId: gid,
         playerName: evGuestNames[i],
-        amount: eventPrice,
+        amount: attendeePrices[gid],
         status: 'pendiente',
       })
     }
@@ -970,6 +1021,55 @@ export default function AgendaPage() {
                 </div>
               )}
             </div>
+            <div className="space-y-3">
+              <Label>Precios personalizados (opcional)</Label>
+              <div className="rounded-md border p-3 space-y-3 bg-muted/20">
+                {(evPlayerIds.length > 0 || evGuestNames.length > 0) ? (
+                  <>
+                    {evPlayerIds.map(pid => {
+                      const player = players.find(p => p.id === pid)
+                      if (!player) return null
+                      return (
+                        <div key={pid} className="flex items-center justify-between gap-4">
+                          <span className="text-sm truncate flex-1">{player.firstName} {player.lastName}</span>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              className="h-8 w-24 text-right"
+                              placeholder={evPrice || "0.00"}
+                              value={evAttendeePrices[pid] || ''}
+                              onChange={(e) => setEvAttendeePrices(prev => ({ ...prev, [pid]: e.target.value }))}
+                            />
+                            <span className="text-xs text-muted-foreground">€</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {evGuestNames.map((name, i) => {
+                      const tmpGid = `guest-tmp-${i}` 
+                      return (
+                        <div key={tmpGid} className="flex items-center justify-between gap-4">
+                          <span className="text-sm truncate flex-1">{name} (Invitado)</span>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              className="h-8 w-24 text-right"
+                              placeholder={evPrice || "0.00"}
+                              value={evAttendeePrices[tmpGid] || ''}
+                              onChange={(e) => setEvAttendeePrices(prev => ({ ...prev, [tmpGid]: e.target.value }))}
+                            />
+                            <span className="text-xs text-muted-foreground">€</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-2">Selecciona asistentes para personalizar sus precios</p>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5"><Label>Precio (&euro;)</Label><Input type="number" min="0" step="0.01" value={evPrice} onChange={(e) => setEvPrice(e.target.value)} placeholder="0.00" /></div>
               <div className="space-y-1.5"><Label>Capacidad max.</Label><Input type="number" min="1" value={evMaxCapacity} onChange={(e) => setEvMaxCapacity(e.target.value)} placeholder="Sin limite" /></div>

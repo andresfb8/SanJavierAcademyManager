@@ -107,6 +107,11 @@ export interface DataState {
   holidays: Holiday[]
   attendanceNotices: AttendanceNotice[]
   vouchers: Voucher[]
+  payments: Payment[]
+  eventPayments: EventPayment[]
+  privateLessonPayments: PrivateLessonPayment[]
+  invoices: Invoice[]
+  attendance: AttendanceRecord[]
 
   // --- Club ---
   updateClub: (club: Partial<Club>) => void
@@ -315,6 +320,11 @@ export const useDataStore = create<DataState>()(
       clubTransactions: [],
       attendanceNotices: [],
       vouchers: [],
+      payments: [],
+      eventPayments: [],
+      privateLessonPayments: [],
+      invoices: [],
+      attendance: [],
 
       // --- Vouchers ---
       addVoucher: (voucherData) => {
