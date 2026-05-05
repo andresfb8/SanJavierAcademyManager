@@ -8,7 +8,7 @@ Write-Host ""
 Write-Host "[1/4] Actualizando codigo desde GitHub..." -ForegroundColor Cyan
 git fetch origin
 git checkout main
-git pull origin claude/ready-for-deployment-spvME
+git pull origin main
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[ERROR] Error al actualizar codigo" -ForegroundColor Red

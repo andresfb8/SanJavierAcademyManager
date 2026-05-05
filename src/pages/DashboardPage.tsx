@@ -324,12 +324,47 @@ export default function DashboardPage() {
   const altasEsteMes = players.filter(
     (p) => p.registrationDate >= monthStart && p.registrationDate <= monthEnd
   ).length
-  const bajasEsteMes = players.filter(
-    (p) => p.cancellationDate && p.cancellationDate >= monthStart && p.cancellationDate <= monthEnd
-  ).length
+  const { bajasEsteMes } = useMemo(() => {
+    const nextMonthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+
+    // Jugadores que han estado activos en algún momento de este mes
+    const playersActiveInMonth = players.filter(p => {
+      const pEnrols = enrollments.filter(e => e.playerId === p.id)
+      return pEnrols.some(e => {
+        const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+        const eEnd = e.unenrollmentDate ? (e.unenrollmentDate instanceof Date ? e.unenrollmentDate : new Date(e.unenrollmentDate)) : null
+        return eStart <= monthEnd && (!eEnd || eEnd >= monthStart)
+      })
+    })
+
+    // De esos, ¿cuántos han dejado de estar activos al final del mes y no tienen planes de volver el mes que viene?
+    const trueBajas = playersActiveInMonth.filter(p => {
+      const pEnrols = enrollments.filter(e => e.playerId === p.id)
+      
+      // ¿Sigue teniendo algo activo al final de este mes?
+      const isActiveAtEnd = pEnrols.some(e => {
+        const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+        const eEnd = e.unenrollmentDate ? (e.unenrollmentDate instanceof Date ? e.unenrollmentDate : new Date(e.unenrollmentDate)) : null
+        return eStart <= monthEnd && (!eEnd || eEnd > monthEnd)
+      })
+      
+      if (isActiveAtEnd) return false
+
+      // ¿Tiene una inscripción que empiece el mes que viene?
+      const hasNextMonthEnrollment = pEnrols.some(e => {
+        const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+        return eStart > monthEnd && eStart <= nextMonthEnd
+      })
+
+      return !hasNextMonthEnrollment
+    }).length
+
+    return { bajasEsteMes: trueBajas }
+  }, [players, enrollments, currentMonth, currentYear, monthStart, monthEnd])
+
   const rotationDivisor = activePlayers + bajasEsteMes
   const rotationIndex = rotationDivisor > 0
-    ? Math.round(((bajasEsteMes + altasEsteMes) / rotationDivisor) * 100)
+    ? Math.round(((altasEsteMes + bajasEsteMes) / rotationDivisor) * 100)
     : 0
   const churnRate = rotationDivisor > 0
     ? Math.round((bajasEsteMes / rotationDivisor) * 100)
@@ -428,17 +463,46 @@ export default function DashboardPage() {
       const collectionRate = totalBilled > 0 ? Math.round((revenue / totalBilled) * 100) : 0
 
       const monthStart = new Date(y, m - 1, 1)
+      const nextMonthEnd = new Date(y, m + 1, 0, 23, 59, 59)
+
       const altas = players.filter(p => {
         const regDate = p.registrationDate instanceof Date ? p.registrationDate : new Date(p.registrationDate)
         return regDate >= monthStart && regDate <= monthEnd
       }).length
-      const bajas = players.filter(p => {
-        if (!p.cancellationDate) return false
-        const canDate = p.cancellationDate instanceof Date ? p.cancellationDate : new Date(p.cancellationDate)
-        return canDate >= monthStart && canDate <= monthEnd
+
+      // --- LÓGICA DE ABANDONO REAL (CHURN) ---
+      // 1. Jugadores activos en algún momento del mes m
+      const playersActiveInMonth = players.filter(p => {
+        const pEnrols = enrollments.filter(e => e.playerId === p.id)
+        return pEnrols.some(e => {
+          const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+          const eEnd = e.unenrollmentDate ? (e.unenrollmentDate instanceof Date ? e.unenrollmentDate : new Date(e.unenrollmentDate)) : null
+          return eStart <= monthEnd && (!eEnd || eEnd >= monthStart)
+        })
+      })
+
+      // 2. Jugadores que dejan de estar activos al final del mes m y NO se reincorporan en m+1
+      const bajas = playersActiveInMonth.filter(p => {
+        const pEnrols = enrollments.filter(e => e.playerId === p.id)
+        
+        const isActiveAtEnd = pEnrols.some(e => {
+          const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+          const eEnd = e.unenrollmentDate ? (e.unenrollmentDate instanceof Date ? e.unenrollmentDate : new Date(e.unenrollmentDate)) : null
+          return eStart <= monthEnd && (!eEnd || eEnd > monthEnd)
+        })
+        
+        if (isActiveAtEnd) return false
+
+        const hasNextMonthEnrollment = pEnrols.some(e => {
+          const eStart = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
+          return eStart > monthEnd && eStart <= nextMonthEnd
+        })
+
+        return !hasNextMonthEnrollment
       }).length
       
-      const rotationDivisor = activeInMonth + bajas
+      const activeAtEnd = playersActiveInMonth.length - bajas
+      const rotationDivisor = activeAtEnd + bajas
       const rotationIndex = rotationDivisor > 0 ? Math.round(((altas + bajas) / rotationDivisor) * 100) : 0
       const churnRate = rotationDivisor > 0 ? Math.round((bajas / rotationDivisor) * 100) : 0
 
