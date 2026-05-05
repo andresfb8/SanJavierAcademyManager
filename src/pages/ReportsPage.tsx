@@ -735,10 +735,22 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIngresos)}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Cuotas {formatCurrency(ingresosCuotas)} · Eventos {formatCurrency(ingresosEventos)} · Clases {formatCurrency(ingresosClases)}
-              </p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIngresos)}</p>
+                  <p className="text-xs text-muted-foreground mt-1 text-wrap">
+                    Cuotas {formatCurrency(ingresosCuotas)} · Eventos {formatCurrency(ingresosEventos)} · Clases {formatCurrency(ingresosClases)}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 text-[10px] uppercase font-bold border-purple-200 text-purple-600 hover:bg-purple-50"
+                  onClick={() => setDetailsView('ingresos_eventos')}
+                >
+                  Detalle Eventos
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -818,25 +830,7 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <FileText className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Eventos</p>
-                      <p className="text-lg font-bold">{formatCurrency(ingresosEventos)}</p>
-                    </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-xs h-7"
-                    onClick={() => setDetailsView('ingresos_eventos')}
-                  >
-                    Ver detalle
-                  </Button>
-                </div>
+              <p className="text-2xl font-bold">{groupChanges.length}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 grupos con movimientos
                 {groupChanges.length > 0 && ` · ${groupChanges[0].name} lidera`}
