@@ -777,6 +777,15 @@ export const useDataStore = create<DataState>()(
             ),
           }))
 
+          // Auto-promoción a 'activo' si el jugador estaba en lista de espera
+          if (enrollmentData.isActive) {
+            const player = get().players.find((p) => p.id === enrollmentData.playerId)
+            if (player && player.status === 'lista_espera') {
+              get().updatePlayer(player.id, { status: 'activo' })
+              console.info(`[addEnrollment] Player ${player.id} promoted to activo`)
+            }
+          }
+
           const { userId, userName } = getCurrentUser()
           get().addActivity({
             type: 'enrollment_created',

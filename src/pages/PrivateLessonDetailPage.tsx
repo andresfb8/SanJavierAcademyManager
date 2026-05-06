@@ -172,7 +172,7 @@ export default function PrivateLessonDetailPage() {
   const activePlayers = useMemo(
     () =>
       players
-        .filter((p) => p.status === 'activo')
+        .filter((p) => p.status === 'activo' || p.status === 'lista_espera')
         .sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [players]
   )

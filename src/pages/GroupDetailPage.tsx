@@ -59,7 +59,7 @@ export default function GroupDetailPage() {
   )
 
   const availablePlayers = useMemo(
-    () => players.filter((p) => p.status === 'activo' && !enrolledPlayerIds.has(p.id)),
+    () => players.filter((p) => (p.status === 'activo' || p.status === 'lista_espera') && !enrolledPlayerIds.has(p.id)),
     [players, enrolledPlayerIds]
   )
 

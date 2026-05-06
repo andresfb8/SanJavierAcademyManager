@@ -95,7 +95,7 @@ export default function EventDetailPage() {
   )
 
   const availablePlayers = useMemo(
-    () => players.filter((p) => p.status === 'activo' && !attendeeIds.has(p.id)),
+    () => players.filter((p) => (p.status === 'activo' || p.status === 'lista_espera') && !attendeeIds.has(p.id)),
     [players, attendeeIds]
   )
 
