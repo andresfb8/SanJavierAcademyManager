@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
+import { normalizeText } from '@/lib/utils';
 import {
     MethodologyParameter,
     ParameterCategory,
@@ -105,8 +106,9 @@ const MethodologyPage: React.FC = () => {
 
     // Local filtering
     const filteredParameters = parameters.filter(param => {
-        const matchesSearch = param.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (param.tags && param.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase())));
+        const q = normalizeText(searchTerm)
+        const matchesSearch = normalizeText(param.name).includes(q) ||
+            (param.tags && param.tags.some(t => normalizeText(t).includes(q)));
 
         let matchesLevel = true;
         if (selectedLevel !== 'all') {

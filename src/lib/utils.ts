@@ -50,7 +50,8 @@ export function generateId(): string {
  * Normalizes a string by removing diacritics/accents for accent-insensitive search.
  * Example: normalizeText('García') === 'garcia'
  */
-export function normalizeText(text: string): string {
+export function normalizeText(text: any): string {
+  if (!text || typeof text !== 'string') return ''
   return text
     .normalize('NFD')
     .replace(/\p{Mn}/gu, '')

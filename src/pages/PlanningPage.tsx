@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { normalizeText } from '@/lib/utils'
 import { Search, Plus, Calendar as CalendarIcon, MoreVertical } from 'lucide-react'
 import { TrainingTemplate } from '@/types/methodology'
 import { getTrainingTemplates } from '@/lib/planning-service'
@@ -33,9 +34,10 @@ export default function PlanningPage() {
     }
   }
 
-  const filteredTemplates = templates.filter(t =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredTemplates = templates.filter(t => {
+    const q = normalizeText(searchTerm)
+    return normalizeText(t.name).includes(q)
+  })
 
   if (showBuilder) {
     return (

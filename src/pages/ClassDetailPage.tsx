@@ -20,6 +20,7 @@ import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
 import { PLAYER_LEVELS, DAYS_OF_WEEK, PAYMENT_METHODS } from '@/constants'
 import type { AttendanceEntry, PaymentMethod, UserRole } from '@/types'
+import { normalizeText } from '@/lib/utils'
 import {
 
   ArrowLeft,
@@ -283,12 +284,12 @@ export default function ClassDetailPage() {
         !attendancePlayerIds.has(p.id)
     )
     if (!paidSearchTerm.trim()) return filtered
-    const term = paidSearchTerm.toLowerCase()
+    const term = normalizeText(paidSearchTerm)
     return filtered.filter(
       (p) =>
-        p.firstName.toLowerCase().includes(term) ||
-        p.lastName.toLowerCase().includes(term) ||
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(term)
+        normalizeText(p.firstName).includes(term) ||
+        normalizeText(p.lastName).includes(term) ||
+        normalizeText(`${p.firstName} ${p.lastName}`).includes(term)
     )
   }, [groupId, enrolledPlayerIds, attendancePlayerIds, players, paidSearchTerm])
 

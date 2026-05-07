@@ -35,7 +35,7 @@ import {
   RotateCcw,
   MessageCircle,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, normalizeText } from '@/lib/utils'
 import { INVOICE_STATUSES, INVOICE_SERIES } from '@/constants'
 import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDialog'
 import { InvoiceDetailDialog } from '@/components/invoices/InvoiceDetailDialog'
@@ -68,9 +68,9 @@ export default function InvoicesPage() {
     return invoices.filter((inv) => {
       // Búsqueda por número o nombre de cliente
       if (search) {
-        const searchLower = search.toLowerCase()
-        const matchesNumber = inv.invoiceNumber.toLowerCase().includes(searchLower)
-        const matchesPlayer = inv.playerName.toLowerCase().includes(searchLower)
+        const q = normalizeText(search)
+        const matchesNumber = normalizeText(inv.invoiceNumber).includes(q)
+        const matchesPlayer = normalizeText(inv.playerName).includes(q)
         if (!matchesNumber && !matchesPlayer) return false
       }
 

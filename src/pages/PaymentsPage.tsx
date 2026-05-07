@@ -35,7 +35,7 @@ import {
   Trash2,
   MessageCircle,
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import { prepareSepaPayments, generateSepaXml } from '@/lib/sepa-utils'
 import type { SepaClubConfig } from '@/lib/sepa-utils'
@@ -196,10 +196,11 @@ export default function PaymentsPage() {
   // Filtered payments (para vista mensual — incluye los 3 origenes de pago)
   const filteredPayments = useMemo(() => {
     return allPayments.filter((p) => {
+      const q = normalizeText(search)
       const matchesSearch =
         search === '' ||
-        p.playerName.toLowerCase().includes(search.toLowerCase()) ||
-        p.concept.toLowerCase().includes(search.toLowerCase())
+        normalizeText(p.playerName).includes(q) ||
+        normalizeText(p.concept).includes(q)
       const matchesStatus = statusFilter === '' || p.status === statusFilter
       const matchesGroup = groupFilter === '' || p.groupId === groupFilter
       const matchesCategory = categoryFilter === '' || p.source === categoryFilter

@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { Plus, Search, Users, Clock, MapPin, User, Trash2, Edit2, LayoutGrid, List, FileDown } from 'lucide-react'
-import { generateId } from '@/lib/utils'
+import { generateId, normalizeText } from '@/lib/utils'
 import { PLAYER_LEVELS, DAYS_OF_WEEK } from '@/constants'
 import type { Group, PlayerLevel, ScheduleSlot } from '@/types'
 import { generateGroupsListReport } from '@/lib/pdf-reports'
@@ -107,7 +107,8 @@ export default function GroupsPage() {
 
   const filteredGroups = useMemo(() => {
     const filtered = groups.filter((g) => {
-      const matchesSearch = search === '' || g.name.toLowerCase().includes(search.toLowerCase())
+      const q = normalizeText(search)
+      const matchesSearch = search === '' || normalizeText(g.name).includes(q)
       const matchesLevel = levelFilter === '' || g.level === levelFilter
       const matchesCoach = isEntrenador 
         ? g.coachId === currentCoach?.id 

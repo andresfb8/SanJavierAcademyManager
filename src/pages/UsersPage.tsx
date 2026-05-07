@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
-import { formatDate, generateId } from '@/lib/utils'
+import { formatDate, generateId, normalizeText } from '@/lib/utils'
 import type { UserRole, InvitationStatus } from '@/types'
 import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, Users, UserX } from 'lucide-react'
 import { doc, setDoc, deleteDoc, collection, getDocs, query, where, updateDoc } from 'firebase/firestore'
@@ -99,8 +99,9 @@ export default function UsersPage() {
   // --- Filtered invitations ---
   const filteredInvitations = useMemo(() => {
     return invitations.filter((inv) => {
+      const q = normalizeText(searchTerm)
       const matchesSearch =
-        !searchTerm || inv.email.toLowerCase().includes(searchTerm.toLowerCase())
+        !searchTerm || normalizeText(inv.email).includes(q)
       const matchesRole = !filterRole || inv.role === filterRole
       const matchesStatus = !filterStatus || inv.status === filterStatus
       return matchesSearch && matchesRole && matchesStatus
@@ -110,10 +111,11 @@ export default function UsersPage() {
   // --- Filtered users ---
   const filteredUsers = useMemo(() => {
     return users.filter((usr) => {
+      const q = normalizeText(searchTerm)
       const matchesSearch =
         !searchTerm ||
-        usr.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        usr.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeText(usr.email).includes(q) ||
+        normalizeText(usr.displayName).includes(q)
       const matchesRole = !filterRole || usr.role === filterRole
       return matchesSearch && matchesRole
     })

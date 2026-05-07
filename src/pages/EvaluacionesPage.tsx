@@ -22,7 +22,7 @@ import { MatchReportForm } from '@/components/shared/MatchReportForm'
 import { MatchReportDetailView } from '@/components/shared/MatchReportDetailView'
 import { useDataStore } from '@/stores/dataStore'
 import { FileText, Plus, Search, Eye, Trash2, Star, Swords, Users } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, normalizeText } from '@/lib/utils'
 import type { Evaluation, MatchReport } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
@@ -60,10 +60,11 @@ export default function EvaluacionesPage() {
   const filteredEvaluations = useMemo(() => {
     return evaluations
       .filter((ev) => {
+        const q = normalizeText(search)
         const matchesSearch =
           search === '' ||
-          ev.playerName.toLowerCase().includes(search.toLowerCase()) ||
-          ev.coachName.toLowerCase().includes(search.toLowerCase())
+          normalizeText(ev.playerName).includes(q) ||
+          normalizeText(ev.coachName).includes(q)
         const matchesCoach = coachFilter === '' || ev.coachId === coachFilter
         return matchesSearch && matchesCoach
       })
@@ -76,12 +77,13 @@ export default function EvaluacionesPage() {
   const filteredMatchReports = useMemo(() => {
     return matchReports
       .filter((mr) => {
+        const q = normalizeText(mrSearch)
         const matchesSearch =
           mrSearch === '' ||
-          mr.title.toLowerCase().includes(mrSearch.toLowerCase()) ||
-          mr.coachName.toLowerCase().includes(mrSearch.toLowerCase()) ||
+          normalizeText(mr.title).includes(q) ||
+          normalizeText(mr.coachName).includes(q) ||
           mr.playerNames.some((name) =>
-            name.toLowerCase().includes(mrSearch.toLowerCase())
+            normalizeText(name).includes(q)
           )
         const matchesCoach = mrCoachFilter === '' || mr.coachId === mrCoachFilter
         return matchesSearch && matchesCoach

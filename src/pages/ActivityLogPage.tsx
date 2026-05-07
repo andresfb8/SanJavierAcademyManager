@@ -6,7 +6,7 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useDataStore } from '@/stores/dataStore'
-import { formatDate } from '@/lib/utils'
+import { formatDate, normalizeText } from '@/lib/utils'
 import { History, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { MONTHS } from '@/constants'
 import {
@@ -148,10 +148,11 @@ export default function ActivityLogPage() {
       const matchesMonth = selectedMonth === 0 || d.getMonth() + 1 === selectedMonth
       const matchesType = typeFilter === '' || a.type === typeFilter
       const displayUser = a.userName ?? a.userId
+      const q = normalizeText(search)
       const matchesSearch =
         search === '' ||
-        a.description.toLowerCase().includes(search.toLowerCase()) ||
-        displayUser.toLowerCase().includes(search.toLowerCase())
+        normalizeText(a.description).includes(q) ||
+        normalizeText(displayUser).includes(q)
       return matchesYear && matchesMonth && matchesType && matchesSearch
     })
   }, [activities, search, typeFilter, selectedMonth, selectedYear])
