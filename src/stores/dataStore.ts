@@ -263,7 +263,7 @@ function toISODate(date: Date | string): string {
 // with 60-day expiration.
 const RECOVERY_CREDIT_EXPIRY_DAYS = 60
 
-function computePlayerRecoveryBalance(
+export function computePlayerRecoveryBalance(
   playerId: string,
   attendance: AttendanceRecord[],
   now = new Date()
@@ -1729,6 +1729,11 @@ export const useDataStore = create<DataState>()(
         users: state.users,
         holidays: state.holidays,
         attendanceNotices: state.attendanceNotices,
+        vouchers: state.vouchers,
+        attendance: state.attendance,
+        payments: state.payments,
+        evaluations: state.evaluations,
+        matchReports: state.matchReports,
       } as unknown as DataState)
     }
   )

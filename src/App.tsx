@@ -30,6 +30,7 @@ import InvoicesPage from '@/pages/InvoicesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import FinancialsPage from '@/pages/FinancialsPage'
 import PlayerDashboard from '@/pages/PlayerDashboard'
+import CoachDashboard from '@/pages/CoachDashboard'
 import FreeSlotsPage from '@/pages/FreeSlotsPage'
 
 function RoleRoute({
@@ -95,7 +96,16 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={user?.role === 'jugador' ? <PlayerDashboard /> : <DashboardPage />} />
+          <Route 
+            path="/" 
+            element={
+              user?.role === 'jugador' 
+                ? <PlayerDashboard /> 
+                : user?.role === 'entrenador' 
+                  ? <CoachDashboard /> 
+                  : <DashboardPage />
+            } 
+          />
           <Route path="/jugadores" element={<PlayersPage />} />
           <Route path="/jugadores/:id" element={<PlayerProfilePage />} />
           <Route path="/grupos" element={<GroupsPage />} />

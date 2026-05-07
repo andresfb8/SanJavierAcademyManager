@@ -55,6 +55,12 @@ function clearDataStore(): void {
     events: [],
     coachSalaryConfigs: [],
     attendanceNotices: [],
+    vouchers: [],
+    attendance: [],
+    payments: [],
+    evaluations: [],
+    matchReports: [],
+    invoices: [],
   })
 }
 
@@ -268,7 +274,7 @@ export function hasPermission(role: UserRole, module: string, action: string = '
     entrenador: {
       dashboard: ['read'], players: ['read'], groups: ['read'],
       attendance: ['read', 'write'], payments: [], coaches: [],
-      agenda: ['read'], settings: [], users: [],
+      agenda: ['read'], settings: ['read'], users: [],
       informes: ['read', 'write'], events: ['read'],
       informes_mensuales: [],
     },

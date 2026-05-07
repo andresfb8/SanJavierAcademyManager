@@ -44,6 +44,11 @@ export async function loadAllData(clubId: string): Promise<void> {
     events,
     coachSalaryConfigs,
     clubTransactions,
+    vouchers,
+    evaluations,
+    matchReports,
+    attendanceNotices,
+    payments,
   ] = await Promise.all([
     loadCollection<Court>('courts', clubId),
     loadCollection<Tariff>('tariffs', clubId),
@@ -56,6 +61,11 @@ export async function loadAllData(clubId: string): Promise<void> {
     loadCollection<AcademyEvent>('events', clubId),
     loadCollection<CoachSalaryConfig>('coachSalaryConfigs', clubId),
     loadCollection<ClubTransaction>('clubTransactions', clubId),
+    loadCollection<any>('vouchers', clubId),
+    loadCollection<Evaluation>('evaluations', clubId),
+    loadCollection<MatchReport>('matchReports', clubId),
+    loadCollection<any>('attendanceNotices', clubId),
+    loadCollection<any>('payments', clubId),
   ])
 
   useDataStore.setState({
@@ -69,6 +79,11 @@ export async function loadAllData(clubId: string): Promise<void> {
     invitations,
     events,
     clubTransactions,
+    vouchers: vouchers as any,
+    evaluations,
+    matchReports,
+    attendanceNotices: attendanceNotices as any,
+    payments: payments as any,
     coachSalaryConfigs: coachSalaryConfigs.map(c => normalizeSalaryConfig(c as unknown as Record<string, unknown>) as unknown as typeof c),
   })
 
@@ -116,6 +131,9 @@ export async function migrateLocalToFirestore(clubId: string): Promise<void> {
     { name: 'invitations', items: state.invitations as unknown as Array<Record<string, unknown>> },
     { name: 'events', items: state.events as unknown as Array<Record<string, unknown>> },
     { name: 'coachSalaryConfigs', items: state.coachSalaryConfigs as unknown as Array<Record<string, unknown>> },
+    { name: 'vouchers', items: state.vouchers as unknown as Array<Record<string, unknown>> },
+    { name: 'evaluations', items: state.evaluations as unknown as Array<Record<string, unknown>> },
+    { name: 'matchReports', items: state.matchReports as unknown as Array<Record<string, unknown>> },
   ]
 
   for (const { name, items } of collections) {

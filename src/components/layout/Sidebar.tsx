@@ -114,6 +114,22 @@ export function Sidebar() {
       return item.href === '/'
     }
 
+    // Limpieza estricta para entrenadores: Ocultamos módulos administrativos y financieros
+    if (user?.role === 'entrenador') {
+      const coachAllowedPaths = [
+        '/', 
+        '/jugadores', 
+        '/grupos', 
+        '/asistencia', 
+        '/agenda', 
+        '/eventos', 
+        '/informes', 
+        '/methodology', 
+        '/planificacion'
+      ]
+      if (!coachAllowedPaths.includes(item.href)) return false
+    }
+
     if (item.requiredModule && user?.role) {
       return hasPermission(user.role as UserRole, item.requiredModule, 'read')
     }

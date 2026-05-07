@@ -93,7 +93,7 @@ export function subscribeToAllData(
     
     if (userRole === 'jugador' || userRole === 'tutor') {
       // Jugadores solo ven lo esencial para su portal
-      return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments', 'attendanceNotices', 'vouchers'].includes(coll.name)
+      return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments', 'attendanceNotices', 'vouchers', 'evaluations', 'matchReports'].includes(coll.name)
     }
     
     return true

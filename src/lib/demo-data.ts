@@ -1431,3 +1431,72 @@ export const demoCoachSalaryConfigs: CoachSalaryConfig[] = [
     bonuses: 0,
   },
 ]
+// BONOS DEMO
+export const demoVouchers: Voucher[] = [
+  {
+    id: 'voucher-001',
+    playerId: 'player-001',
+    playerName: 'Antonio García',
+    type: '10_classes',
+    totalClasses: 10,
+    usedClasses: 3,
+    price: 150,
+    status: 'active',
+    createdAt: new Date('2024-01-10'),
+    expiresAt: new Date('2024-04-10')
+  },
+  {
+    id: 'voucher-002',
+    playerId: 'player-001',
+    playerName: 'Carlos Ruiz',
+    type: 'monthly',
+    totalClasses: 0,
+    usedClasses: 0,
+    price: 60,
+    status: 'active',
+    createdAt: new Date('2024-02-01'),
+    expiresAt: new Date('2024-03-01')
+  }
+]
+
+// EVALUACIONES DEMO
+export const demoEvaluations: Evaluation[] = [
+  {
+    id: 'eval-001',
+    playerId: 'player-001',
+    playerName: 'Antonio García',
+    coachId: 'coach-001',
+    coachName: 'Miguel Fernández',
+    date: new Date('2024-01-15'),
+    overallAverage: 7.8,
+    finalComment: 'Gran progresión en el revés. Debe mejorar la movilidad lateral.',
+    blocks: [
+      {
+        blockKey: 'tecnica',
+        average: 8.0,
+        scores: [{ criterionKey: 'reves', score: 8 }, { criterionKey: 'derecha', score: 8 }]
+      }
+    ],
+    createdAt: new Date('2024-01-15'),
+    updatedAt: new Date('2024-01-15')
+  }
+]
+
+// INFORMES DE PARTIDO DEMO
+export const demoMatchReports: MatchReport[] = [
+  {
+    id: 'report-001',
+    title: 'Crónica Partido Entrenamiento',
+    date: new Date('2024-02-05'),
+    playerIds: ['player-001', 'player-002'],
+    playerNames: ['Antonio García', 'Elena Martínez'],
+    coachId: 'coach-001',
+    coachName: 'Miguel Fernández',
+    tacticsComment: 'Buen control de los tiempos. Carlos dominó la red en el segundo set.',
+    decisionMakingComment: 'Mejor selección de golpes en momentos clave.',
+    mentalComment: 'Muy concentrado a pesar de ir perdiendo el primer set.',
+    generalComment: 'Excelente actitud competitiva.',
+    createdAt: new Date('2024-02-05'),
+    updatedAt: new Date('2024-02-05')
+  }
+]
