@@ -12,7 +12,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
 import { formatDate, generateId, normalizeText } from '@/lib/utils'
 import type { UserRole, InvitationStatus } from '@/types'
-import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, Users, UserX } from 'lucide-react'
+import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, Users, UserX, UserCog, UserCheck } from 'lucide-react'
 import { doc, setDoc, deleteDoc, collection, getDocs, query, where, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -26,6 +26,7 @@ interface FirestoreUser {
   createdAt: Date
   linkedPlayerId?: string
   linkedPlayerIds?: string[]
+  roles?: UserRole[]
 }
 
 export default function UsersPage() {
@@ -37,6 +38,14 @@ export default function UsersPage() {
 
   // --- Users state ---
   const [deactivateUserId, setDeactivateUserId] = useState<string | null>(null)
+  
+  // --- Edit roles state ---
+  const [showRolesDialog, setShowRolesDialog] = useState(false)
+  const [editingUser, setEditingUser] = useState<FirestoreUser | null>(null)
+  const [editingRoles, setEditingRoles] = useState<UserRole[]>([])
+  const [editingLinkedPlayerId, setEditingLinkedPlayerId] = useState('')
+  const [editingLinkedPlayerIds, setEditingLinkedPlayerIds] = useState<string[]>([])
+  const [addingEditingPlayerId, setAddingEditingPlayerId] = useState('')
 
   // --- Filter state ---
   const [searchTerm, setSearchTerm] = useState('')
@@ -81,6 +90,11 @@ export default function UsersPage() {
   const availableTutorPlayerOptions = useMemo(
     () => playerOptions.filter((opt) => !linkedPlayerIds.includes(opt.value)),
     [playerOptions, linkedPlayerIds]
+  )
+
+  const availableEditingTutorPlayerOptions = useMemo(
+    () => playerOptions.filter((opt) => !editingLinkedPlayerIds.includes(opt.value)),
+    [playerOptions, editingLinkedPlayerIds]
   )
 
   const roleOptions = USER_ROLES.map((r) => ({ value: r.value, label: r.label }))
@@ -304,6 +318,45 @@ export default function UsersPage() {
     }
   }
 
+  async function handleReactivateUser(userId: string) {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        isActive: true,
+      })
+    } catch (err) {
+      console.error('Error reactivating user:', err)
+    }
+  }
+
+  async function handleSaveRoles() {
+    if (!editingUser) return
+    if (editingRoles.length === 0) return
+
+    try {
+      await updateDoc(doc(db, 'users', editingUser.id), {
+        roles: editingRoles,
+        role: editingRoles[0], // fallback for backward compatibility
+        linkedPlayerId: editingRoles.includes('jugador') ? editingLinkedPlayerId : '',
+        linkedPlayerIds: editingRoles.includes('tutor') ? editingLinkedPlayerIds : [],
+      })
+      setShowRolesDialog(false)
+      setEditingUser(null)
+    } catch (err) {
+      console.error('Error updating user roles:', err)
+    }
+  }
+
+  function toggleRole(role: UserRole) {
+    if (editingRoles.includes(role)) {
+      // Prevent removing the last role
+      if (editingRoles.length > 1) {
+        setEditingRoles((prev) => prev.filter((r) => r !== role))
+      }
+    } else {
+      setEditingRoles((prev) => [...prev, role])
+    }
+  }
+
   function handleAddTutorPlayer() {
     if (addingPlayerId && !linkedPlayerIds.includes(addingPlayerId)) {
       setLinkedPlayerIds((prev) => [...prev, addingPlayerId])
@@ -313,6 +366,17 @@ export default function UsersPage() {
 
   function handleRemoveTutorPlayer(playerId: string) {
     setLinkedPlayerIds((prev) => prev.filter((id) => id !== playerId))
+  }
+
+  function handleAddEditingTutorPlayer() {
+    if (addingEditingPlayerId && !editingLinkedPlayerIds.includes(addingEditingPlayerId)) {
+      setEditingLinkedPlayerIds((prev) => [...prev, addingEditingPlayerId])
+      setAddingEditingPlayerId('')
+    }
+  }
+
+  function handleRemoveEditingTutorPlayer(playerId: string) {
+    setEditingLinkedPlayerIds((prev) => prev.filter((id) => id !== playerId))
   }
 
   // --- Render ---
@@ -492,7 +556,21 @@ export default function UsersPage() {
                   <TableRow key={usr.id}>
                     <TableCell className="font-medium">{usr.displayName}</TableCell>
                     <TableCell>{usr.email}</TableCell>
-                    <TableCell>{getRoleLabel(usr.role)}</TableCell>
+                    <TableCell>
+                      {usr.roles && usr.roles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {usr.roles.map((r) => (
+                            <Badge key={r} variant="outline" className="text-xs">
+                              {getRoleLabel(r)}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          {getRoleLabel(usr.role)}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {usr.isActive ? (
                         <Badge variant="success">Activo</Badge>
@@ -515,7 +593,22 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>{formatDate(usr.createdAt)}</TableCell>
                     <TableCell className="text-right">
-                      {usr.isActive && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingUser(usr)
+                          setEditingRoles(usr.roles && usr.roles.length > 0 ? [...usr.roles] : [usr.role])
+                          setEditingLinkedPlayerId(usr.linkedPlayerId || '')
+                          setEditingLinkedPlayerIds(usr.linkedPlayerIds ? [...usr.linkedPlayerIds] : [])
+                          setAddingEditingPlayerId('')
+                          setShowRolesDialog(true)
+                        }}
+                        title="Gestionar roles"
+                      >
+                        <UserCog className="h-4 w-4 text-primary" />
+                      </Button>
+                      {usr.isActive ? (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -523,6 +616,15 @@ export default function UsersPage() {
                           title="Desactivar usuario"
                         >
                           <UserX className="h-4 w-4 text-destructive" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleReactivateUser(usr.id)}
+                          title="Reactivar usuario"
+                        >
+                          <UserCheck className="h-4 w-4 text-green-600" />
                         </Button>
                       )}
                     </TableCell>
@@ -546,6 +648,114 @@ export default function UsersPage() {
         variant="destructive"
         onConfirm={handleDeactivateUser}
       />
+
+      {/* Edit Roles Dialog */}
+      <Dialog open={showRolesDialog} onOpenChange={setShowRolesDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gestionar roles de usuario</DialogTitle>
+            <DialogDescription>
+              Anade o quita roles para {editingUser?.displayName || editingUser?.email}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-2">
+              {USER_ROLES.map((role) => {
+                const isSelected = editingRoles.includes(role.value)
+                return (
+                  <div
+                    key={role.value}
+                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+                    }`}
+                    onClick={() => toggleRole(role.value)}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        isSelected ? 'border-primary bg-primary' : 'border-input'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                    </div>
+                    <span className="text-sm font-medium">{role.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+            {editingRoles.length === 0 && (
+              <p className="text-sm text-destructive">Debes seleccionar al menos un rol.</p>
+            )}
+
+            {/* Player linking: jugador role */}
+            {editingRoles.includes('jugador') && (
+              <div className="space-y-2 mt-4 pt-4 border-t">
+                <Label htmlFor="edit-linked-player">Vincular jugador (Rol: Jugador)</Label>
+                <Select
+                  id="edit-linked-player"
+                  options={playerOptions}
+                  placeholder="Selecciona un jugador"
+                  value={editingLinkedPlayerId}
+                  onChange={(e) => setEditingLinkedPlayerId(e.target.value)}
+                />
+                {!editingLinkedPlayerId && <p className="text-xs text-amber-500">Es recomendable vincular un jugador para que el portal funcione.</p>}
+              </div>
+            )}
+
+            {/* Player linking: tutor role */}
+            {editingRoles.includes('tutor') && (
+              <div className="space-y-2 mt-4 pt-4 border-t">
+                <Label>Vincular jugadores (Rol: Tutor)</Label>
+                {editingLinkedPlayerIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {editingLinkedPlayerIds.map((pid) => {
+                      const player = players.find((p) => p.id === pid)
+                      const name = player ? `${player.firstName} ${player.lastName}` : 'Desconocido'
+                      return (
+                        <Badge key={pid} variant="secondary" className="flex items-center gap-1">
+                          {name}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditingTutorPlayer(pid)}
+                            className="ml-1 rounded-full hover:bg-muted p-0.5"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Select
+                      options={availableEditingTutorPlayerOptions}
+                      placeholder="Anadir un jugador"
+                      value={addingEditingPlayerId}
+                      onChange={(e) => setAddingEditingPlayerId(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddEditingTutorPlayer}
+                    disabled={!addingEditingPlayerId}
+                  >
+                    Anadir
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRolesDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveRoles} disabled={editingRoles.length === 0}>
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Invite Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>

@@ -30,12 +30,16 @@ import {
   RotateCcw,
   Phone,
   Share2,
+  CalendarDays,
+  Zap,
 } from 'lucide-react'
 import { formatDate, generateId } from '@/lib/utils'
 import { downloadXlsx } from '@/lib/excel'
 import type { AttendanceEntry, AttendanceStatus } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
-
+import { QuickAttendanceSheet } from '@/components/attendance/QuickAttendanceSheet'
+import { AttendanceCalendar } from '@/components/attendance/AttendanceCalendar'
+import { useNextClass } from '@/hooks/useNextClass'
 
 // ==========================================
 // AttendancePage - Registro de Asistencia
@@ -55,6 +59,9 @@ export default function AttendancePage() {
   const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches, attendanceNotices } = useDataStore()
   const { data: attendance = [] } = useAttendanceQuery()
 
+  // ── Vista: 'selector' | 'sheet' | 'calendar' ────────────────────────────
+  type PageView = 'selector' | 'sheet' | 'calendar'
+  const [pageView, setPageView] = useState<PageView>('selector')
 
   // --- Seleccion de grupo y fecha ---
   const [selectedGroupId, setSelectedGroupId] = useState('')
@@ -63,64 +70,75 @@ export default function AttendancePage() {
     return today.toISOString().split('T')[0]
   })
 
-  // --- Registros de asistencia en edicion ---
+  const activeRole = user?.activeRole ?? user?.role
+  const isEntrenador = activeRole === 'entrenador'
+  const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
+
+  // --- Registros de asistencia en edición ---
   const [entries, setEntries] = useState<AttendanceEntry[]>([])
   const [entriesInitialized, setEntriesInitialized] = useState(false)
-
-  // --- Dialog de recuperacion ---
-  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false)
-  const [selectedRecoveryPlayerId, setSelectedRecoveryPlayerId] = useState('')
 
   // --- Estado de guardado ---
   const [saved, setSaved] = useState(false)
 
-  // --- Dialog de clase suelta ---
+  // --- Dialogs ---
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false)
+  const [selectedRecoveryPlayerId, setSelectedRecoveryPlayerId] = useState('')
   const [showOneOffDialog, setShowOneOffDialog] = useState(false)
   const [selectedOneOffPlayerId, setSelectedOneOffPlayerId] = useState('')
   const [oneOffPrice, setOneOffPrice] = useState('15')
-
-  // --- Dialog de exportacion ---
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [exportDateFrom, setExportDateFrom] = useState(() => {
     const d = new Date()
     d.setMonth(d.getMonth() - 1)
     return d.toISOString().split('T')[0]
   })
-  const [exportDateTo, setExportDateTo] = useState(() => {
-    return new Date().toISOString().split('T')[0]
-  })
+  const [exportDateTo, setExportDateTo] = useState(() => new Date().toISOString().split('T')[0])
   const [exportSelectedGroupIds, setExportSelectedGroupIds] = useState<string[]>([])
   const [exportPlayerId, setExportPlayerId] = useState('')
 
-  // ===================
-  // DATOS DERIVADOS
-  // ===================
-
-  const isEntrenador = user?.role === 'entrenador'
   const currentCoach = useMemo(
-    () => coaches.find((c) => c.userId === user?.id),
-    [coaches, user?.id]
+    () => coaches.find((c) => c.userId === user?.id || c.id === user?.linkedCoachId),
+    [coaches, user?.id, user?.linkedCoachId]
   )
 
+  // ── Auto-detección de clase próxima (solo entrenadores) ─────────────────
+  const nextClass = useNextClass(currentCoach?.id ?? '')
+
+  // ── URL params (acceso directo) ──────────────────────────────────────────
   const [searchParams] = useSearchParams()
   const urlGroupId = searchParams.get('groupId')
+  const urlDate = searchParams.get('fecha')
 
+  // ── Grupos visibles según rol activo ────────────────────────────────────
+  const activeGroups = useMemo(() => {
+    const allActive = groups.filter((g) => g.isActive)
+    if (isAdmin) return allActive
+    // entrenador: solo sus grupos
+    if (isEntrenador && currentCoach) {
+      return allActive.filter((g) => g.coachId === currentCoach.id)
+    }
+    return allActive
+  }, [groups, isEntrenador, isAdmin, currentCoach])
+
+  // ── Auto-navegación por URL params ──────────────────────────────────────
   useEffect(() => {
     if (urlGroupId) {
       setSelectedGroupId(urlGroupId)
+      if (urlDate) setSelectedDate(urlDate)
+      setPageView('sheet')
     }
-  }, [urlGroupId])
+  }, [urlGroupId, urlDate])
 
-  const activeGroups = useMemo(
-    () => {
-      const allActive = groups.filter((g) => g.isActive)
-      if (isEntrenador && currentCoach) {
-        return allActive.filter((g) => g.coachId === currentCoach.id)
-      }
-      return allActive
-    },
-    [groups, isEntrenador, currentCoach]
-  )
+  // ── Auto-detección de clase próxima (entrenador, 2h ventana) ───────────
+  useEffect(() => {
+    if (nextClass && !urlGroupId && pageView === 'selector') {
+      const todayISO = new Date().toISOString().split('T')[0]
+      setSelectedGroupId(nextClass.group.id)
+      setSelectedDate(todayISO)
+      setPageView('sheet')
+    }
+  }, [nextClass, urlGroupId])
 
   const selectedGroup = useMemo(
     () => groups.find((g) => g.id === selectedGroupId) ?? null,
@@ -497,6 +515,49 @@ export default function AttendancePage() {
   // RENDER
   // ===================
 
+
+  // ===================
+  // RENDER
+  // ===================
+
+  // ── Vista QuickAttendanceSheet ───────────────────────────────────────────
+  const sheetGroup = useMemo(
+    () => groups.find((g) => g.id === selectedGroupId) ?? null,
+    [groups, selectedGroupId]
+  )
+
+  if (pageView === 'sheet' && sheetGroup) {
+    return (
+      <div className="flex flex-col h-full">
+        <QuickAttendanceSheet
+          group={sheetGroup}
+          date={selectedDate}
+          onBack={() => setPageView('selector')}
+        />
+      </div>
+    )
+  }
+
+  // ── Vista Calendar ───────────────────────────────────────────────────────
+  if (pageView === 'calendar' && sheetGroup) {
+    return (
+      <div className="flex flex-col h-full">
+        <Header title="Historial de Asistencia" subtitle={sheetGroup.name} />
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <AttendanceCalendar
+            group={sheetGroup}
+            onDayClick={(date, status) => {
+              setSelectedDate(date)
+              if (status === 'pending' || status === 'recorded') {
+                setPageView('sheet')
+              }
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       <Header
@@ -511,6 +572,35 @@ export default function AttendancePage() {
       />
 
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6">
+        {/* Auto-detect banner */}
+        {nextClass && pageView === 'selector' && (
+          <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in slide-in-from-top-3 duration-300">
+            <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <Zap className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-emerald-800">
+                Clase próxima: <span className="font-black">{nextClass.group.name}</span>
+              </p>
+              <p className="text-xs text-emerald-600">
+                {nextClass.startTime} · Abre el pase de lista en un tap
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shrink-0"
+              onClick={() => {
+                const today = new Date().toISOString().split('T')[0]
+                setSelectedGroupId(nextClass.group.id)
+                setSelectedDate(today)
+                setPageView('sheet')
+              }}
+            >
+              Pasar lista →
+            </Button>
+          </div>
+        )}
+
         {/* ============================== */}
         {/* SELECTOR DE GRUPO Y FECHA      */}
         {/* ============================== */}
@@ -540,14 +630,27 @@ export default function AttendancePage() {
                   onChange={handleDateChange}
                 />
               </div>
-              <div>
+              <div className="flex gap-2">
                 <Button
-                  onClick={handleLoadSheet}
+                  onClick={() => {
+                    if (selectedGroupId && selectedDate) {
+                      setPageView('sheet')
+                    }
+                  }}
                   disabled={!selectedGroupId || !selectedDate}
-                  className="w-full"
+                  className="flex-1"
                 >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Cargar hoja
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  Pasar Lista
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (selectedGroupId) setPageView('calendar')
+                  }}
+                  disabled={!selectedGroupId}
+                >
+                  <Calendar className="h-4 w-4" />
                 </Button>
               </div>
             </div>

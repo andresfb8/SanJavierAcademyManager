@@ -15,6 +15,7 @@ import { cn, formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor }
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
 import { useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+import { useAuthStore } from '@/stores/authStore'
 
 
 // =========================================
@@ -84,6 +85,8 @@ export default function PlayerProfilePage() {
     attendance,
     evaluations
   } = useDataStore()
+  const { user, isDataLoading } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
 
   const payments = useMemo(() => {
     const currentYear = new Date().getFullYear()
@@ -263,25 +266,43 @@ export default function PlayerProfilePage() {
   // Not found
   // =========================================
 
+  if (isDataLoading) {
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Cargando perfil...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!player) {
     return (
-      <div>
-        <Header title="Perfil del jugador" />
-        <div className="p-6">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-              <AlertCircle className="h-12 w-12 text-muted-foreground" />
-              <h2 className="text-lg font-semibold">Jugador no encontrado</h2>
-              <p className="text-sm text-muted-foreground">
-                El jugador que buscas no existe o ha sido eliminado.
+      <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6">
+        <Header title="Perfil del Jugador" />
+        <Card className="border-none shadow-sm rounded-2xl">
+          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+              <AlertCircle className="h-6 w-6 text-slate-400" />
+            </div>
+            <h2 className="text-lg font-semibold">Jugador no encontrado</h2>
+            <p className="text-sm text-muted-foreground mb-2">
+              El jugador que buscas no existe o ha sido eliminado.
+            </p>
+            {user?.linkedPlayerId === id ? (
+              <p className="text-xs text-rose-500 mb-6 bg-rose-50 px-3 py-1 rounded-md">
+                Error de vinculación: Tu usuario apunta al ID <b>{id}</b> pero no existe en la base de datos. Contacta con tu academia.
               </p>
-              <Button variant="outline" onClick={() => navigate('/jugadores')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver a jugadores
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+            ) : (
+              <p className="text-xs text-slate-400 mb-6">ID buscado: {id}</p>
+            )}
+            <Button variant="outline" onClick={() => navigate(activeRole === 'jugador' || activeRole === 'tutor' ? '/' : '/jugadores')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {activeRole === 'jugador' || activeRole === 'tutor' ? 'Volver al Inicio' : 'Volver a jugadores'}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -299,7 +320,7 @@ export default function PlayerProfilePage() {
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={player.status} />
-            {player.email && (
+            {player.email && activeRole !== 'jugador' && activeRole !== 'tutor' && (
               <Button 
                 variant={player.invitationStatus === 'active' ? "ghost" : "outline"} 
                 size="sm" 
@@ -322,10 +343,12 @@ export default function PlayerProfilePage() {
               <EditIcon className="h-4 w-4 mr-1" />
               Editar
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/jugadores')}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Volver
-            </Button>
+            {activeRole !== 'jugador' && activeRole !== 'tutor' && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/jugadores')}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Volver
+              </Button>
+            )}
           </div>
         }
       />

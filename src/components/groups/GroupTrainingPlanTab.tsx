@@ -8,7 +8,8 @@ import { Calendar, FileText, Youtube, Video, Info, CheckCircle2, AlertCircle, Cl
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { DAYS_OF_WEEK } from '@/constants';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { ParameterWeightControl } from '../methodology/ParameterWeightControl';
 import { SessionFeedbackDialog } from '../planning/SessionFeedbackDialog';
 import { RescheduleDialog } from '../planning/RescheduleDialog';

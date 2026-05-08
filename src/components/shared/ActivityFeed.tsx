@@ -105,11 +105,12 @@ const LAST_VISIT_KEY = 'activity-feed-last-visit'
 interface ActivityFeedProps {
     activities: Activity[]
     canReadPayments?: boolean
+    limit?: number
 }
 
-const PAGE_SIZE = 8
+const DEFAULT_PAGE_SIZE = 8
 
-export function ActivityFeed({ activities, canReadPayments = true }: ActivityFeedProps) {
+export function ActivityFeed({ activities, canReadPayments = true, limit }: ActivityFeedProps) {
     const navigate = useNavigate()
     const [category, setCategory] = useState<Category>('all')
     const [search, setSearch] = useState('')
@@ -117,6 +118,8 @@ export function ActivityFeed({ activities, canReadPayments = true }: ActivityFee
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [newCount, setNewCount] = useState(0)
     const lastVisitRef = useRef<Date | null>(null)
+
+    const pageSize = limit || DEFAULT_PAGE_SIZE
 
     // Track "new since last visit" badge
     useEffect(() => {
@@ -150,7 +153,7 @@ export function ActivityFeed({ activities, canReadPayments = true }: ActivityFee
         })
     }, [activities, category, search, canReadPayments])
 
-    const paged = visible.slice(0, page * PAGE_SIZE)
+    const paged = visible.slice(0, page * pageSize)
     const hasMore = paged.length < visible.length
 
     // Group by day label

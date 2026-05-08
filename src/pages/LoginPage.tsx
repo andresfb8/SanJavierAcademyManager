@@ -38,6 +38,8 @@ export default function LoginPage() {
       const code = (err as { code?: string })?.code
       if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         setError('Email o contraseña incorrectos.')
+      } else if (code === 'auth/user-disabled') {
+        setError('Tu cuenta ha sido desactivada. Por favor, contacta con la academia.')
       } else if (code === 'auth/too-many-requests') {
         setError('Demasiados intentos. Inténtalo más tarde.')
       } else {

@@ -32,6 +32,7 @@ interface AuthState {
   resetPassword: (email: string) => Promise<void>
   changePassword: (currentPass: string, newPass: string) => Promise<void>
   setUser: (user: AppUser | null) => void
+  setActiveRole: (role: UserRole) => void
   signupPlayer: (email: string, pass: string, playerId: string) => Promise<void>
   initAuth: () => () => void
 }
@@ -71,6 +72,8 @@ function buildUserFromAuth(firebaseUser: FirebaseUser): AppUser {
     email: firebaseUser.email ?? '',
     displayName: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? '',
     role: 'director',
+    roles: ['director'],
+    activeRole: 'director',
     clubId: 'club-001',
     isActive: true,
     createdAt: new Date(),
@@ -91,14 +94,26 @@ async function loadUserProfile(
 
     if (userDoc.exists()) {
       const data = userDoc.data()
+      const primaryRole: UserRole = data.role ?? 'director'
+      // Fallback: si no tiene roles[], lo construimos desde el campo role (usuarios existentes)
+      const roles: UserRole[] = Array.isArray(data.roles) && data.roles.length > 0
+        ? data.roles as UserRole[]
+        : [primaryRole]
+      // Restaurar el rol activo desde localStorage si es un rol válido
+      const storedRole = localStorage.getItem('activeRole') as UserRole | null
+      const activeRole: UserRole = (storedRole && roles.includes(storedRole)) ? storedRole : roles[0]
+
       appUser = {
         id: firebaseUser.uid,
         email: data.email ?? firebaseUser.email ?? '',
         displayName: data.displayName ?? firebaseUser.displayName ?? '',
-        role: data.role ?? 'director',
+        role: primaryRole,
+        roles,
+        activeRole,
         clubId: data.clubId ?? 'club-001',
         linkedPlayerId: data.linkedPlayerId,
         linkedPlayerIds: data.linkedPlayerIds,
+        linkedCoachId: data.linkedCoachId,
         isActive: data.isActive ?? true,
         createdAt: data.createdAt?.toDate?.() ?? new Date(),
       }
@@ -110,6 +125,7 @@ async function loadUserProfile(
           email: appUser.email,
           displayName: appUser.displayName,
           role: appUser.role,
+          roles: appUser.roles,
           clubId: appUser.clubId,
           isActive: appUser.isActive,
           createdAt: appUser.createdAt,
@@ -141,7 +157,7 @@ async function loadUserProfile(
           console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
         }
         // Iniciar listeners en tiempo real
-        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
+        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.activeRole, () => {
           setDataLoading(false)
         })
       })
@@ -168,6 +184,18 @@ export const useAuthStore = create<AuthState>((set) => ({
         credential.user,
         (v) => set({ isDataLoading: v })
       )
+
+      if (!appUser.isActive) {
+        if (_dataUnsubscribe) {
+          _dataUnsubscribe()
+          _dataUnsubscribe = null
+        }
+        clearDataStore()
+        await signOut(auth)
+        set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
+        throw { code: 'auth/user-disabled' }
+      }
+
       set({ user: appUser, isAuthenticated: true, isLoading: false })
     } catch (error) {
       set({ isLoading: false })
@@ -208,6 +236,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, isAuthenticated: !!user })
   },
 
+  setActiveRole: (role) => {
+    localStorage.setItem('activeRole', role)
+    set((state) => ({
+      user: state.user ? { ...state.user, activeRole: role } : null,
+    }))
+  },
+
   signupPlayer: async (email, pass, playerId) => {
     set({ isLoading: true })
     try {
@@ -238,6 +273,18 @@ export const useAuthStore = create<AuthState>((set) => ({
           firebaseUser,
           (v) => set({ isDataLoading: v })
         )
+        
+        if (!appUser.isActive) {
+          if (_dataUnsubscribe) {
+            _dataUnsubscribe()
+            _dataUnsubscribe = null
+          }
+          clearDataStore()
+          await signOut(auth)
+          set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
+          return
+        }
+
         set({ user: appUser, isAuthenticated: true, isLoading: false })
       } else {
         // Sesión expirada o logout externo (otra pestaña, token caducado...)

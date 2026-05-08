@@ -91,10 +91,13 @@ export interface AppUser {
   id: string
   email: string
   displayName: string
-  role: UserRole
+  role: UserRole           // mantener para compatibilidad con código existente
+  roles: UserRole[]        // todos los roles asignados a este usuario
+  activeRole: UserRole     // rol activo en este momento (persiste en localStorage)
   clubId: string
   linkedPlayerId?: string
   linkedPlayerIds?: string[]
+  linkedCoachId?: string   // vincula con colección coaches
   isActive: boolean
   createdAt: Date
 }

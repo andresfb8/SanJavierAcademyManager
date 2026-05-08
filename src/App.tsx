@@ -12,6 +12,8 @@ import GroupsPage from '@/pages/GroupsPage'
 import GroupDetailPage from '@/pages/GroupDetailPage'
 import AttendancePage from '@/pages/AttendancePage'
 import PaymentsPage from '@/pages/PaymentsPage'
+import PlayerPaymentsPage from '@/pages/PlayerPaymentsPage'
+import PlayerGroupsPage from '@/pages/PlayerGroupsPage'
 import CoachesPage from '@/pages/CoachesPage'
 import AgendaPage from '@/pages/AgendaPage'
 import SettingsPage from '@/pages/SettingsPage'
@@ -43,7 +45,8 @@ function RoleRoute({
   action?: string
 }) {
   const { user } = useAuthStore()
-  if (user?.role && !hasPermission(user.role as UserRole, module, action)) {
+  const effectiveRole = (user?.activeRole ?? user?.role) as UserRole | undefined
+  if (effectiveRole && !hasPermission(effectiveRole, module, action)) {
     return <Navigate to="/" replace />
   }
   return <>{children}</>
@@ -63,6 +66,36 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />
   return <>{children}</>
+}
+
+function PaymentsRouter() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (activeRole === 'jugador' || activeRole === 'tutor') {
+    return <PlayerPaymentsPage />
+  }
+  return <PaymentsPage />
+}
+
+function GroupsRouter() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (activeRole === 'jugador' || activeRole === 'tutor') {
+    return <PlayerGroupsPage />
+  }
+  return <GroupsPage />
+}
+
+function PlayersRouter() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (activeRole === 'jugador' || activeRole === 'tutor') {
+    if (user?.linkedPlayerId) {
+      return <Navigate to={`/jugadores/${user.linkedPlayerId}`} replace />
+    }
+    return <Navigate to="/" replace />
+  }
+  return <PlayersPage />
 }
 
 export default function App() {
@@ -98,17 +131,16 @@ export default function App() {
         >
           <Route 
             path="/" 
-            element={
-              user?.role === 'jugador' 
-                ? <PlayerDashboard /> 
-                : user?.role === 'entrenador' 
-                  ? <CoachDashboard /> 
-                  : <DashboardPage />
-            } 
+            element={(() => {
+              const activeRole = user?.activeRole ?? user?.role
+              if (activeRole === 'jugador') return <PlayerDashboard />
+              if (activeRole === 'entrenador') return <CoachDashboard />
+              return <DashboardPage />
+            })()}
           />
-          <Route path="/jugadores" element={<PlayersPage />} />
+          <Route path="/jugadores" element={<PlayersRouter />} />
           <Route path="/jugadores/:id" element={<PlayerProfilePage />} />
-          <Route path="/grupos" element={<GroupsPage />} />
+          <Route path="/grupos" element={<GroupsRouter />} />
           <Route path="/grupos/:id" element={<GroupDetailPage />} />
           <Route path="/asistencia" element={<AttendancePage />} />
           <Route path="/huecos" element={<FreeSlotsPage />} />
@@ -117,7 +149,7 @@ export default function App() {
           <Route path="/eventos/:id" element={<EventDetailPage />} />
           <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
           <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
-          <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
+          <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsRouter /></RoleRoute>} />
           <Route path="/facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
           <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
           <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />

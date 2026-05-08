@@ -5,10 +5,11 @@
 // Cuando cualquier dispositivo escribe un cambio, todos los listeners activos
 // reciben la actualización automáticamente y actualizan el store de Zustand.
 
-import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, where, documentId } from 'firebase/firestore'
 import { db } from './firebase'
 import { fromFirestore } from './firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore } from '@/stores/authStore'
 
 const COLLECTIONS = [
   { name: 'courts', stateKey: 'courts' },
@@ -114,7 +115,31 @@ export function subscribeToAllData(
   }
 
   for (const { name, stateKey } of allowedCollections) {
-    const q = query(collection(db, name), where('clubId', '==', clubId))
+    let q = query(collection(db, name), where('clubId', '==', clubId))
+
+    // Firebase Security Rules for 'jugador' and 'tutor' restrict reading ALL documents in certain collections.
+    // We must narrow the query to match the security rules, otherwise the entire query is rejected.
+    const currentUser = useAuthStore.getState().user
+    const actualRole = currentUser?.role // The real role in DB, not activeRole
+
+    if (actualRole === 'jugador' || actualRole === 'tutor') {
+      const isPlayerRestricted = ['players', 'payments', 'privateLessonPayments', 'eventPayments', 'invoices', 'evaluations'].includes(name)
+      if (isPlayerRestricted) {
+        const playerIds = actualRole === 'tutor' 
+          ? (currentUser?.linkedPlayerIds?.length ? currentUser.linkedPlayerIds : ['none'])
+          : (currentUser?.linkedPlayerId ? [currentUser.linkedPlayerId] : ['none'])
+
+        // Use 'in' operator to get only the allowed players
+        // Firestore limits 'in' queries to 10 elements.
+        const safePlayerIds = playerIds.slice(0, 10)
+        
+        if (name === 'players') {
+          q = query(collection(db, name), where('clubId', '==', clubId), where(documentId(), 'in', safePlayerIds))
+        } else {
+          q = query(collection(db, name), where('clubId', '==', clubId), where('playerId', 'in', safePlayerIds))
+        }
+      }
+    }
 
     const unsub = onSnapshot(
       q,

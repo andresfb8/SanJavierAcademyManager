@@ -23,12 +23,14 @@ import {
   Map,
   KeyRound,
   BarChart3,
+  User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { UserRole } from '@/types'
 import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog'
+import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 
 interface NavItem {
   name: string
@@ -109,29 +111,31 @@ export function Sidebar() {
     items.some((item) => isItemActive(item.href))
 
   const filterItem = (item: NavItem) => {
-    // Si es jugador, solo permitimos ver el Dashboard (portal)
-    if (user?.role === 'jugador') {
+    const activeRole = user?.activeRole ?? user?.role
+
+    // Jugador: solo ve el Dashboard (portal)
+    if (activeRole === 'jugador') {
       return item.href === '/'
     }
 
-    // Limpieza estricta para entrenadores: Ocultamos módulos administrativos y financieros
-    if (user?.role === 'entrenador') {
+    // Entrenador: módulos permitidos explícitamente
+    if (activeRole === 'entrenador') {
       const coachAllowedPaths = [
-        '/', 
-        '/jugadores', 
-        '/grupos', 
-        '/asistencia', 
-        '/agenda', 
-        '/eventos', 
-        '/informes', 
-        '/methodology', 
+        '/',
+        '/jugadores',
+        '/grupos',
+        '/asistencia',
+        '/agenda',
+        '/eventos',
+        '/informes',
+        '/methodology',
         '/planificacion'
       ]
       if (!coachAllowedPaths.includes(item.href)) return false
     }
 
-    if (item.requiredModule && user?.role) {
-      return hasPermission(user.role as UserRole, item.requiredModule, 'read')
+    if (item.requiredModule && activeRole) {
+      return hasPermission(activeRole as UserRole, item.requiredModule, 'read')
     }
     return true
   }
@@ -206,7 +210,32 @@ export function Sidebar() {
     )
   }
 
-  const avatarGradient = ROLE_COLORS[user?.role || ''] || 'from-slate-500 to-slate-600'
+  const avatarGradient = ROLE_COLORS[user?.activeRole ?? user?.role ?? ''] || 'from-slate-500 to-slate-600'
+
+  // Bottom Nav items depending on active role
+  const activeRole = user?.activeRole ?? user?.role
+
+  // Para jugador: encontrar su grupo primario (si existe)
+  const playerGroupId = useMemo(() => {
+    if (activeRole !== 'jugador' || !user?.linkedPlayerId) return ''
+    // No tenemos acceso al dataStore aquí, se navega a /grupos como fallback
+    return ''
+  }, [activeRole, user?.linkedPlayerId])
+
+  const bottomNavItems = activeRole === 'jugador'
+    ? [
+        { href: '/', label: 'Inicio', icon: LayoutDashboard },
+        { href: '/grupos', label: 'Mi Clase', icon: GraduationCap },
+        { href: '/pagos', label: 'Mis Pagos', icon: CreditCard },
+        { href: user?.linkedPlayerId ? `/jugadores/${user.linkedPlayerId}` : '/', label: 'Mi Perfil', icon: User },
+      ]
+    : [
+        { href: '/', label: 'Inicio', icon: LayoutDashboard },
+        { href: '/grupos', label: 'Clases', icon: GraduationCap },
+        { href: '/asistencia', label: 'Asistencia', icon: ClipboardCheck },
+      ]
+  // Silencing unused warning
+  void playerGroupId
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -227,37 +256,40 @@ export function Sidebar() {
       </nav>
 
       {/* User section */}
-      <div className="border-t border-sidebar-border p-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br text-white text-sm font-bold shadow-sm shrink-0',
-            avatarGradient
-          )}>
-            {user?.displayName?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">
-              {user?.displayName || 'Usuario'}
-            </p>
-            <p className="text-[11px] text-sidebar-foreground/50 truncate capitalize font-medium">
-              {user?.role || 'director'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => setIsPasswordDialogOpen(true)}
-              className="rounded-xl p-2.5 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150 active:scale-95"
-              title="Cambiar contraseña"
-            >
-              <KeyRound className="h-5 w-5" />
-            </button>
-            <button
-              onClick={logout}
-              className="rounded-xl p-2.5 text-red-500/70 hover:bg-red-500/10 hover:text-red-500 transition-all duration-150 active:scale-95 ml-1"
-              title="Cerrar sesión"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
+      <div className="border-t border-sidebar-border shrink-0">
+        <RoleSwitcher />
+        <div className="p-4 pt-2">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br text-white text-sm font-bold shadow-sm shrink-0',
+              avatarGradient
+            )}>
+              {user?.displayName?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">
+                {user?.displayName || 'Usuario'}
+              </p>
+              <p className="text-[11px] text-sidebar-foreground/50 truncate capitalize font-medium">
+                {user?.activeRole ?? user?.role ?? 'director'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => setIsPasswordDialogOpen(true)}
+                className="rounded-xl p-2.5 text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150 active:scale-95"
+                title="Cambiar contraseña"
+              >
+                <KeyRound className="h-5 w-5" />
+              </button>
+              <button
+                onClick={logout}
+                className="rounded-xl p-2.5 text-red-500/70 hover:bg-red-500/10 hover:text-red-500 transition-all duration-150 active:scale-95 ml-1"
+                title="Cerrar sesión"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -266,51 +298,35 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Bottom Nav */}
+      {/* Mobile Bottom Nav — conditional by role */}
       <div className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] lg:hidden">
-        <NavLink
-          to="/"
-          onClick={() => setMobileOpen(false)}
-          className={({ isActive }) => cn(
-            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
-            isActive ? "text-primary" : "text-slate-500 hover:text-slate-900"
-          )}
-        >
-          <LayoutDashboard className="h-5 w-5" />
-          <span>Inicio</span>
-        </NavLink>
-        <NavLink
-          to="/grupos"
-          onClick={() => setMobileOpen(false)}
-          className={({ isActive }) => cn(
-            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
-            isActive ? "text-primary" : "text-slate-500 hover:text-slate-900"
-          )}
-        >
-          <GraduationCap className="h-5 w-5" />
-          <span>Clases</span>
-        </NavLink>
-        <NavLink
-          to="/asistencia"
-          onClick={() => setMobileOpen(false)}
-          className={({ isActive }) => cn(
-            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
-            isActive ? "text-primary" : "text-slate-500 hover:text-slate-900"
-          )}
-        >
-          <ClipboardCheck className="h-5 w-5" />
-          <span>Asistencia</span>
-        </NavLink>
-        <button
-          onClick={() => setMobileOpen(true)}
-          className={cn(
-            "flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors",
-            mobileOpen ? "text-primary" : "text-slate-500 hover:text-slate-900"
-          )}
-        >
-          <Menu className="h-5 w-5" />
-          <span>Menú</span>
-        </button>
+        {bottomNavItems.map((item) => (
+          <NavLink
+            key={item.href}
+            to={item.href}
+            onClick={() => setMobileOpen(false)}
+            className={({ isActive }) => cn(
+              'flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors',
+              isActive ? 'text-primary' : 'text-slate-500 hover:text-slate-900'
+            )}
+          >
+            <item.icon className="h-5 w-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+        {/* Botón Menú — solo roles admin/entrenador */}
+        {activeRole !== 'jugador' && (
+          <button
+            onClick={() => setMobileOpen(true)}
+            className={cn(
+              'flex flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors',
+              mobileOpen ? 'text-primary' : 'text-slate-500 hover:text-slate-900'
+            )}
+          >
+            <Menu className="h-5 w-5" />
+            <span>Menú</span>
+          </button>
+        )}
       </div>
 
       {/* Mobile overlay */}

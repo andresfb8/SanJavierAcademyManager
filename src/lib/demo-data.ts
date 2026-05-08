@@ -14,6 +14,8 @@ import type {
   AcademyEvent,
   Evaluation,
   CoachSalaryConfig,
+  Voucher,
+  MatchReport,
 } from '@/types'
 
 // ===================
@@ -1459,28 +1461,7 @@ export const demoVouchers: Voucher[] = [
   }
 ]
 
-// EVALUACIONES DEMO
-export const demoEvaluations: Evaluation[] = [
-  {
-    id: 'eval-001',
-    playerId: 'player-001',
-    playerName: 'Antonio García',
-    coachId: 'coach-001',
-    coachName: 'Miguel Fernández',
-    date: new Date('2024-01-15'),
-    overallAverage: 7.8,
-    finalComment: 'Gran progresión en el revés. Debe mejorar la movilidad lateral.',
-    blocks: [
-      {
-        blockKey: 'tecnica',
-        average: 8.0,
-        scores: [{ criterionKey: 'reves', score: 8 }, { criterionKey: 'derecha', score: 8 }]
-      }
-    ],
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15')
-  }
-]
+// (Removed duplicate demoEvaluations - already defined above)
 
 // INFORMES DE PARTIDO DEMO
 export const demoMatchReports: MatchReport[] = [
