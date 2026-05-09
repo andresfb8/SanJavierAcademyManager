@@ -34,6 +34,7 @@ import {
   RotateCcw,
   Trash2,
   MessageCircle,
+  UploadCloud,
 } from 'lucide-react'
 import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
@@ -44,6 +45,8 @@ import type { PaymentMethod, PaymentCategory } from '@/types'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
 import type { WhatsAppPayload } from '@/components/shared/WhatsAppNotificationDialog'
+import { WhatsAppCSVDialog } from '@/components/shared/WhatsAppCSVDialog'
+import { SepaImportDialog } from '@/components/financials/SepaImportDialog'
 import {
   useReactTable,
   getCoreRowModel,
@@ -165,6 +168,8 @@ export default function PaymentsPage() {
 
   // WhatsApp notification
   const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppPayload | null>(null)
+  const [whatsappCSVOpen, setWhatsappCSVOpen] = useState(false)
+  const [sepaImportOpen, setSepaImportOpen] = useState(false)
 
   // Generate available years (current year +/- 2)
   const availableYears = useMemo(() => {
@@ -799,6 +804,43 @@ export default function PaymentsPage() {
     setManualDialogOpen(false)
   }
 
+  const handleProcessConciliation = (paidIds: string[], returned: { paymentId: string; penaltyAmount: number }[]) => {
+    // 1. Mark paid
+    paidIds.forEach(id => {
+      // Find the payment to know if it's event or regular
+      const payment = allPendingPayments.find(p => p.id === id)
+      if (!payment) return
+
+      if (payment.source === 'evento') {
+        markEventPaymentPaid(id, 'domiciliacion')
+      } else if (payment.source === 'clase_particular') {
+        markPrivateLessonPaymentPaid(id, 'domiciliacion')
+      } else {
+        markPaymentPaid(id, 'domiciliacion')
+      }
+    })
+    
+    // 2. Process returned
+    returned.forEach(r => {
+      const originalPayment = allPendingPayments.find(p => p.id === r.paymentId)
+      if (!originalPayment) return
+      
+      // Add penalty
+      if (r.penaltyAmount > 0) {
+        addManualPayment({
+          playerId: originalPayment.playerId,
+          playerName: originalPayment.playerName,
+          concept: 'Recargo por devolución SEPA',
+          amount: r.penaltyAmount,
+          category: 'otro',
+          notes: `Recargo asociado al recibo: ${originalPayment.concept}`
+        })
+      }
+    })
+    
+    alert(`Conciliación completada:\n- ${paidIds.length} recibos cobrados\n- ${returned.length} devoluciones procesadas con recargo.`)
+  }
+
   const selectedMonthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label || ''
 
   // --- Chart data for annual view ---
@@ -851,6 +893,20 @@ export default function PaymentsPage() {
                 <Button variant="outline" size="sm" onClick={handleExportSepaXML} title="Exportar XML para domiciliación SEPA">
                   <Download className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">XML SEPA</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSepaImportOpen(true)} title="Importar respuestas del banco para conciliar" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                  <UploadCloud className="h-4 w-4 md:mr-1" />
+                  <span className="hidden md:inline">Conciliar SEPA</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setWhatsappCSVOpen(true)} 
+                  title="Envío masivo WhatsApp CSV"
+                  className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">WhatsApp CSV</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={openManualPaymentDialog}>
                   <Plus className="h-4 w-4 mr-1" />
@@ -1423,6 +1479,21 @@ export default function PaymentsPage() {
         open={!!whatsAppPayload}
         onOpenChange={(open) => { if (!open) setWhatsAppPayload(null) }}
         payload={whatsAppPayload}
+      />
+
+      {/* WhatsApp CSV Dialog */}
+      <WhatsAppCSVDialog
+        open={whatsappCSVOpen}
+        onOpenChange={setWhatsappCSVOpen}
+      />
+
+      {/* SEPA Conciliation Dialog */}
+      <SepaImportDialog
+        open={sepaImportOpen}
+        onOpenChange={setSepaImportOpen}
+        pendingPayments={payments.filter(p => p.status === 'pendiente' && p.billingMonth === selectedMonth && p.billingYear === selectedYear)}
+        players={players}
+        onProcessConciliation={handleProcessConciliation}
       />
     </div>
   )
