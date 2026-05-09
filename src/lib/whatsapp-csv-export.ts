@@ -100,19 +100,23 @@ export function generateWhatsAppCSV(
  * Descarga el CSV en el formato que esperan las extensiones.
  * Columnas requeridas: telefono, mensaje
  */
-export function descargarCSV(rows: WhatsAppRow[], filename = 'morosos-whatsapp.csv') {
-  // Crear una nueva versión limpia para exportar (solo las columnas necesarias para la extensión o todas)
+export function descargarCSV(rows: WhatsAppRow[], filename = 'morosos-whatsapp.xlsx') {
+  // Según la documentación de WhatSender, las columnas van por posición:
+  // Columna 1: Teléfono
+  // Columna 2: @value1
+  // Columna 3: @value2, etc.
+  
   const dataToExport = rows.map(r => ({
-    Telefono: r.telefono,
-    Mensaje: r.mensaje,
-    Nombre: r.nombre, // extra helper column
-    Deuda: r.deuda_total, // extra helper column
+    'WhatsApp Number': '+' + r.telefono, // Columna 1
+    'Mensaje Personalizado': r.mensaje,  // Columna 2 -> Será @value1
+    'Nombre': r.nombre,                  // Columna 3 -> Será @value2 (opcional)
+    'Deuda': r.deuda_total               // Columna 4 -> Será @value3 (opcional)
   }))
 
   const ws = XLSX.utils.json_to_sheet(dataToExport)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Morosos')
-  XLSX.writeFile(wb, filename, { bookType: 'csv' })
+  XLSX.writeFile(wb, filename, { bookType: 'xlsx' })
 }
 
 /**

@@ -44,10 +44,10 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-green-600" />
-            Envío masivo WhatsApp — Exportar CSV
+            Envío masivo WhatsApp — Exportar Excel
           </DialogTitle>
           <DialogDescription>
-            Genera el CSV con los morosos y súbelo a la extensión de Chrome (ej: WA Sender)
+            Genera el Excel (.xlsx) con los morosos y súbelo a WAPI Sender
           </DialogDescription>
         </DialogHeader>
 
@@ -136,13 +136,13 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
 
           {/* Instrucciones */}
           <div className="rounded-lg bg-muted/50 border p-4 space-y-2 text-sm">
-            <p className="font-semibold">Pasos tras descargar el CSV para WhatSender / WA Sender:</p>
+            <p className="font-semibold">Pasos tras descargar el Excel para WhatSender:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Abre la extensión y ve a la sección de envío masivo.</li>
-              <li>Sube el archivo CSV que acabas de descargar.</li>
-              <li>Si te pide mapear columnas, asocia la columna <strong>Telefono</strong> al número y <strong>Mensaje</strong> al cuerpo del mensaje.</li>
-              <li>Configura un tiempo de espera (delay) de <strong>al menos 10 segundos</strong> entre mensajes para evitar baneos de WhatsApp.</li>
-              <li>Inicia el envío.</li>
+              <li>Abre WhatSender.</li>
+              <li>Sube el archivo Excel (.xlsx) que acabas de descargar.</li>
+              <li>En la caja de mensaje de WhatSender, escribe SOLO la variable <strong>@value1</strong>.</li>
+              <li>Al enviar, WhatSender cogerá todo el mensaje personalizado de la segunda columna (que se asigna a @value1) y lo enviará correctamente.</li>
+              <li>Configura un tiempo de espera de seguridad entre envíos y dale a empezar.</li>
             </ol>
           </div>
         </div>
@@ -157,7 +157,7 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
             className="gap-2 bg-green-600 hover:bg-green-700"
           >
             <Download className="h-4 w-4" />
-            Descargar CSV ({rows.length} contactos)
+            Descargar Excel ({rows.length} contactos)
           </Button>
         </DialogFooter>
       </DialogContent>
