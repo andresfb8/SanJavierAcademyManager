@@ -100,6 +100,15 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
                     <div className="flex items-center gap-3 text-muted-foreground">
                       <span className="text-xs">{r.telefono}</span>
                       <Badge variant="destructive" className="text-xs">{r.deuda_total}€</Badge>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-7 px-2 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
+                        onClick={() => window.open(`https://api.whatsapp.com/send?phone=${r.telefono}&text=${encodeURIComponent(r.mensaje)}`, '_blank')}
+                      >
+                        <MessageCircle className="h-3 w-3 mr-1" />
+                        Enviar
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -136,14 +145,14 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
 
           {/* Instrucciones */}
           <div className="rounded-lg bg-muted/50 border p-4 space-y-2 text-sm">
-            <p className="font-semibold">Pasos tras descargar el Excel para WhatSender:</p>
+            <p className="font-semibold">Si WhatSender no te lee bien el archivo Excel, prueba esto:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Abre WhatSender.</li>
-              <li>Sube el archivo Excel (.xlsx) que acabas de descargar.</li>
-              <li>En la caja de mensaje de WhatSender, escribe SOLO la variable <strong>@value1</strong>.</li>
-              <li>Al enviar, WhatSender cogerá todo el mensaje personalizado de la segunda columna (que se asigna a @value1) y lo enviará correctamente.</li>
-              <li>Configura un tiempo de espera de seguridad entre envíos y dale a empezar.</li>
+              <li>Abre el Excel que has descargado en tu ordenador.</li>
+              <li>Selecciona todas las filas (teléfonos y mensajes) y dale a <strong>Copiar</strong>.</li>
+              <li>Abre WhatSender, busca la opción <strong>"Copiar y pegar"</strong> o "Importar Manual" y pégalo ahí.</li>
+              <li>En la caja de mensaje de WhatSender, prueba a poner <strong>@value1</strong> (o <strong>@value2</strong> si el mensaje se ha quedado en la segunda columna al pegar).</li>
             </ol>
+            <p className="text-xs text-amber-600 mt-2 font-medium">Nota: Si usas la extensión gratuita de Chrome "WA Web Plus", detectará las columnas Phone y Message automáticamente.</p>
           </div>
         </div>
 

@@ -101,16 +101,11 @@ export function generateWhatsAppCSV(
  * Columnas requeridas: telefono, mensaje
  */
 export function descargarCSV(rows: WhatsAppRow[], filename = 'morosos-whatsapp.xlsx') {
-  // Según la documentación de WhatSender, las columnas van por posición:
-  // Columna 1: Teléfono
-  // Columna 2: @value1
-  // Columna 3: @value2, etc.
-  
+  // Para WhatSender (y la mayoría de extensiones), vamos a usar Phone y Message.
   const dataToExport = rows.map(r => ({
-    'WhatsApp Number': '+' + r.telefono, // Columna 1
-    'Mensaje Personalizado': r.mensaje,  // Columna 2 -> Será @value1
-    'Nombre': r.nombre,                  // Columna 3 -> Será @value2 (opcional)
-    'Deuda': r.deuda_total               // Columna 4 -> Será @value3 (opcional)
+    'Phone': r.telefono,
+    'Message': r.mensaje,
+    '@value1': r.mensaje // Añadimos una cabecera @value1 explícita por si WhatSender lee la cabecera en lugar de la posición
   }))
 
   const ws = XLSX.utils.json_to_sheet(dataToExport)
