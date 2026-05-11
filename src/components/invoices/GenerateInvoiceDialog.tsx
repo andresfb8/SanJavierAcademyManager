@@ -56,7 +56,7 @@ export function GenerateInvoiceDialog({
     new Set(preSelectedPaymentIds)
   )
   const [notes, setNotes] = useState('')
-  const [invoiceStatus, setInvoiceStatus] = useState<'issued' | 'paid'>('issued')
+  const [invoiceStatus, setInvoiceStatus] = useState<'issued' | 'paid'>('paid')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [isManualClient, setIsManualClient] = useState(false)

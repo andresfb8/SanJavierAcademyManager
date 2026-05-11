@@ -163,9 +163,15 @@ export function InvoiceDetailDialog({
             <h4 className="font-semibold mb-2">Cliente</h4>
             <div className="rounded-lg border p-3 space-y-1 text-sm">
               <p className="font-medium">{invoice.playerName}</p>
-              {invoice.customerNif && <p className="text-muted-foreground">NIF: {invoice.customerNif}</p>}
+              {invoice.customerNif && <p className="text-muted-foreground">NIF/DNI: {invoice.customerNif}</p>}
               {invoice.customerAddress && (
                 <p className="text-muted-foreground">{invoice.customerAddress}</p>
+              )}
+              {invoice.customerEmail && (
+                <p className="text-muted-foreground">Email: {invoice.customerEmail}</p>
+              )}
+              {invoice.customerPhone && (
+                <p className="text-muted-foreground">Tel: {invoice.customerPhone}</p>
               )}
             </div>
           </div>

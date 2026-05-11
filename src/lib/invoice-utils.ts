@@ -332,6 +332,8 @@ export async function generateInvoiceFromPayments(
     playerName: `${player.firstName} ${player.lastName}`,
     customerNif: player.dni || undefined,
     customerAddress: customerAddress || undefined,
+    customerEmail: player.email || undefined,
+    customerPhone: player.phone || undefined,
     lineItems,
     subtotal,
     totalVat,

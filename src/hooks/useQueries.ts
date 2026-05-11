@@ -263,14 +263,28 @@ export function useActivitiesQuery(limitCount = 50) {
     queryKey: ['activities', clubId, limitCount],
     queryFn: async () => {
       if (!clubId) return []
-      const q = query(
-        collection(db, 'activities'),
-        where('clubId', '==', clubId),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      )
-      const snap = await getDocs(q)
-      return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Activity))
+      try {
+        // Requiere índice (clubId ASC, createdAt DESC) en Firestore
+        const q = query(
+          collection(db, 'activities'),
+          where('clubId', '==', clubId),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        )
+        const snap = await getDocs(q)
+        return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Activity))
+      } catch {
+        // Fallback: si el índice aún no está activo, ordenar en cliente
+        const q = query(collection(db, 'activities'), where('clubId', '==', clubId))
+        const snap = await getDocs(q)
+        const acts = snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Activity))
+        acts.sort((a, b) => {
+          const ad = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt as unknown as string).getTime()
+          const bd = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt as unknown as string).getTime()
+          return bd - ad
+        })
+        return acts.slice(0, limitCount)
+      }
     },
     enabled: !!clubId
   })

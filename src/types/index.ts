@@ -567,8 +567,10 @@ export interface Invoice {
   // Cliente
   playerId: string
   playerName: string
-  customerNif?: string     // NIF del cliente si lo tiene
+  customerNif?: string     // NIF/DNI del cliente
   customerAddress?: string
+  customerEmail?: string   // Email del cliente
+  customerPhone?: string   // Teléfono del cliente
 
   // Líneas de factura
   lineItems: InvoiceLineItem[]

@@ -1761,7 +1761,7 @@ export const useDataStore = create<DataState>()(
               player,
               club,
               'FC',
-              { status: 'issued' }
+              { status: 'paid' }
             )
 
             await get().addInvoice(invoiceData)

@@ -118,10 +118,10 @@ function SortableHeader({
   )
 }
 
-import { useActivitiesQuery } from '@/hooks/useQueries'
-
 export default function ActivityLogPage() {
-  const { data: activities = [] } = useActivitiesQuery(2000)
+  // Las actividades ya están cargadas en el store via real-time sync
+  // No necesitamos una query separada (que requeriría un índice Firestore adicional)
+  const { activities } = useDataStore()
 
   const now = new Date()
   const [search, setSearch] = useState('')

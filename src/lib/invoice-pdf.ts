@@ -162,10 +162,12 @@ function drawCustomerInfo(
   doc.setFont('helvetica', 'normal')
 
   // Nombre
+  doc.setFont('helvetica', 'bold')
   doc.text(invoice.playerName || 'Cliente', MARGIN, y)
   y += 5
+  doc.setFont('helvetica', 'normal')
 
-  // NIF
+  // NIF/DNI
   if (invoice.customerNif) {
     doc.text(`NIF/DNI: ${invoice.customerNif}`, MARGIN, y)
     y += 5
@@ -178,6 +180,18 @@ function drawCustomerInfo(
       doc.text(line, MARGIN, y)
       y += 5
     })
+  }
+
+  // Email
+  if (invoice.customerEmail) {
+    doc.text(`Email: ${invoice.customerEmail}`, MARGIN, y)
+    y += 5
+  }
+
+  // Teléfono
+  if (invoice.customerPhone) {
+    doc.text(`Tel: ${invoice.customerPhone}`, MARGIN, y)
+    y += 5
   }
 
   return y + 8
