@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +15,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore } from '@/stores/authStore'
 import { PLAYER_LEVELS } from '@/constants'
 import {
   ArrowLeft,
@@ -29,15 +30,17 @@ import {
   CreditCard,
   Star,
   IdCard,
+  Edit as EditIcon,
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
-import { 
-  useAttendanceQuery, 
-  useActivitiesQuery, 
-  useMatchReportsQuery, 
+import {
+  useAttendanceQuery,
+  useActivitiesQuery,
+  useMatchReportsQuery,
   useInvoicesQuery
 } from '@/hooks/useQueries'
 import { calculateEventSalary } from '@/lib/salary-utils'
+import { CoachSelfEditDialog } from '@/components/coach/CoachSelfEditDialog'
 
 // ==========================================
 // CoachProfilePage - Perfil del entrenador
@@ -47,12 +50,15 @@ import { calculateEventSalary } from '@/lib/salary-utils'
 export default function CoachProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
-  const { 
-    coaches, 
-    groups, 
-    coachSalaryConfigs, 
-    privateLessons, 
+  const {
+    coaches,
+    groups,
+    coachSalaryConfigs,
+    privateLessons,
     events,
     eventPayments,
     clubTransactions: allTransactions,
@@ -154,16 +160,33 @@ export default function CoachProfilePage() {
     )
   }
 
+  // Un entrenador solo puede editar su propio perfil
+  const isOwnProfile = useMemo(() => {
+    if (!user || activeRole !== 'entrenador') return false
+    const linked = coaches.find(c => c.userId === user.id || c.email?.toLowerCase() === user.email?.toLowerCase())
+    return linked?.id === id
+  }, [user, activeRole, coaches, id])
+
   return (
     <div>
       <Header
         title={`${coach.firstName} ${coach.lastName}`}
         subtitle={coach.specialization || 'Entrenador'}
         actions={
-          <Button variant="outline" size="sm" onClick={() => navigate('/entrenadores')}>
-            <ArrowLeft className="h-4 w-4 sm:mr-1" />
-            <span className="hidden sm:inline">Volver</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {isOwnProfile && (
+              <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
+                <EditIcon className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Editar</span>
+              </Button>
+            )}
+            {activeRole !== 'entrenador' && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/entrenadores')}>
+                <ArrowLeft className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Volver</span>
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -584,6 +607,15 @@ export default function CoachProfilePage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Dialog — solo para entrenador en su propio perfil */}
+      {isOwnProfile && (
+        <CoachSelfEditDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          coach={coach}
+        />
+      )}
     </div>
   )
 }

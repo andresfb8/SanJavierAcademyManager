@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { CancelPlayerDialog } from '@/components/shared/CancelPlayerDialog'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
 import { ImportPlayersDialog, type ImportedPlayer } from '@/components/shared/ImportPlayersDialog'
 import { Button } from '@/components/ui/button'
@@ -29,15 +30,16 @@ import type { Player, PlayerLevel, PlayerStatus } from '@/types'
 import {
   Plus, Search, Upload, Download, Users, Mail, Phone,
   MoreHorizontal, Eye, Edit, Trash2, UserX, CheckCircle2,
-  Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
+  Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Gamepad2,
 } from 'lucide-react'
 
 export default function PlayersPage() {
   const navigate = useNavigate()
-  const { players, addPlayer, updatePlayer, cancelPlayer, deletePlayer } = useDataStore()
+  const { players, addPlayer, updatePlayer, cancelPlayer, deletePlayer, invitePlayer } = useDataStore()
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [portalFilter, setPortalFilter] = useState<string>('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
@@ -65,9 +67,15 @@ export default function PlayersPage() {
         p.phone.includes(search)
       const matchesLevel = levelFilter === '' || p.level === levelFilter
       const matchesStatus = statusFilter === '' || p.status === statusFilter
-      return matchesSearch && matchesLevel && matchesStatus
+      const matchesPortal =
+        portalFilter === '' ? true :
+        portalFilter === 'active' ? p.invitationStatus === 'active' :
+        portalFilter === 'sent' ? p.invitationStatus === 'sent' :
+        portalFilter === 'none' ? !p.invitationStatus || p.invitationStatus === 'pending' :
+        true
+      return matchesSearch && matchesLevel && matchesStatus && matchesPortal
     })
-  }, [players, search, levelFilter, statusFilter])
+  }, [players, search, levelFilter, statusFilter, portalFilter])
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -131,8 +139,6 @@ export default function PlayersPage() {
     setShowCreateDialog(false)
     setEditingPlayer(null)
   }
-
-  const { invitePlayer } = useDataStore()
 
   const handleImport = async (importedPlayers: ImportedPlayer[]) => {
     for (const p of importedPlayers) {
@@ -299,6 +305,18 @@ export default function PlayersPage() {
               <DropdownMenuItem onClick={() => { setEditingPlayer(player); setShowCreateDialog(true) }}>
                 <Edit className="h-4 w-4 mr-2" /> Editar
               </DropdownMenuItem>
+              {player.email && player.invitationStatus !== 'active' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => invitePlayer(player.id)}
+                    className="text-blue-700 focus:text-blue-700"
+                  >
+                    <Gamepad2 className="h-4 w-4 mr-2" />
+                    {player.invitationStatus === 'sent' ? 'Reenviar invitación' : 'Invitar al portal'}
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               {player.status === 'activo' && (
                 <DropdownMenuItem onClick={() => setShowCancelConfirm(player.id)}>
@@ -316,7 +334,7 @@ export default function PlayersPage() {
       enableSorting: false,
       size: 40,
     },
-  ], [selectedIds, filteredPlayers.length, navigate])
+  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer])
 
   const table = useReactTable({
     data: filteredPlayers,
@@ -366,13 +384,24 @@ export default function PlayersPage() {
             options={[{ value: '', label: 'Todos los niveles' }, ...PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label }))]}
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
-            className="w-full sm:w-48"
+            className="w-full sm:w-40"
           />
           <Select
             options={[{ value: '', label: 'Todos los estados' }, ...PLAYER_STATUSES.map((s) => ({ value: s.value, label: s.label }))]}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full sm:w-48"
+            className="w-full sm:w-40"
+          />
+          <Select
+            options={[
+              { value: '', label: 'Portal: todos' },
+              { value: 'active', label: 'Portal activo' },
+              { value: 'sent', label: 'Invitación enviada' },
+              { value: 'none', label: 'Sin acceso' },
+            ]}
+            value={portalFilter}
+            onChange={(e) => setPortalFilter(e.target.value)}
+            className="w-full sm:w-44"
           />
         </div>
 
@@ -563,15 +592,13 @@ export default function PlayersPage() {
         }}
       />
 
-      {/* Cancel Confirm */}
-      <ConfirmDialog
+      {/* Cancel Player Dialog */}
+      <CancelPlayerDialog
         open={!!showCancelConfirm}
-        onOpenChange={() => setShowCancelConfirm(null)}
-        title="Dar de baja"
-        description="El jugador sera dado de baja. Se aplicara la logica de facturacion segun la fecha actual (antes o despues del dia 5 del mes)."
-        confirmLabel="Dar de baja"
-        onConfirm={() => {
-          if (showCancelConfirm) cancelPlayer(showCancelConfirm)
+        onOpenChange={(open) => { if (!open) setShowCancelConfirm(null) }}
+        player={players.find((p) => p.id === showCancelConfirm) ?? null}
+        onConfirm={(options) => {
+          if (showCancelConfirm) cancelPlayer(showCancelConfirm, options)
           setShowCancelConfirm(null)
         }}
       />

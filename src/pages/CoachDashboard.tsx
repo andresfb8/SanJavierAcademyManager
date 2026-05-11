@@ -19,21 +19,28 @@ import {
   Bell,
   Trophy,
   GraduationCap,
-  Plus
+  Plus,
+  Euro,
+  ClipboardList,
 } from 'lucide-react'
+import { calculateEventSalary } from '@/lib/salary-utils'
+import { formatCurrency } from '@/lib/utils'
 
 export default function CoachDashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const { 
-    players, 
-    groups, 
-    enrollments, 
+  const {
+    players,
+    groups,
+    enrollments,
     coaches,
     privateLessons,
     attendanceNotices,
     activities,
-    attendance
+    attendance,
+    coachSalaryConfigs,
+    events,
+    eventPayments,
   } = useDataStore()
 
   const now = new Date()
@@ -127,6 +134,58 @@ export default function CoachDashboard() {
     return activities.filter(a => a.userId === user?.id && a.type !== 'payment_received')
   }, [activities, user?.id])
 
+  // -- Salario estimado del mes --
+  const estimatedSalary = useMemo(() => {
+    if (!currentCoachId) return null
+    const salaryConfig = coachSalaryConfigs.find(c => c.coachId === currentCoachId)
+    if (!salaryConfig) return null
+    const coachGroups = groups.filter(g => g.coachId === currentCoachId && g.isActive)
+    const adultGroups = coachGroups.filter(g => g.level !== 'menores').length
+    const minorGroups = coachGroups.filter(g => g.level === 'menores').length
+    const groupsSalary = adultGroups * (salaryConfig.ratePerGroupAdults || 0) + minorGroups * (salaryConfig.ratePerGroupMinors || 0)
+    const monthlyLessons = privateLessons.filter(
+      pl => pl.coachId === currentCoachId &&
+        new Date(pl.date).getMonth() === now.getMonth() &&
+        new Date(pl.date).getFullYear() === now.getFullYear()
+    )
+    const lessonsSalary = monthlyLessons.reduce((acc, lesson) =>
+      salaryConfig.privateLessonPaymentType === 'fixed'
+        ? acc + (salaryConfig.privateLessonRate || 0)
+        : acc + (lesson.price * ((salaryConfig.privateLessonRate || 0) / 100))
+    , 0)
+    const monthlyEvents = events.filter(
+      ev => ev.coachIds.includes(currentCoachId) &&
+        new Date(ev.date).getMonth() === now.getMonth() &&
+        new Date(ev.date).getFullYear() === now.getFullYear()
+    )
+    const eventsSalary = monthlyEvents.reduce((acc, ev) => acc + calculateEventSalary(ev, eventPayments, salaryConfig), 0)
+    return groupsSalary + lessonsSalary + eventsSalary + (salaryConfig.bonuses || 0)
+  }, [currentCoachId, coachSalaryConfigs, groups, privateLessons, events, eventPayments])
+
+  // -- Todas las clases de hoy --
+  const todayClasses = useMemo(() => {
+    if (!currentCoachId) return []
+    const dayOfWeek = now.getDay()
+    const todayStr = now.toDateString()
+    return groups
+      .filter(g => g.isActive && g.coachId === currentCoachId)
+      .flatMap(group =>
+        group.schedule
+          .filter(s => s.dayOfWeek === dayOfWeek)
+          .map(slot => {
+            const [h, m] = slot.startTime.split(':').map(Number)
+            const classStart = new Date(now)
+            classStart.setHours(h, m, 0, 0)
+            const attRecord = attendance.find(a =>
+              a.groupId === group.id && new Date(a.date).toDateString() === todayStr
+            )
+            const enrolledCount = enrollments.filter(e => e.groupId === group.id && e.isActive).length
+            return { group, slot, classStart, attRecord, enrolledCount, isMarked: !!attRecord && attRecord.records.length > 0 }
+          })
+      )
+      .sort((a, b) => a.classStart.getTime() - b.classStart.getTime())
+  }, [currentCoachId, groups, attendance, enrollments])
+
   if (!currentCoachId) {
     return (
       <div className="p-6">
@@ -210,7 +269,71 @@ export default function CoachDashboard() {
         {/* -- Widget Pasar Lista Rápido -- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7 space-y-6">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Asistencia Rápida</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                Clases de Hoy
+                {todayClasses.length > 0 && (
+                  <span className="ml-2 normal-case font-bold text-slate-300">({todayClasses.length})</span>
+                )}
+              </h3>
+              {todayClasses.length > 0 && (
+                <button
+                  onClick={() => navigate('/asistencia')}
+                  className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+                >
+                  Ver todas
+                </button>
+              )}
+            </div>
+
+            {/* Lista de todas las clases de hoy */}
+            {todayClasses.length > 0 && (
+              <div className="space-y-3">
+                {todayClasses.map(({ group, slot, classStart, isMarked, enrolledCount }) => {
+                  const isActive = activeClass?.id === group.id
+                  return (
+                    <div
+                      key={`${group.id}-${slot.startTime}`}
+                      className={cn(
+                        'flex items-center gap-4 rounded-2xl border p-4 transition-all',
+                        isActive ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100',
+                      )}
+                    >
+                      <div className={cn(
+                        'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-black',
+                        isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500',
+                      )}>
+                        {slot.startTime.slice(0, 5)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn('text-sm font-bold truncate', isActive ? 'text-emerald-900' : 'text-slate-800')}>
+                          {group.name}
+                          {isActive && <span className="ml-2 text-[10px] font-black text-emerald-600 uppercase">● En curso</span>}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {slot.startTime}–{slot.endTime} · {group.courtName} · {enrolledCount} alumnos
+                        </p>
+                      </div>
+                      {isMarked ? (
+                        <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold shrink-0">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Lista
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/asistencia?groupId=${group.id}`)}
+                          className="shrink-0 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-black hover:bg-black transition-colors"
+                        >
+                          Pasar lista
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Clase activa con widget detallado (solo si hay) */}
             {activeClass ? (
               <Card className="border-none shadow-xl shadow-primary/5 rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-slate-100">
                 <CardHeader className="pb-4 px-8 pt-8">
@@ -287,19 +410,37 @@ export default function CoachDashboard() {
                   </Button>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50">
+            ) : todayClasses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50">
                 <div className="h-16 w-16 rounded-3xl bg-white shadow-sm flex items-center justify-center mb-4">
                   <CalendarCheck className="h-8 w-8 text-slate-300" />
                 </div>
-                <p className="text-sm font-bold text-slate-400">No hay clases activas ahora mismo</p>
+                <p className="text-sm font-bold text-slate-400">Sin clases programadas hoy</p>
                 <Button variant="link" onClick={() => navigate('/agenda')} className="text-xs text-primary font-black uppercase tracking-widest mt-2">Ver mi agenda</Button>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="lg:col-span-5 space-y-8">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Mi Rendimiento</h3>
+
+            {/* Salario estimado */}
+            {estimatedSalary !== null && (
+              <div
+                className="flex items-center gap-4 rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-100 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => navigate(`/entrenadores/${currentCoachId}`)}
+              >
+                <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+                  <Euro className="h-6 w-6 text-emerald-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-2xl font-black text-slate-900 leading-none">{formatCurrency(estimatedSalary)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mt-1">Estimación mensual · Ver detalle</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <StatCard
                 title="Horas Trabajadas"

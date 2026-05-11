@@ -4,7 +4,7 @@
 // Genera PDFs de facturas según estándares fiscales españoles
 // con desglose de IVA y formato profesional
 
-import { jsPDF } from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { Invoice, Club } from '@/types'
 import { ensureDate } from './utils'
 
@@ -411,13 +411,14 @@ function drawLegalFooter(
 /**
  * Genera y descarga un PDF de factura en formato español
  */
-export function generateInvoicePDF(invoice: Invoice, club: Club): void {
+export async function generateInvoicePDF(invoice: Invoice, club: Club): Promise<void> {
   try {
-    const doc = new jsPDF({
+    const { jsPDF: JsPDF } = await import('jspdf')
+    const doc = new JsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
-    })
+    }) as unknown as jsPDF
 
     let y = MARGIN
 

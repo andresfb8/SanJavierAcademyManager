@@ -63,9 +63,9 @@ export function InvoiceDetailDialog({
     })
   }
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!club) return
-    generateInvoicePDF(invoice, club)
+    await generateInvoicePDF(invoice, club)
   }
 
   const handleChangeStatus = async (newStatus: InvoiceStatus) => {

@@ -136,7 +136,7 @@ export default function GroupsPage() {
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const clubName = user?.clubId || 'San Javier Academy'
 
     const groupsData = filteredGroups.map((group) => {
@@ -154,7 +154,7 @@ export default function GroupsPage() {
       }
     })
 
-    generateGroupsListReport({
+    await generateGroupsListReport({
       clubName,
       groups: groupsData,
     })

@@ -9,9 +9,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
+import { PlayerSelfEditDialog } from '@/components/player/PlayerSelfEditDialog'
+import { SeasonPaymentDialog } from '@/components/shared/SeasonPaymentDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw, Send, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw, Send, CheckCircle2, CalendarRange } from 'lucide-react'
 import { cn, formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
+import { toast } from '@/hooks/use-toast'
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
 import { useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
@@ -75,15 +78,16 @@ const attendanceStatusLabels: Record<string, string> = {
 export default function PlayerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { 
-    players, 
-    enrollments, 
-    groups, 
-    updatePlayer, 
+  const {
+    players,
+    enrollments,
+    groups,
+    updatePlayer,
     invitePlayer,
     payments: allBasePayments,
     attendance,
-    evaluations
+    evaluations,
+    generateScheduledInstallments,
   } = useDataStore()
   const { user, isDataLoading } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
@@ -95,6 +99,7 @@ export default function PlayerProfilePage() {
 
 
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showSeasonPaymentDialog, setShowSeasonPaymentDialog] = useState(false)
   const [viewingEvaluation, setViewingEvaluation] = useState<Evaluation | null>(null)
 
   const player = useMemo(() => players.find((p) => p.id === id), [players, id])
@@ -119,6 +124,37 @@ export default function PlayerProfilePage() {
     if (!player) return []
     return enrollments.filter((e) => e.playerId === player.id && e.isActive)
   }, [enrollments, player])
+
+  // Installments programadas pero aún no generadas como recibo
+  const ungeneratedInstallments = useMemo(() => {
+    if (!player) return []
+    const result: { enrollmentId: string; groupName: string; key: string; year: number; month: number; amount: number }[] = []
+    const existingKeys = new Set(
+      allBasePayments
+        .filter((p) => p.playerId === player.id)
+        .map((p) => `${p.enrollmentId}__${p.billingYear}-${String(p.billingMonth).padStart(2, '0')}`)
+    )
+    for (const enrollment of activeEnrollments) {
+      const group = groups.find((g) => g.id === enrollment.groupId)
+      if (!group || group.billingFrequency !== 'installments' || !group.installmentPrices) continue
+      Object.entries(group.installmentPrices)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([key, amount]) => {
+          const lookupKey = `${enrollment.id}__${key}`
+          if (existingKeys.has(lookupKey)) return
+          const [yearStr, monthStr] = key.split('-')
+          result.push({
+            enrollmentId: enrollment.id,
+            groupName: enrollment.groupName,
+            key,
+            year: parseInt(yearStr),
+            month: parseInt(monthStr),
+            amount: enrollment.customPrice ?? amount,
+          })
+        })
+    }
+    return result
+  }, [player, allBasePayments, activeEnrollments, groups])
 
   // All enrollments for groups tab
   const playerEnrollments = useMemo(() => {
@@ -510,10 +546,85 @@ export default function PlayerProfilePage() {
           {/* ================================ */}
           {/* TAB: Facturacion                 */}
           {/* ================================ */}
-          <TabsContent value="facturacion">
+          <TabsContent value="facturacion" className="space-y-4">
+            {/* Pagos programados pendientes de generar (solo para tarifas por plazos) */}
+            {activeRole !== 'jugador' && activeRole !== 'tutor' && ungeneratedInstallments.length > 0 && (
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CalendarRange className="h-4 w-4 text-amber-600" />
+                      Pagos de la temporada sin generar
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {ungeneratedInstallments.length} cuota{ungeneratedInstallments.length > 1 ? 's' : ''} definidas en la tarifa que aún no tienen recibo.
+                      Genéralos para poder marcarlos como pagados cuando el padre abone la temporada completa.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 border-amber-300 bg-white hover:bg-amber-50"
+                    onClick={() => {
+                      const enrollmentIds = [...new Set(ungeneratedInstallments.map((i) => i.enrollmentId))]
+                      let total = 0
+                      enrollmentIds.forEach((eid) => { total += generateScheduledInstallments(eid) })
+                      toast.success(`${total} recibo${total !== 1 ? 's' : ''} generado${total !== 1 ? 's' : ''}. Márcalos como pagados desde aquí o desde Pagos.`)
+                    }}
+                  >
+                    Generar todos
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-amber-100/60">
+                          <th className="p-3 text-left text-xs font-medium text-amber-700">Mes</th>
+                          <th className="p-3 text-left text-xs font-medium text-amber-700">Grupo</th>
+                          <th className="p-3 text-right text-xs font-medium text-amber-700">Importe</th>
+                          <th className="p-3 text-right text-xs font-medium text-amber-700"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ungeneratedInstallments.map((item) => (
+                          <tr key={`${item.enrollmentId}-${item.key}`} className="border-b last:border-0">
+                            <td className="p-3 text-sm text-slate-700">
+                              {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][item.month - 1]} {item.year}
+                            </td>
+                            <td className="p-3 text-sm text-muted-foreground">{item.groupName}</td>
+                            <td className="p-3 text-sm text-right font-medium">{formatCurrency(item.amount)}</td>
+                            <td className="p-3 text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs h-7 text-amber-700 hover:text-amber-900 hover:bg-amber-100"
+                                onClick={() => {
+                                  generateScheduledInstallments(item.enrollmentId)
+                                  toast.success(`Cuota de ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][item.month - 1]} ${item.year} creada como pendiente.`)
+                                }}
+                              >
+                                Generar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Historial de pagos</CardTitle>
+                {activeRole !== 'jugador' && activeRole !== 'tutor' && (
+                  <Button variant="outline" size="sm" onClick={() => setShowSeasonPaymentDialog(true)}>
+                    <CalendarRange className="h-4 w-4 mr-1" />
+                    Pago libre
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="p-0">
                 {playerPayments.length === 0 ? (
@@ -834,13 +945,31 @@ export default function PlayerProfilePage() {
         </Tabs>
       </div>
 
-      {/* Edit Dialog */}
-      <PlayerFormDialog
-        open={showEditDialog}
-        onOpenChange={setShowEditDialog}
-        player={player}
-        onSubmit={handleEditSubmit}
-      />
+      {/* Season Payment Dialog — solo para staff */}
+      {activeRole !== 'jugador' && activeRole !== 'tutor' && (
+        <SeasonPaymentDialog
+          open={showSeasonPaymentDialog}
+          onOpenChange={setShowSeasonPaymentDialog}
+          playerId={player.id}
+          playerName={`${player.firstName} ${player.lastName}`}
+        />
+      )}
+
+      {/* Edit Dialog — restringido para jugador/tutor, completo para staff */}
+      {activeRole === 'jugador' || activeRole === 'tutor' ? (
+        <PlayerSelfEditDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          player={player}
+        />
+      ) : (
+        <PlayerFormDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          player={player}
+          onSubmit={handleEditSubmit}
+        />
+      )}
     </div>
   )
 }

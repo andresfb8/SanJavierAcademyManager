@@ -52,10 +52,10 @@ export function PlayerPaymentsList({ playerId }: PlayerPaymentsListProps) {
     )
   }
 
-  const handleDownloadInvoice = (invoiceId: string) => {
+  const handleDownloadInvoice = async (invoiceId: string) => {
     const invoice = invoices.find(inv => inv.id === invoiceId)
     if (invoice && club) {
-      generateInvoicePDF(invoice, club)
+      await generateInvoicePDF(invoice, club)
     }
   }
 

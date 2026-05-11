@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react'
-import * as XLSX from 'xlsx'
 import {
   Dialog,
   DialogContent,
@@ -60,8 +59,9 @@ export function SepaImportDialog({
     if (!file) return
 
     const reader = new FileReader()
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
+        const XLSX = await import('xlsx')
         const bstr = evt.target?.result
         const wb = XLSX.read(bstr, { type: 'binary' })
         const wsname = wb.SheetNames[0]

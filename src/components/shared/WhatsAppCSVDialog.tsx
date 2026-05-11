@@ -34,8 +34,8 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
     [payments, players, plantilla]
   )
 
-  const handleDescargar = () => {
-    descargarCSV(rows)
+  const handleDescargar = async () => {
+    await descargarCSV(rows)
   }
 
   return (
@@ -100,9 +100,9 @@ export function WhatsAppCSVDialog({ open, onOpenChange }: WhatsAppCSVDialogProps
                     <div className="flex items-center gap-3 text-muted-foreground">
                       <span className="text-xs">{r.telefono}</span>
                       <Badge variant="destructive" className="text-xs">{r.deuda_total}€</Badge>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         className="h-7 px-2 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
                         onClick={() => window.open(`https://api.whatsapp.com/send?phone=${r.telefono}&text=${encodeURIComponent(r.mensaje)}`, '_blank')}
                       >

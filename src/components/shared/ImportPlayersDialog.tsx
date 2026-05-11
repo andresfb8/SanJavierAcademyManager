@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, X } from 'lucide-react'
 import { parseExcelSerialDate } from '@/lib/excel'
-import ExcelJS from 'exceljs'
 
 interface ImportedPlayer {
   firstName: string
@@ -165,6 +164,7 @@ function ImportPlayersDialog({ open, onOpenChange, onImport }: ImportPlayersDial
 
   const processWorkbook = useCallback(async (data: Uint8Array, name: string) => {
     try {
+      const { default: ExcelJS } = await import('exceljs')
       const wb = new ExcelJS.Workbook()
       await wb.xlsx.load(data.buffer as ArrayBuffer)
       const ws = wb.worksheets[0]

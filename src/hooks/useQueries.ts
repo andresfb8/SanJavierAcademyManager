@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { collection, query, where, getDocs, QueryConstraint } from 'firebase/firestore'
+import { collection, query, where, getDocs, orderBy, limit, QueryConstraint } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { fromFirestore } from '@/lib/firestoreSync'
 import { normalizeAllPayments, type NormalizedPayment } from '@/lib/payment-utils'
@@ -263,17 +263,14 @@ export function useActivitiesQuery(limitCount = 50) {
     queryKey: ['activities', clubId, limitCount],
     queryFn: async () => {
       if (!clubId) return []
-      const q = query(collection(db, 'activities'), where('clubId', '==', clubId))
+      const q = query(
+        collection(db, 'activities'),
+        where('clubId', '==', clubId),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      )
       const snap = await getDocs(q)
-      const acts = snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Activity))
-      
-      // Sort client-side for simplicity, then slice
-      acts.sort((a,b) => {
-        const ad = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
-        const bd = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
-        return bd - ad
-      })
-      return acts.slice(0, limitCount)
+      return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as Activity))
     },
     enabled: !!clubId
   })

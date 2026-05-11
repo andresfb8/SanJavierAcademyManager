@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import type { Payment, Player } from '@/types'
 import { MONTHS } from '@/constants'
 
@@ -100,12 +99,12 @@ export function generateWhatsAppCSV(
  * Descarga el CSV en el formato que esperan las extensiones.
  * Columnas requeridas: telefono, mensaje
  */
-export function descargarCSV(rows: WhatsAppRow[], filename = 'morosos-whatsapp.xlsx') {
-  // Para WhatSender (y la mayoría de extensiones), vamos a usar Phone y Message.
+export async function descargarCSV(rows: WhatsAppRow[], filename = 'morosos-whatsapp.xlsx'): Promise<void> {
+  const XLSX = await import('xlsx')
   const dataToExport = rows.map(r => ({
     'Phone': r.telefono,
     'Message': r.mensaje,
-    '@value1': r.mensaje // Añadimos una cabecera @value1 explícita por si WhatSender lee la cabecera en lugar de la posición
+    '@value1': r.mensaje,
   }))
 
   const ws = XLSX.utils.json_to_sheet(dataToExport)

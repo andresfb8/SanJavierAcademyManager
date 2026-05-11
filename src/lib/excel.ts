@@ -1,5 +1,3 @@
-import ExcelJS from 'exceljs'
-
 /**
  * Downloads an array of objects as an .xlsx file using ExcelJS.
  * Safe replacement for xlsx/SheetJS.
@@ -9,12 +7,13 @@ export async function downloadXlsx(
     sheetName: string,
     fileName: string
 ): Promise<void> {
+    const { default: ExcelJS } = await import('exceljs')
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet(sheetName)
 
     if (rows.length === 0) {
         const buf = await wb.xlsx.writeBuffer()
-        triggerDownload(buf, fileName)
+        triggerDownload(buf as ArrayBuffer, fileName)
         return
     }
 
@@ -28,7 +27,7 @@ export async function downloadXlsx(
     }
 
     const buf = await wb.xlsx.writeBuffer()
-    triggerDownload(buf, fileName)
+    triggerDownload(buf as ArrayBuffer, fileName)
 }
 
 /**
@@ -39,16 +38,17 @@ export async function downloadXlsxAoa(
     sheetName: string,
     fileName: string
 ): Promise<void> {
+    const { default: ExcelJS } = await import('exceljs')
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet(sheetName)
     for (const row of aoa) {
-        ws.addRow(row as ExcelJS.CellValue[])
+        ws.addRow(row as (string | number | boolean | Date | null)[])
     }
     const buf = await wb.xlsx.writeBuffer()
-    triggerDownload(buf, fileName)
+    triggerDownload(buf as ArrayBuffer, fileName)
 }
 
-function triggerDownload(buffer: ExcelJS.Buffer, fileName: string): void {
+function triggerDownload(buffer: ArrayBuffer, fileName: string): void {
     const blob = new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     })

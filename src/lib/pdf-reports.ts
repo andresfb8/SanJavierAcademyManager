@@ -2,7 +2,7 @@
 // San Javier Academy Manager - Generación de PDFs
 // ==========================================
 
-import jsPDF from 'jspdf'
+import type { jsPDF } from 'jspdf'
 
 // --- Interfaces de datos para los informes ---
 
@@ -354,8 +354,9 @@ function drawKpiBox(
 // 1. Informe Mensual
 // ==========================================
 
-export function generateMonthlyReport(data: MonthlyReportData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+export async function generateMonthlyReport(data: MonthlyReportData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf')
+  const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as unknown as jsPDF
 
   const monthLabel = MONTH_NAMES[data.month - 1] ?? ''
   const subtitle = `${monthLabel} ${data.year}`
@@ -402,8 +403,9 @@ export function generateMonthlyReport(data: MonthlyReportData): void {
 // 2. Historial de Pagos del Jugador
 // ==========================================
 
-export function generatePlayerHistoryReport(data: PlayerHistoryData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+export async function generatePlayerHistoryReport(data: PlayerHistoryData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf')
+  const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as unknown as jsPDF
 
   // Header
   let y = drawHeader(doc, data.clubName, `Historial de Pagos - ${data.playerName}`)
@@ -485,8 +487,9 @@ export function generatePlayerHistoryReport(data: PlayerHistoryData): void {
 // 3. Informe Anual
 // ==========================================
 
-export function generateAnnualReport(data: AnnualReportData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+export async function generateAnnualReport(data: AnnualReportData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf')
+  const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as unknown as jsPDF
 
   // Header
   let y = drawHeader(doc, data.clubName, `Resumen Anual ${data.year}`)
@@ -540,8 +543,9 @@ export function generateAnnualReport(data: AnnualReportData): void {
 // 4. Listado de Grupos
 // ==========================================
 
-export function generateGroupsListReport(data: GroupListReportData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+export async function generateGroupsListReport(data: GroupListReportData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf')
+  const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as unknown as jsPDF
 
   // Header
   let y = drawHeader(doc, data.clubName, 'Listado de Grupos')
@@ -573,8 +577,9 @@ export function generateGroupsListReport(data: GroupListReportData): void {
 // 5. Detalle de Grupo
 // ==========================================
 
-export function generateGroupDetailReport(data: GroupDetailReportData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+export async function generateGroupDetailReport(data: GroupDetailReportData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf')
+  const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as unknown as jsPDF
 
   // Header
   let y = drawHeader(doc, data.clubName, `Detalle de Grupo - ${data.groupName}`)

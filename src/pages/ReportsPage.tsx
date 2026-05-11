@@ -16,9 +16,6 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useAttendanceQuery, useActivitiesQuery } from '@/hooks/useQueries'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import ExcelJS from 'exceljs'
 import { calculateEventSalary } from '@/lib/salary-utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 
@@ -274,9 +271,13 @@ export default function ReportsPage() {
   // PDF GENERATION
   // =====================================
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     setIsGenerating(true)
     try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const pageW = doc.internal.pageSize.getWidth()
       const margin = 15
@@ -542,6 +543,7 @@ export default function ReportsPage() {
   const generateExcel = async () => {
     setIsGeneratingExcel(true)
     try {
+      const { default: ExcelJS } = await import('exceljs')
       const workbook = new ExcelJS.Workbook()
       workbook.creator = club?.name ?? 'San Javier Academy'
       workbook.created = new Date()

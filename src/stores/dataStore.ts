@@ -134,7 +134,7 @@ export interface DataState {
   updatePlayer: (id: string, updates: Partial<Player>) => void
   invitePlayer: (id: string) => Promise<void>
   bulkInvitePlayers: (ids: string[]) => Promise<void>
-  cancelPlayer: (id: string) => void
+  cancelPlayer: (id: string, options?: { cancelCurrentMonthPayments: boolean }) => void
   deletePlayer: (id: string) => void
 
   // --- Coaches CRUD ---
@@ -158,6 +158,8 @@ export interface DataState {
   generatePartialReceipt: (enrollmentId: string, amount: number) => Promise<void>
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => void
   addManualPayment: (data: { playerId: string; playerName: string; concept: string; amount: number; category?: PaymentCategory; notes?: string }) => void
+  registerSeasonPayment: (data: { enrollmentId: string; startMonth: number; startYear: number; endMonth: number; endYear: number; totalAmount: number; paymentMethod: import('@/types').PaymentMethod; paidDate: Date; notes?: string }) => void
+  generateScheduledInstallments: (enrollmentId: string) => number
   updatePayment: (id: string, data: Partial<Payment>) => void
   deletePayment: (id: string) => void
   deleteEventPayment: (id: string) => void
@@ -548,21 +550,22 @@ export const useDataStore = create<DataState>()(
         enrollmentsToDelete.forEach((eid) => deleteFirestoreDoc('enrollments', eid))
       },
 
-      cancelPlayer: (playerId) => {
+      cancelPlayer: (playerId, options) => {
         const state = get()
         const player = state.players.find((p) => p.id === playerId)
         if (!player || player.status === 'baja') return
         const today = new Date()
-        const currentDay = today.getDate()
         const currentMonth = today.getMonth() + 1
         const currentYear = today.getFullYear()
 
+        // 1. Marcar jugador como baja
         set((prevState) => ({
           players: prevState.players.map((p) =>
             p.id === playerId ? { ...p, status: 'baja' as PlayerStatus, cancellationDate: today, updatedAt: today } : p
           ),
         }))
 
+        // 2. Desactivar matrículas y actualizar contadores de grupos
         const activeEnrollments = state.enrollments.filter((e) => e.playerId === playerId && e.isActive)
         const affectedGroupIds = activeEnrollments.map((e: any) => e.groupId)
 
@@ -575,9 +578,21 @@ export const useDataStore = create<DataState>()(
           ),
         }))
 
-        if (currentDay <= CANCELLATION_DEADLINE_DAY) {
+        // 3. Cancelar recibos del mes actual si el admin lo decide
+        if (options?.cancelCurrentMonthPayments) {
+          const currentMonthPendingPayments = get().payments.filter(
+            (p) =>
+              p.playerId === playerId &&
+              p.status === 'pendiente' &&
+              p.billingMonth === currentMonth &&
+              p.billingYear === currentYear
+          )
+          currentMonthPendingPayments.forEach((p) => {
+            get().updatePayment(p.id, { status: 'cancelado' })
+          })
         }
 
+        // 4. Persistir cambios en Firestore
         const clubId = getClubId()
         if (clubId) {
           const stateAfter = get()
@@ -589,6 +604,7 @@ export const useDataStore = create<DataState>()(
             if (g) syncDoc('groups', gid, g as any, clubId)
           })
         }
+
         const { userId, userName } = getCurrentUser()
         get().addActivity({
           type: 'player_cancelled',
@@ -1032,6 +1048,115 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         if (clubId) syncDoc('payments', newPayment.id, newPayment as any, clubId)
         queryClient.invalidateQueries({ queryKey: ['payments'] });
+      },
+
+      registerSeasonPayment: (data) => {
+        const state = get()
+        const enrollment = state.enrollments.find((e) => e.id === data.enrollmentId)
+        if (!enrollment) return
+
+        const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+        const { userName } = getCurrentUser()
+
+        // Calcular los meses del periodo
+        const months: { month: number; year: number }[] = []
+        let m = data.startMonth
+        let y = data.startYear
+        while (y < data.endYear || (y === data.endYear && m <= data.endMonth)) {
+          months.push({ month: m, year: y })
+          m++
+          if (m > 12) { m = 1; y++ }
+        }
+
+        if (months.length === 0) return
+
+        const amountPerMonth = Math.round((data.totalAmount / months.length) * 100) / 100
+
+        months.forEach(({ month, year }) => {
+          // Verificar que no exista ya un pago para este mes/matrícula
+          const existing = state.payments.find(
+            (p) => p.enrollmentId === data.enrollmentId && p.billingMonth === month && p.billingYear === year
+          )
+          if (existing) return // No sobreescribir recibos ya existentes
+
+          const dueDate = new Date(year, month - 1, 5)
+          get().addPayment({
+            playerId: enrollment.playerId,
+            playerName: enrollment.playerName,
+            groupId: enrollment.groupId,
+            groupName: enrollment.groupName,
+            enrollmentId: enrollment.id,
+            concept: `Cuota ${MONTH_NAMES[month - 1]} ${year} — ${enrollment.groupName} (temporada)`,
+            category: 'cuota',
+            amount: amountPerMonth,
+            status: 'pagado',
+            billingMonth: month,
+            billingYear: year,
+            dueDate,
+            paidDate: data.paidDate,
+            paymentMethod: data.paymentMethod,
+            autogenerated: false,
+            notes: data.notes,
+            registeredBy: userName,
+          })
+        })
+
+        const { userId } = getCurrentUser()
+        get().addActivity({
+          type: 'payment_received',
+          description: `Pago de temporada registrado para ${enrollment.playerName} (${enrollment.groupName}): ${data.totalAmount}€`,
+          relatedEntityId: enrollment.playerId,
+          userId,
+          userName,
+        })
+      },
+
+      generateScheduledInstallments: (enrollmentId) => {
+        const state = get()
+        const enrollment = state.enrollments.find((e) => e.id === enrollmentId)
+        if (!enrollment) return 0
+        const group = state.groups.find((g) => g.id === enrollment.groupId)
+        if (!group || group.billingFrequency !== 'installments' || !group.installmentPrices) return 0
+
+        const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+        const { userName } = getCurrentUser()
+
+        // Meses que ya tienen recibo para esta matrícula
+        const existingKeys = new Set(
+          state.payments
+            .filter((p) => p.enrollmentId === enrollmentId)
+            .map((p) => `${p.billingYear}-${String(p.billingMonth).padStart(2, '0')}`)
+        )
+
+        let created = 0
+        Object.entries(group.installmentPrices)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .forEach(([key, amount]) => {
+            if (existingKeys.has(key)) return
+            const [yearStr, monthStr] = key.split('-')
+            const year = parseInt(yearStr)
+            const month = parseInt(monthStr)
+            const dueDate = new Date(year, month - 1, 5)
+            get().addPayment({
+              playerId: enrollment.playerId,
+              playerName: enrollment.playerName,
+              groupId: enrollment.groupId,
+              groupName: enrollment.groupName,
+              enrollmentId: enrollment.id,
+              concept: `Cuota ${MONTH_NAMES[month - 1]} ${year} — ${enrollment.groupName}`,
+              category: 'cuota',
+              amount: enrollment.customPrice ?? amount,
+              status: 'pendiente',
+              billingMonth: month,
+              billingYear: year,
+              dueDate,
+              autogenerated: false,
+              registeredBy: userName,
+            })
+            created++
+          })
+
+        return created
       },
 
       updatePayment: (id, data) => {

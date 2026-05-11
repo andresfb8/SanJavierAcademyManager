@@ -118,9 +118,9 @@ export default function InvoicesPage() {
     setShowDetailDialog(true)
   }
 
-  const handleDownloadPDF = (invoice: Invoice) => {
+  const handleDownloadPDF = async (invoice: Invoice) => {
     if (!club) return
-    generateInvoicePDF(invoice, club)
+    await generateInvoicePDF(invoice, club)
   }
 
   const handleChangeStatus = (invoice: Invoice, newStatus: InvoiceStatus) => {

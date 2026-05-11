@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { useDataStore } from '@/stores/dataStore'
@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Award,
   ClipboardCheck,
+  BellOff,
 } from 'lucide-react'
 import { cn, formatDate, ensureDate } from '@/lib/utils'
 import type { AttendanceNotice } from '@/types'
@@ -28,6 +29,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { PlayerPaymentsList } from '@/components/player/PlayerPaymentsList'
 import { VoucherCard } from '@/components/vouchers/VoucherCard'
 import { PlayerProgressSheet } from '@/components/player/PlayerProgressSheet'
+import { ScheduleAbsenceDialog } from '@/components/player/ScheduleAbsenceDialog'
 import { usePlayerData } from '@/hooks/usePlayerData'
 import {
   MisGruposCard,
@@ -54,6 +56,7 @@ export default function PlayerDashboard() {
   const [showPayments, setShowPayments] = useState(false)
   const [showVouchers, setShowVouchers] = useState(false)
   const [showProgress, setShowProgress] = useState(false)
+  const [showAbsences, setShowAbsences] = useState(false)
 
   const {
     studentId,
@@ -92,6 +95,18 @@ export default function PlayerDashboard() {
     }
     addAttendanceNotice(newNotice)
   }
+
+  // ── Ausencias programadas (mis avisos de ausencia futuros) ───────────────
+  const myAbsenceCount = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return attendanceNotices.filter(
+      (n) =>
+        n.playerId === studentId &&
+        n.type === 'absent' &&
+        new Date(n.date instanceof Date ? n.date : n.date) >= today,
+    ).length
+  }, [attendanceNotices, studentId])
 
   // ── Quick Actions (Mobile & Desktop) ───────────────────────────────────────
   const quickActions = [
@@ -138,6 +153,13 @@ export default function PlayerDashboard() {
       onClick: () => {
         if (studentId) navigate(`/jugadores/${studentId}`)
       },
+    },
+    {
+      label: 'Mis Ausencias',
+      icon: BellOff,
+      sub: myAbsenceCount > 0 ? `${myAbsenceCount} avisada${myAbsenceCount > 1 ? 's' : ''}` : 'Programar aviso',
+      color: myAbsenceCount > 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500',
+      onClick: () => setShowAbsences(true),
     },
   ]
 
@@ -370,6 +392,24 @@ export default function PlayerDashboard() {
           </div>
         </div>
 
+        {/* Ausencias programadas (móvil) */}
+        {myAbsenceCount > 0 && (
+          <button
+            onClick={() => setShowAbsences(true)}
+            className="w-full flex items-center gap-3 bg-red-50 border border-red-100 rounded-2xl p-4 text-left hover:bg-red-100 transition-colors"
+          >
+            <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+              <BellOff className="h-5 w-5 text-red-500" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-black text-red-700">
+                {myAbsenceCount} ausencia{myAbsenceCount > 1 ? 's' : ''} avisada{myAbsenceCount > 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-red-400">Tu entrenador está informado · Toca para gestionar</p>
+            </div>
+          </button>
+        )}
+
         {/* Agenda Semanal */}
         <div className="space-y-4 pt-2">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-2">Mi Agenda Semanal</h3>
@@ -450,6 +490,35 @@ export default function PlayerDashboard() {
           <div className="col-span-1 space-y-4">
             {renderNextClassWidget()}
             <MisGruposCard groups={myGroups} />
+
+            {/* Ausencias programadas (desktop) */}
+            <button
+              onClick={() => setShowAbsences(true)}
+              className={cn(
+                'w-full flex items-center gap-3 rounded-2xl p-4 border text-left transition-colors',
+                myAbsenceCount > 0
+                  ? 'bg-red-50 border-red-100 hover:bg-red-100'
+                  : 'bg-white border-slate-100 hover:border-slate-200',
+              )}
+            >
+              <div className={cn(
+                'h-10 w-10 rounded-xl flex items-center justify-center shrink-0',
+                myAbsenceCount > 0 ? 'bg-red-100' : 'bg-slate-100',
+              )}>
+                <BellOff className={cn('h-5 w-5', myAbsenceCount > 0 ? 'text-red-500' : 'text-slate-400')} />
+              </div>
+              <div>
+                <p className={cn('text-sm font-bold', myAbsenceCount > 0 ? 'text-red-700' : 'text-slate-600')}>
+                  {myAbsenceCount > 0
+                    ? `${myAbsenceCount} ausencia${myAbsenceCount > 1 ? 's' : ''} programada${myAbsenceCount > 1 ? 's' : ''}`
+                    : 'Programar ausencia'}
+                </p>
+                <p className={cn('text-xs mt-0.5', myAbsenceCount > 0 ? 'text-red-400' : 'text-slate-400')}>
+                  {myAbsenceCount > 0 ? 'Tu entrenador está informado' : 'Avisa con antelación y gana recuperaciones'}
+                </p>
+              </div>
+            </button>
+
             {studentId && (
               <EstadoPagosCard
                 pendingCount={pendingPaymentsCount}
@@ -496,6 +565,20 @@ export default function PlayerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Ausencias Dialog */}
+      {studentId && (
+        <ScheduleAbsenceDialog
+          open={showAbsences}
+          onOpenChange={setShowAbsences}
+          myGroups={myGroups}
+          existingNotices={attendanceNotices}
+          studentId={studentId}
+          playerName={user?.displayName || 'Alumno'}
+          onAdd={addAttendanceNotice}
+          onDelete={deleteAttendanceNotice}
+        />
+      )}
 
       {/* ── SHEETS (shared mobile & desktop) ────────────────────────────── */}
       <PlayerProgressSheet

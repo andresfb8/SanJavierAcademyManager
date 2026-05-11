@@ -205,7 +205,7 @@ export default function GroupDetailPage() {
   }
 
   // Handle PDF export
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!group) return
 
     const clubName = user?.clubId || 'San Javier Academy'
@@ -235,7 +235,7 @@ export default function GroupDetailPage() {
       }
     }).filter((p) => p !== null) as { name: string; level: string; email: string; phone: string }[]
 
-    generateGroupDetailReport({
+    await generateGroupDetailReport({
       clubName,
       groupName: group.name,
       level: levelInfo?.label || group.level,
