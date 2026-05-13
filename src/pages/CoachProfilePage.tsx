@@ -301,9 +301,6 @@ export default function CoachProfilePage() {
                             >
                               Pasar Lista
                             </Button>
-                            <Button size="sm" variant="outline" className="rounded-full">Traspasar</Button>
-                            <Button size="sm" variant="outline" className="rounded-full text-amber-600 border-amber-200 hover:bg-amber-50">Bloquear</Button>
-                            <Button size="sm" variant="outline" className="rounded-full text-red-600 border-red-200 hover:bg-red-50">Cancelar</Button>
                           </div>
                         </div>
                       </div>
