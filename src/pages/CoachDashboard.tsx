@@ -16,6 +16,7 @@ import {
   CalendarCheck,
   CheckCircle2,
   ChevronRight,
+  ChevronDown,
   Bell,
   Trophy,
   GraduationCap,
@@ -44,6 +45,7 @@ export default function CoachDashboard() {
   } = useDataStore()
 
   const now = new Date()
+  const [activityCollapsed, setActivityCollapsed] = useState(false)
 
   // -- Coach identification --
   const currentCoachId = useMemo(() => {
@@ -476,17 +478,13 @@ export default function CoachDashboard() {
               />
             </div>
 
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Actividad Reciente</h3>
-            <Card className="border-none shadow-sm rounded-[1.5rem] overflow-hidden bg-white">
-              <ActivityFeed activities={visibleActivities} limit={5} />
-            </Card>
           </div>
         </div>
 
-        {/* -- Acciones Rápidas Finales -- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
-          <Button 
-            variant="outline" 
+        {/* -- Acciones Rápidas -- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Button
+            variant="outline"
             className="h-16 rounded-2xl border-slate-100 bg-white text-slate-700 font-bold justify-between px-6 hover:bg-slate-50"
             onClick={() => navigate('/informes')}
           >
@@ -498,8 +496,8 @@ export default function CoachDashboard() {
             </div>
             <ChevronRight className="h-4 w-4 opacity-30" />
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="h-16 rounded-2xl border-slate-100 bg-white text-slate-700 font-bold justify-between px-6 hover:bg-slate-50"
             onClick={() => navigate(`/entrenadores/${currentCoachId}`)}
           >
@@ -511,6 +509,27 @@ export default function CoachDashboard() {
             </div>
             <ChevronRight className="h-4 w-4 opacity-30" />
           </Button>
+        </div>
+
+        {/* -- Actividad Reciente (colapsable, siempre al final) -- */}
+        <div className="pb-8">
+          <button
+            onClick={() => setActivityCollapsed((v) => !v)}
+            className="flex items-center justify-between w-full mb-4 group"
+          >
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Actividad Reciente</h3>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 text-slate-400 transition-transform duration-200',
+                activityCollapsed ? '-rotate-90' : 'rotate-0'
+              )}
+            />
+          </button>
+          {!activityCollapsed && (
+            <Card className="border-none shadow-sm rounded-[1.5rem] overflow-hidden bg-white">
+              <ActivityFeed activities={visibleActivities} limit={5} />
+            </Card>
+          )}
         </div>
       </div>
     </div>

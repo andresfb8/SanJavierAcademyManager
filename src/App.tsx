@@ -149,7 +149,8 @@ export default function App() {
             <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsRouter /></RoleRoute>} />
             <Route path="/facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
             <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
-            <Route path="/entrenadores/:id" element={<RoleRoute module="coaches"><CoachProfilePage /></RoleRoute>} />
+            {/* Sin RoleRoute: los entrenadores pueden ver su propio perfil */}
+            <Route path="/entrenadores/:id" element={<CoachProfilePage />} />
             <Route path="/informes" element={<RoleRoute module="settings"><EvaluacionesPage /></RoleRoute>} />
             <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
             <Route path="/finanzas" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
