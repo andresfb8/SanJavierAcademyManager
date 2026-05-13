@@ -265,7 +265,7 @@ export function QuickAttendanceSheet({ group, date, onBack }: QuickAttendanceShe
                 <div
                   key={`${entry.playerId}-${entry.isRecovery ? 'rec' : 'reg'}`}
                   className={cn(
-                    'flex items-center gap-3 px-4 py-3 transition-colors',
+                    'px-4 py-3 transition-colors',
                     entry.status === 'presente'
                       ? 'bg-white'
                       : entry.status === 'ausente'
@@ -273,102 +273,99 @@ export function QuickAttendanceSheet({ group, date, onBack }: QuickAttendanceShe
                       : 'bg-amber-50/40'
                   )}
                 >
-                  {/* Avatar / Inicial */}
-                  <div
-                    className={cn(
-                      'h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-sm font-black',
-                      entry.status === 'presente'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : entry.status === 'ausente'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-amber-100 text-amber-700'
-                    )}
-                  >
-                    {entry.playerName.charAt(0)}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-semibold text-slate-800 truncate leading-tight">
-                        {entry.playerName}
-                      </span>
-                      {entry.isRecovery && (
-                        <Badge className="text-[9px] px-1.5 py-0 bg-blue-100 text-blue-700 border-none shrink-0">Rec.</Badge>
+                  {/* Fila superior: avatar + nombre + badges + teléfono */}
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <div
+                      className={cn(
+                        'h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-sm font-black',
+                        entry.status === 'presente'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : entry.status === 'ausente'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-amber-100 text-amber-700'
                       )}
-                      {notice && (
-                        <Badge
-                          variant={notice.type === 'absent' ? 'destructive' : 'secondary'}
-                          className="text-[9px] px-1.5 py-0 shrink-0 animate-pulse"
-                        >
-                          {notice.type === 'absent' ? '⚠ No viene' : '✓ Viene'}
-                        </Badge>
+                    >
+                      {entry.playerName.charAt(0)}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-base font-bold text-slate-800 leading-tight">
+                          {entry.playerName}
+                        </span>
+                        {entry.isRecovery && (
+                          <Badge className="text-[9px] px-1.5 py-0 bg-blue-100 text-blue-700 border-none shrink-0">Rec.</Badge>
+                        )}
+                        {notice && (
+                          <Badge
+                            variant={notice.type === 'absent' ? 'destructive' : 'secondary'}
+                            className="text-[9px] px-1.5 py-0 shrink-0 animate-pulse"
+                          >
+                            {notice.type === 'absent' ? '⚠ No viene' : '✓ Viene'}
+                          </Badge>
+                        )}
+                      </div>
+                      {player?.medicalNotes && (
+                        <p className="text-[10px] text-red-500 font-medium truncate flex items-center gap-1 mt-0.5">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          {player.medicalNotes}
+                        </p>
                       )}
                     </div>
-                    {player?.medicalNotes && (
-                      <p className="text-[10px] text-red-500 font-medium truncate flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3 shrink-0" />
-                        {player.medicalNotes}
-                      </p>
+
+                    {player?.phone && (
+                      <a
+                        href={`https://wa.me/${player.phone.replace(/\s+/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 rounded-lg hover:bg-green-50 text-slate-300 hover:text-green-600 transition-colors shrink-0"
+                        title="WhatsApp"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
                     )}
                   </div>
 
-                  {/* WhatsApp quick link */}
-                  {player?.phone && (
-                    <a
-                      href={`https://wa.me/${player.phone.replace(/\s+/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2 rounded-lg hover:bg-green-50 text-slate-300 hover:text-green-600 transition-colors shrink-0"
-                      title="WhatsApp"
-                    >
-                      <Phone className="h-4 w-4" />
-                    </a>
-                  )}
-
-                  {/* Status Buttons — área táctil mínima 48x48 */}
-                  <div className="flex gap-1 shrink-0">
-                    {/* Presente */}
+                  {/* Fila inferior: botones P/A/J a ancho completo */}
+                  <div className="flex gap-2 pl-13">
                     <button
                       type="button"
                       onClick={() => handleStatusChange(entry.playerId, 'presente')}
                       className={cn(
-                        'flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all min-h-[48px] min-w-[52px] justify-center active:scale-95',
+                        'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all active:scale-95',
                         entry.status === 'presente'
                           ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
                           : 'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'
                       )}
                     >
                       <CheckCircle className="h-4 w-4" />
-                      <span className="font-black">P</span>
+                      Presente
                     </button>
-                    {/* Ausente */}
                     <button
                       type="button"
                       onClick={() => handleStatusChange(entry.playerId, 'ausente')}
                       className={cn(
-                        'flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all min-h-[48px] min-w-[52px] justify-center active:scale-95',
+                        'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all active:scale-95',
                         entry.status === 'ausente'
                           ? 'bg-red-500 text-white shadow-sm shadow-red-200'
                           : 'bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600'
                       )}
                     >
                       <XCircle className="h-4 w-4" />
-                      <span className="font-black">A</span>
+                      Ausente
                     </button>
-                    {/* Justificado */}
                     <button
                       type="button"
                       onClick={() => handleStatusChange(entry.playerId, 'justificado')}
                       className={cn(
-                        'flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all min-h-[48px] min-w-[52px] justify-center active:scale-95',
+                        'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all active:scale-95',
                         entry.status === 'justificado'
                           ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
                           : 'bg-slate-100 text-slate-500 hover:bg-amber-50 hover:text-amber-600'
                       )}
                     >
                       <AlertCircle className="h-4 w-4" />
-                      <span className="font-black">J</span>
+                      Just.
                     </button>
                   </div>
                 </div>
