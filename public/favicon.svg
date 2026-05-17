@@ -1,4 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" fill="#2563eb"/>
-  <text x="50" y="68" font-family="Arial, sans-serif" font-size="50" font-weight="bold" fill="white" text-anchor="middle">SJ</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo azul royal -->
+  <rect width="512" height="512" rx="0" fill="#1B52C8"/>
+
+  <!-- Arco/swoosh principal — barre de arriba-izquierda hacia abajo-derecha -->
+  <path d="M 195 72 C 310 30 470 80 490 240 C 505 360 450 460 395 500"
+        fill="none" stroke="white" stroke-width="26" stroke-linecap="round"/>
+
+  <!-- Espiga decorativa sobre la S -->
+  <path d="M 183 118 L 196 78 L 210 118" fill="white" stroke="white" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- S grande — negrita itálica -->
+  <text x="72" y="345"
+        font-family="Arial Black, Impact, sans-serif"
+        font-size="255"
+        font-weight="900"
+        font-style="italic"
+        fill="white">S</text>
+
+  <!-- Barra conectora entre S y J -->
+  <rect x="178" y="245" width="165" height="30" rx="10" fill="white" transform="skewX(-12)"/>
+
+  <!-- J grande — negrita itálica -->
+  <text x="252" y="345"
+        font-family="Arial Black, Impact, sans-serif"
+        font-size="255"
+        font-weight="900"
+        font-style="italic"
+        fill="white">J</text>
+
+  <!-- C. PĀDEL -->
+  <text x="256" y="435"
+        font-family="Arial, sans-serif"
+        font-size="52"
+        font-weight="700"
+        font-style="italic"
+        fill="white"
+        text-anchor="middle"
+        letter-spacing="6">C. PĀDEL</text>
 </svg>
