@@ -1,4 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
+import { useNotificationSetup } from '@/hooks/useNotificationSetup'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
 import type { UserRole } from '@/types'
@@ -108,6 +109,9 @@ export default function App() {
     const unsubscribe = initAuth()
     return unsubscribe
   }, [initAuth])
+
+  // Solicita permiso de notificaciones y registra el token FCM tras login
+  useNotificationSetup()
 
   if (isLoading) {
     return <PageLoader />

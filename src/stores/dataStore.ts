@@ -106,6 +106,7 @@ export interface DataState {
   users: AppUser[]
   holidays: Holiday[]
   attendanceNotices: AttendanceNotice[]
+  cancelledClasses: import('@/types').CancelledClass[]
   vouchers: Voucher[]
   payments: Payment[]
   eventPayments: EventPayment[]
@@ -213,6 +214,8 @@ export interface DataState {
   deleteTransaction: (id: string) => Promise<void>
   deleteAttendanceNotice: (id: string) => void
   addAttendanceNotice: (noticeData: Omit<AttendanceNotice, 'id' | 'createdAt'>) => void
+  addCancelledClass: (data: Omit<import('@/types').CancelledClass, 'id' | 'createdAt'>) => void
+  deleteCancelledClass: (id: string) => void
 
   // --- Vouchers ---
   addVoucher: (voucherData: Omit<Voucher, 'id' | 'createdAt'>) => void
@@ -324,6 +327,7 @@ export const useDataStore = create<DataState>()(
       holidays: [],
       clubTransactions: [],
       attendanceNotices: [],
+      cancelledClasses: [],
       vouchers: [],
       payments: [],
       eventPayments: [],
@@ -1822,7 +1826,27 @@ export const useDataStore = create<DataState>()(
         }))
         deleteFirestoreDoc('attendanceNotices', id)
         queryClient.invalidateQueries({ queryKey: ['attendanceNotices'] })
-      }
+      },
+
+      addCancelledClass: (data) => {
+        const newDoc: import('@/types').CancelledClass = { ...data, id: generateId(), createdAt: new Date() }
+        set((state) => ({ cancelledClasses: [...state.cancelledClasses, newDoc] }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('cancelledClasses', newDoc.id, newDoc as any, clubId)
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'player_updated',
+          description: `Clase cancelada: ${data.groupName} (${data.date})${data.reason ? ` — ${data.reason}` : ''}`,
+          relatedEntityId: data.groupId,
+          userId,
+          userName,
+        })
+      },
+
+      deleteCancelledClass: (id) => {
+        set((state) => ({ cancelledClasses: state.cancelledClasses.filter((c) => c.id !== id) }))
+        deleteFirestoreDoc('cancelledClasses', id)
+      },
     }),
     {
       name: 'san-javier-academy-config',

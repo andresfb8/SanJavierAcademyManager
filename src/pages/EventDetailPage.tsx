@@ -145,14 +145,20 @@ export default function EventDetailPage() {
       attendeePlayerNames: [...event.attendeePlayerNames, playerName],
     })
 
-    addEventPayment({
-      eventId: event.id,
-      eventName: event.name,
-      playerId: player.id,
-      playerName,
-      amount: event.price,
-      status: 'pendiente',
-    })
+    // Solo crear el pago si no existe ya uno activo para este jugador en este evento
+    const alreadyHasPayment = thisEventPayments.some(
+      (ep) => ep.playerId === player.id && ep.status !== 'cancelado'
+    )
+    if (!alreadyHasPayment) {
+      addEventPayment({
+        eventId: event.id,
+        eventName: event.name,
+        playerId: player.id,
+        playerName,
+        amount: event.price,
+        status: 'pendiente',
+      })
+    }
 
     setSelectedPlayerId('')
   }

@@ -73,7 +73,14 @@ service cloud.firestore {
         (isAdmin() && request.resource.data.clubId == getClubId())
       );
 
-      allow update: if isAdmin() && resource.data.clubId == getClubId() && incomingBelongsToClub();
+      // Admins pueden actualizar cualquier campo.
+      // Usuarios autenticados solo pueden actualizar su propio campo fcmTokens (push notifications).
+      allow update: if (
+        request.auth.uid == userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens'])
+      ) || (
+        isAdmin() && resource.data.clubId == getClubId() && incomingBelongsToClub()
+      );
       allow delete: if isAdmin() && resource.data.clubId == getClubId();
     }
     
@@ -336,6 +343,12 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
   
+    // --- Cancelled Classes ---
+    match /cancelledClasses/{classId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAuthenticated() && (isAdmin() || hasRole('entrenador'));
+    }
+
     // --- Attendance Notices ---
     match /attendanceNotices/{noticeId} {
       allow read: if isAuthenticated();

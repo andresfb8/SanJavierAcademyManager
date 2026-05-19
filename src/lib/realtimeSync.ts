@@ -31,6 +31,7 @@ const COLLECTIONS = [
   { name: 'invoices', stateKey: 'invoices' },
   { name: 'attendance', stateKey: 'attendance' },
   { name: 'attendanceNotices', stateKey: 'attendanceNotices' },
+  { name: 'cancelledClasses', stateKey: 'cancelledClasses' },
   { name: 'vouchers', stateKey: 'vouchers' },
   { name: 'activities', stateKey: 'activities' },
   { name: 'evaluations', stateKey: 'evaluations' },

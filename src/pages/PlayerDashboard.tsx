@@ -13,6 +13,7 @@ import {
   User,
   CheckCircle2,
   XCircle,
+  HelpCircle,
   Trophy,
   ChevronRight,
   CreditCard,
@@ -50,6 +51,7 @@ export default function PlayerDashboard() {
     evaluations,
     matchReports,
     events,
+    cancelledClasses,
   } = useDataStore()
 
   const navigate = useNavigate()
@@ -80,7 +82,7 @@ export default function PlayerDashboard() {
       (ensureDate(n.date).toISOString().split('T')[0]) === nextClassDateStr
   )
 
-  const handleAttendanceNotice = (type: 'present' | 'absent') => {
+  const handleAttendanceNotice = (type: 'present' | 'absent' | 'uncertain') => {
     if (!studentId || !nextClass) return
     if (currentNotice) {
       deleteAttendanceNotice(currentNotice.id)
@@ -163,6 +165,13 @@ export default function PlayerDashboard() {
     },
   ]
 
+  // ── Comprobar si la próxima clase está cancelada ─────────────────────────
+  const nextClassCancelled = useMemo(() => {
+    if (!nextClass) return false
+    const dateStr = nextClass.classDate.toISOString().split('T')[0]
+    return cancelledClasses.some(c => c.groupId === nextClass.group.id && c.date === dateStr)
+  }, [nextClass, cancelledClasses])
+
   const renderNextClassWidget = () => {
     if (nextClass) {
       return (
@@ -194,59 +203,66 @@ export default function PlayerDashboard() {
             </div>
 
             <CardContent className="p-6 space-y-4">
-              {nextClass.diffHours <= 48 ? (
-                <>
-                  <div className="flex justify-between items-end mb-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">¿Asistirás a clase?</p>
-                    <span className="text-[10px] font-bold text-slate-300">Responde antes de 24h</span>
+              {nextClassCancelled ? (
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl p-4">
+                  <XCircle className="h-6 w-6 text-red-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-black text-red-700">Clase cancelada</p>
+                    <p className="text-xs text-red-500 mt-0.5">Tu entrenador ha cancelado esta clase. Revisa próximas fechas.</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                </div>
+              ) : nextClass.diffHours <= 48 ? (
+                <>
+                  <div className="mb-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">¿Asistirás a clase?</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
                     <Button
                       variant="outline"
                       className={cn(
-                        'h-16 rounded-[1.25rem] border-2 font-black transition-all active:scale-95 text-sm',
+                        'h-16 rounded-[1.25rem] border-2 font-black transition-all active:scale-95 text-sm flex-col gap-1',
                         currentNotice?.type === 'present'
                           ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-lg shadow-emerald-100'
                           : 'border-slate-100 text-slate-600 hover:bg-slate-50'
                       )}
                       onClick={() => handleAttendanceNotice('present')}
                     >
-                      <CheckCircle2 className={cn('h-5 w-5 mr-2', currentNotice?.type === 'present' ? 'text-emerald-500' : 'text-slate-300')} />
-                      Sí, voy
+                      <CheckCircle2 className={cn('h-5 w-5', currentNotice?.type === 'present' ? 'text-emerald-500' : 'text-slate-300')} />
+                      <span className="text-[11px]">Asisto</span>
                     </Button>
                     <Button
                       variant="outline"
                       className={cn(
-                        'h-16 rounded-[1.25rem] border-2 font-black transition-all active:scale-95 text-sm',
+                        'h-16 rounded-[1.25rem] border-2 font-black transition-all active:scale-95 text-sm flex-col gap-1',
+                        currentNotice?.type === 'uncertain'
+                          ? 'bg-amber-50 border-amber-400 text-amber-700 shadow-lg shadow-amber-100'
+                          : 'border-slate-100 text-slate-600 hover:bg-slate-50'
+                      )}
+                      onClick={() => handleAttendanceNotice('uncertain')}
+                    >
+                      <HelpCircle className={cn('h-5 w-5', currentNotice?.type === 'uncertain' ? 'text-amber-500' : 'text-slate-300')} />
+                      <span className="text-[11px]">En duda</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        'h-16 rounded-[1.25rem] border-2 font-black transition-all active:scale-95 text-sm flex-col gap-1',
                         currentNotice?.type === 'absent'
                           ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-lg shadow-rose-100'
                           : 'border-slate-100 text-slate-600 hover:bg-slate-50'
                       )}
                       onClick={() => handleAttendanceNotice('absent')}
                     >
-                      <XCircle className={cn('h-5 w-5 mr-2', currentNotice?.type === 'absent' ? 'text-rose-500' : 'text-slate-300')} />
-                      No puedo
+                      <XCircle className={cn('h-5 w-5', currentNotice?.type === 'absent' ? 'text-rose-500' : 'text-slate-300')} />
+                      <span className="text-[11px]">No asisto</span>
                     </Button>
                   </div>
-                  {currentNotice?.type === 'absent' && (
-                    <div className="bg-amber-50 rounded-2xl p-4 flex gap-3 items-start animate-in slide-in-from-top-2 duration-500 mt-4 border border-amber-100/50">
-                      <div className="h-8 w-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                        <MessageCircle className="h-4 w-4 text-amber-600" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[11px] text-amber-800 font-bold leading-tight">
-                          Aviso enviado a tu entrenador.
-                        </p>
-                        {nextClass.diffHours >= 24 ? (
-                          <p className="text-[10px] text-emerald-600 font-black uppercase tracking-tight">
-                            ✓ Crédito de recuperación asegurado (+24h)
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-rose-400 font-bold italic">
-                            Aviso tardío: no se generará crédito automático.
-                          </p>
-                        )}
-                      </div>
+                  {currentNotice && (
+                    <div className="bg-slate-50 rounded-2xl p-3 flex gap-2 items-center animate-in slide-in-from-top-2 duration-300 mt-2 border border-slate-100">
+                      <MessageCircle className="h-4 w-4 text-slate-400 shrink-0" />
+                      <p className="text-[11px] text-slate-600 font-medium">
+                        Aviso enviado a tu entrenador.
+                      </p>
                     </div>
                   )}
                 </>
@@ -322,7 +338,7 @@ export default function PlayerDashboard() {
         {/* Widget Próxima Clase */}
         {renderNextClassWidget()}
 
-        {/* Stats Grid */}
+        {/* Stats rápidas */}
         <div className="grid grid-cols-2 gap-4">
           <Card className="border-none shadow-lg shadow-slate-200/50 rounded-[2rem] bg-white p-6 border border-slate-50">
             <div className="flex items-center justify-between mb-2">
@@ -335,18 +351,15 @@ export default function PlayerDashboard() {
             <p className="text-[9px] font-bold text-slate-300">Válidas 60 días</p>
           </Card>
 
-          <Card
-            className="border-none shadow-lg shadow-slate-200/50 rounded-[2rem] bg-white p-6 border border-slate-50 cursor-pointer active:scale-95 transition-all group"
-            onClick={() => setShowPayments(true)}
-          >
+          <Card className="border-none shadow-lg shadow-slate-200/50 rounded-[2rem] bg-white p-6 border border-slate-50">
             <div className="flex items-center justify-between mb-2">
-              <div className="h-10 w-10 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <CreditCard className="h-5 w-5" />
+              <div className="h-10 w-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                <ClipboardCheck className="h-5 w-5" />
               </div>
-              <ChevronRight className="h-5 w-5 text-slate-200 group-hover:text-amber-400 transition-colors" />
+              <span className="text-3xl font-black text-slate-800 tracking-tighter">{attendancePercent}%</span>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mis Pagos</p>
-            <p className="text-[9px] font-bold text-amber-500 mt-1 uppercase tracking-tight">Gestionar →</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Asistencia</p>
+            <p className="text-[9px] font-bold text-slate-300">Este mes</p>
           </Card>
         </div>
 
@@ -391,24 +404,6 @@ export default function PlayerDashboard() {
             </Card>
           </div>
         </div>
-
-        {/* Ausencias programadas (móvil) */}
-        {myAbsenceCount > 0 && (
-          <button
-            onClick={() => setShowAbsences(true)}
-            className="w-full flex items-center gap-3 bg-red-50 border border-red-100 rounded-2xl p-4 text-left hover:bg-red-100 transition-colors"
-          >
-            <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-              <BellOff className="h-5 w-5 text-red-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-black text-red-700">
-                {myAbsenceCount} ausencia{myAbsenceCount > 1 ? 's' : ''} avisada{myAbsenceCount > 1 ? 's' : ''}
-              </p>
-              <p className="text-xs text-red-400">Tu entrenador está informado · Toca para gestionar</p>
-            </div>
-          </button>
-        )}
 
         {/* Agenda Semanal */}
         <div className="space-y-4 pt-2">

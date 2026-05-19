@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
+import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'MISSING_API_KEY',
@@ -15,6 +16,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Messaging — solo disponible en navegadores que lo soportan (no en Safari < 16.4 ni SSR)
+export const messagingPromise = isSupported().then((supported) =>
+  supported ? getMessaging(app) : null
+)
 
 // Exportar funciones de Firestore para transacciones y operaciones atómicas
 export {

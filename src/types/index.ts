@@ -100,6 +100,7 @@ export interface AppUser {
   linkedCoachId?: string   // vincula con colección coaches
   isActive: boolean
   createdAt: Date
+  fcmTokens?: string[]     // tokens FCM para push notifications (uno por dispositivo)
 }
 
 // --- Jugador ---
@@ -255,7 +256,19 @@ export interface AttendanceRecord {
 }
 
 // --- Avisos de Asistencia (Pupil Notices) ---
-export type NoticeType = 'absent' | 'present'
+export type NoticeType = 'absent' | 'present' | 'uncertain'
+
+// --- Clase cancelada ---
+export interface CancelledClass {
+  id: string
+  clubId: string
+  groupId: string
+  groupName: string
+  date: string        // 'YYYY-MM-DD'
+  reason?: string
+  cancelledBy: string // userId del entrenador
+  createdAt: Date
+}
 
 export interface AttendanceNotice {
   id: string

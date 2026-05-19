@@ -42,7 +42,12 @@ export default function CoachDashboard() {
     coachSalaryConfigs,
     events,
     eventPayments,
+    cancelledClasses,
+    addCancelledClass,
+    deleteCancelledClass,
   } = useDataStore()
+  const [cancelDialog, setCancelDialog] = useState<{ groupId: string; groupName: string; dateStr: string } | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
 
   const now = new Date()
   const [activityCollapsed, setActivityCollapsed] = useState(false)
@@ -165,6 +170,7 @@ export default function CoachDashboard() {
   }, [currentCoachId, coachSalaryConfigs, groups, privateLessons, events, eventPayments])
 
   // -- Todas las clases de hoy --
+  const todayDateStr = now.toISOString().split('T')[0]
   const todayClasses = useMemo(() => {
     if (!currentCoachId) return []
     const dayOfWeek = now.getDay()
@@ -182,11 +188,17 @@ export default function CoachDashboard() {
               a.groupId === group.id && new Date(a.date).toDateString() === todayStr
             )
             const enrolledCount = enrollments.filter(e => e.groupId === group.id && e.isActive).length
-            return { group, slot, classStart, attRecord, enrolledCount, isMarked: !!attRecord && attRecord.records.length > 0 }
+            const cancelledDoc = cancelledClasses.find(c => c.groupId === group.id && c.date === todayDateStr)
+            return {
+              group, slot, classStart, attRecord, enrolledCount,
+              isMarked: !!attRecord && attRecord.records.length > 0,
+              isCancelled: !!cancelledDoc,
+              cancelledId: cancelledDoc?.id,
+            }
           })
       )
       .sort((a, b) => a.classStart.getTime() - b.classStart.getTime())
-  }, [currentCoachId, groups, attendance, enrollments])
+  }, [currentCoachId, groups, attendance, enrollments, cancelledClasses, todayDateStr])
 
   if (!currentCoachId) {
     return (
@@ -232,21 +244,37 @@ export default function CoachDashboard() {
               .map(notice => (
                 <div key={notice.id} className={cn(
                   "rounded-[1.5rem] border p-5 shadow-sm transition-all hover:shadow-md",
-                  notice.type === 'absent' ? "border-amber-100 bg-amber-50/40" : "border-blue-100 bg-blue-50/40"
+                  notice.type === 'absent' ? "border-amber-100 bg-amber-50/40"
+                  : notice.type === 'uncertain' ? "border-violet-100 bg-violet-50/40"
+                  : "border-blue-100 bg-blue-50/40"
                 )}>
                   <div className="flex gap-4">
                     <div className={cn(
                       "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl",
-                      notice.type === 'absent' ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"
+                      notice.type === 'absent' ? "bg-amber-100 text-amber-600"
+                      : notice.type === 'uncertain' ? "bg-violet-100 text-violet-600"
+                      : "bg-blue-100 text-blue-600"
                     )}>
-                      {notice.type === 'absent' ? <Trophy className="h-6 w-6" /> : <Bell className="h-6 w-6" />}
+                      {notice.type === 'absent' ? <Trophy className="h-6 w-6" />
+                      : notice.type === 'uncertain' ? <Bell className="h-6 w-6" />
+                      : <Bell className="h-6 w-6" />}
                     </div>
                     <div className="space-y-1 min-w-0">
-                      <h4 className={cn("text-sm font-black truncate", notice.type === 'absent' ? "text-amber-900" : "text-blue-900")}>
+                      <h4 className={cn("text-sm font-black truncate",
+                        notice.type === 'absent' ? "text-amber-900"
+                        : notice.type === 'uncertain' ? "text-violet-900"
+                        : "text-blue-900"
+                      )}>
                         {notice.playerName}
                       </h4>
-                      <p className={cn("text-xs font-medium leading-relaxed", notice.type === 'absent' ? "text-amber-700/80" : "text-blue-700/80")}>
-                        {notice.type === 'absent' ? 'No asistirá a clase hoy' : 'Ha confirmado su asistencia'}
+                      <p className={cn("text-xs font-medium leading-relaxed",
+                        notice.type === 'absent' ? "text-amber-700/80"
+                        : notice.type === 'uncertain' ? "text-violet-700/80"
+                        : "text-blue-700/80"
+                      )}>
+                        {notice.type === 'absent' ? 'No asistirá a clase hoy'
+                        : notice.type === 'uncertain' ? 'Está en duda para clase hoy'
+                        : 'Ha confirmado su asistencia'}
                       </p>
                       {notice.notes && <p className="text-[10px] mt-1 italic opacity-60 truncate">"{notice.notes}"</p>}
                     </div>
@@ -291,43 +319,73 @@ export default function CoachDashboard() {
             {/* Lista de todas las clases de hoy */}
             {todayClasses.length > 0 && (
               <div className="space-y-3">
-                {todayClasses.map(({ group, slot, classStart, isMarked, enrolledCount }) => {
+                {todayClasses.map(({ group, slot, isMarked, enrolledCount, isCancelled, cancelledId }) => {
                   const isActive = activeClass?.id === group.id
                   return (
                     <div
                       key={`${group.id}-${slot.startTime}`}
                       className={cn(
                         'flex items-center gap-4 rounded-2xl border p-4 transition-all',
-                        isActive ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100',
+                        isCancelled ? 'bg-red-50 border-red-200 opacity-75'
+                        : isActive ? 'bg-emerald-50 border-emerald-200'
+                        : 'bg-white border-slate-100',
                       )}
                     >
                       <div className={cn(
                         'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-black',
-                        isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500',
+                        isCancelled ? 'bg-red-100 text-red-400 line-through'
+                        : isActive ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-100 text-slate-500',
                       )}>
                         {slot.startTime.slice(0, 5)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={cn('text-sm font-bold truncate', isActive ? 'text-emerald-900' : 'text-slate-800')}>
+                        <p className={cn('text-sm font-bold truncate', isCancelled ? 'text-red-600 line-through' : isActive ? 'text-emerald-900' : 'text-slate-800')}>
                           {group.name}
-                          {isActive && <span className="ml-2 text-[10px] font-black text-emerald-600 uppercase">● En curso</span>}
+                          {isActive && !isCancelled && <span className="ml-2 text-[10px] font-black text-emerald-600 uppercase">● En curso</span>}
                         </p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
                           {slot.startTime}–{slot.endTime} · {group.courtName} · {enrolledCount} alumnos
                         </p>
                       </div>
-                      {isMarked ? (
-                        <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold shrink-0">
-                          <CheckCircle2 className="h-4 w-4" />
-                          Lista
+                      {isCancelled ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] font-black text-red-500 uppercase tracking-wide">Cancelada</span>
+                          <button
+                            onClick={() => cancelledId && deleteCancelledClass(cancelledId)}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                          >
+                            Reabrir
+                          </button>
+                        </div>
+                      ) : isMarked ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Lista
+                          </div>
+                          <button
+                            onClick={() => setCancelDialog({ groupId: group.id, groupName: group.name, dateStr: todayDateStr })}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold text-red-400 hover:bg-red-50 transition-colors"
+                          >
+                            Cancelar
+                          </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => navigate(`/asistencia?groupId=${group.id}`)}
-                          className="shrink-0 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-black hover:bg-black transition-colors"
-                        >
-                          Pasar lista
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => navigate(`/asistencia?groupId=${group.id}`)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-black hover:bg-black transition-colors"
+                          >
+                            Pasar lista
+                          </button>
+                          <button
+                            onClick={() => setCancelDialog({ groupId: group.id, groupName: group.name, dateStr: todayDateStr })}
+                            className="px-2 py-1.5 rounded-xl text-xs font-bold text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
                       )}
                     </div>
                   )
@@ -532,6 +590,58 @@ export default function CoachDashboard() {
           )}
         </div>
       </div>
+
+      {/* Diálogo cancelar clase */}
+      {cancelDialog && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => { setCancelDialog(null); setCancelReason('') }}>
+          <div className="bg-white rounded-[2rem] w-full max-w-sm p-6 space-y-4 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div>
+              <h3 className="text-base font-black text-slate-800">Cancelar clase</h3>
+              <p className="text-sm text-slate-500 mt-0.5">{cancelDialog.groupName} · hoy</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Motivo (opcional)</label>
+              <select
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+              >
+                <option value="">Sin especificar</option>
+                <option value="Lluvia">Lluvia</option>
+                <option value="Festivo">Festivo</option>
+                <option value="Pista no disponible">Pista no disponible</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                onClick={() => { setCancelDialog(null); setCancelReason('') }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 transition-colors"
+                onClick={() => {
+                  if (!user?.id) return
+                  addCancelledClass({
+                    clubId: user.clubId ?? '',
+                    groupId: cancelDialog.groupId,
+                    groupName: cancelDialog.groupName,
+                    date: cancelDialog.dateStr,
+                    reason: cancelReason || undefined,
+                    cancelledBy: user.id,
+                  })
+                  setCancelDialog(null)
+                  setCancelReason('')
+                }}
+              >
+                Confirmar cancelación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

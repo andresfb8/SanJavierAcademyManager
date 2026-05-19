@@ -23,3 +23,12 @@ export { generateMonthlyInvoices } from "./invoicing/generateMonthlyInvoices";
 // Firestore triggers
 // ---------------------------------------------------------------------------
 export { onPlayerStatusChange } from "./triggers/onPlayerStatusChange";
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+export { onAttendanceNoticeCreated } from "./notifications/onAttendanceNotice";
+export { classRemindersScheduled } from "./notifications/classReminders";
+export { onPaymentCreated } from "./notifications/onPaymentCreated";
+export { paymentReminderDay15 } from "./notifications/paymentReminder";
+export { onCancelledClassCreated } from "./notifications/onCancelledClass";

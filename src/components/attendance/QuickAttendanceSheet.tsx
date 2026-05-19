@@ -298,10 +298,13 @@ export function QuickAttendanceSheet({ group, date, onBack }: QuickAttendanceShe
                         )}
                         {notice && (
                           <Badge
-                            variant={notice.type === 'absent' ? 'destructive' : 'secondary'}
-                            className="text-[9px] px-1.5 py-0 shrink-0 animate-pulse"
+                            variant={notice.type === 'absent' ? 'destructive' : notice.type === 'uncertain' ? 'outline' : 'secondary'}
+                            className={cn(
+                              'text-[9px] px-1.5 py-0 shrink-0 animate-pulse',
+                              notice.type === 'uncertain' && 'border-amber-300 text-amber-600'
+                            )}
                           >
-                            {notice.type === 'absent' ? '⚠ No viene' : '✓ Viene'}
+                            {notice.type === 'absent' ? '⚠ No viene' : notice.type === 'uncertain' ? '? En duda' : '✓ Viene'}
                           </Badge>
                         )}
                       </div>

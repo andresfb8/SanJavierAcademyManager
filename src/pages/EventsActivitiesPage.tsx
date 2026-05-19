@@ -69,6 +69,7 @@ export default function EventsActivitiesPage() {
     deletePrivateLesson,
     addEvent,
     addEventPayment,
+    updateEventPayment,
     deleteEvent
   } = useDataStore()
 
@@ -448,32 +449,49 @@ export default function EventsActivitiesPage() {
       isActive: true,
     })
 
-    // Crear pagos para jugadores
+    // Crear o actualizar pagos para jugadores (evitar duplicados)
     for (const pid of evPlayerIds) {
       const player = selectedPlayers.find(p => p.id === pid)
-      if (player) {
+      if (!player) continue
+      const existing = eventPayments.find(
+        p => p.eventId === eventId && p.playerId === pid && p.status !== 'cancelado'
+      )
+      if (existing) {
+        if (existing.amount !== attendeePrices[pid]) {
+          updateEventPayment(existing.id, { amount: attendeePrices[pid] })
+        }
+      } else {
         addEventPayment({
           eventId,
           eventName: evName,
           playerId: pid,
           playerName: `${player.firstName} ${player.lastName}`,
-          amount: attendeePrices[pid], // Usar el precio específico
+          amount: attendeePrices[pid],
           status: 'pendiente',
         })
       }
     }
 
-    // Crear pagos para invitados
+    // Crear o actualizar pagos para invitados (evitar duplicados)
     for (let i = 0; i < evGuestNames.length; i++) {
       const gid = guestIds[i]
-      addEventPayment({
-        eventId,
-        eventName: evName,
-        playerId: gid,
-        playerName: evGuestNames[i],
-        amount: attendeePrices[gid], // Usar el precio específico
-        status: 'pendiente',
-      })
+      const existing = eventPayments.find(
+        p => p.eventId === eventId && p.playerId === gid && p.status !== 'cancelado'
+      )
+      if (existing) {
+        if (existing.amount !== attendeePrices[gid]) {
+          updateEventPayment(existing.id, { amount: attendeePrices[gid] })
+        }
+      } else {
+        addEventPayment({
+          eventId,
+          eventName: evName,
+          playerId: gid,
+          playerName: evGuestNames[i],
+          amount: attendeePrices[gid],
+          status: 'pendiente',
+        })
+      }
     }
   }
 
