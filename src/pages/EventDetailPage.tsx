@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -186,25 +186,6 @@ export default function EventDetailPage() {
     const method = paymentMethods[paymentId] || 'efectivo'
     markEventPaymentPaid(paymentId, method as 'transferencia' | 'efectivo' | 'domiciliacion' | 'tarjeta')
   }
-
-  // Auto-crear pagos faltantes para asistentes sin pago (migración de eventos antiguos)
-  useEffect(() => {
-    if (!event) return
-    for (let i = 0; i < event.attendeePlayerIds.length; i++) {
-      const pid = event.attendeePlayerIds[i]
-      const hasPayment = thisEventPayments.some((ep) => ep.playerId === pid && ep.status !== 'cancelado')
-      if (!hasPayment) {
-        addEventPayment({
-          eventId: event.id,
-          eventName: event.name,
-          playerId: pid,
-          playerName: event.attendeePlayerNames[i] || 'Asistente',
-          amount: event.price,
-          status: 'pendiente',
-        })
-      }
-    }
-  }, [event?.id, event?.attendeePlayerIds.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddGuest = () => {
     if (!event || !guestNameInput.trim()) return
