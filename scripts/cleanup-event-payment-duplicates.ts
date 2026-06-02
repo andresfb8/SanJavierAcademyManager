@@ -18,14 +18,19 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore'
 if (getApps().length === 0) {
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
   if (serviceAccount) {
-    initializeApp({ credential: cert(JSON.parse(serviceAccount)) })
+    try {
+      initializeApp({ credential: cert(JSON.parse(serviceAccount)) })
+    } catch (e) {
+      console.error('[cleanup] Invalid FIREBASE_SERVICE_ACCOUNT JSON:', e)
+      process.exit(1)
+    }
   } else {
     initializeApp()
   }
 }
 
 const db = getFirestore()
-const CLUB_ID = 'club-001'
+const CLUB_ID = process.env.CLUB_ID || 'club-001'
 
 interface EventPaymentDoc {
   id: string
@@ -54,6 +59,11 @@ async function cleanupDuplicates() {
     const data = doc.data() as Omit<EventPaymentDoc, 'id'>
     if (data.status === 'cancelado') continue
 
+    if (!data.eventId || !data.playerId) {
+      console.warn('[cleanup] Skipping document with missing eventId or playerId:', doc.id)
+      continue
+    }
+
     const key = `${data.eventId}__${data.playerId}`
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push({ ...data, id: doc.id })
@@ -74,7 +84,12 @@ async function cleanupDuplicates() {
 
   const flushBatch = async () => {
     if (opsInBatch > 0) {
-      await batch.commit()
+      try {
+        await batch.commit()
+      } catch (e) {
+        console.error('[cleanup] Batch commit failed:', e)
+        throw e
+      }
       batch = db.batch()
       opsInBatch = 0
     }
