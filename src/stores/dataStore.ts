@@ -926,6 +926,10 @@ export const useDataStore = create<DataState>()(
         const destinationGroup = get().groups.find(g => g.id === destinationGroupId)
         if (!destinationGroup) throw new Error('Grupo destino no encontrado')
 
+        if (currentEnrollment.groupId === destinationGroupId) {
+          throw new Error('El jugador ya está inscrito en ese grupo')
+        }
+
         const newEnrollmentId = generateId()
         const now = new Date()
 
@@ -954,16 +958,16 @@ export const useDataStore = create<DataState>()(
                 : e
               )
               .concat({
+                ...newEnrollmentData,
                 id: newEnrollmentId,
                 groupId: destinationGroupId,
                 groupName: destinationGroup.name,
                 enrollmentDate: now,
                 isActive: true,
                 billingFrequency: newEnrollmentData.billingFrequency ?? 'monthly',
-                ...newEnrollmentData,
               } as Enrollment),
             groups: state.groups.map(g => {
-              if (g.id === currentEnrollment.groupId) return { ...g, currentEnrollment: g.currentEnrollment - 1 }
+              if (g.id === currentEnrollment.groupId) return { ...g, currentEnrollment: Math.max(0, g.currentEnrollment - 1) }
               if (g.id === destinationGroupId) return { ...g, currentEnrollment: g.currentEnrollment + 1 }
               return g
             }),

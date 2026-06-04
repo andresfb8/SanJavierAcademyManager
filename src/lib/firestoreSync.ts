@@ -669,6 +669,7 @@ export async function moveEnrollmentAtomic(
   clubId: string
 ): Promise<void> {
   return runTransaction(db, async (transaction) => {
+    // Read new group to check existence + capacity
     const newGroupRef = doc(db, 'groups', newGroupId)
     const newGroupSnap = await transaction.get(newGroupRef)
 
@@ -681,8 +682,22 @@ export async function moveEnrollmentAtomic(
       throw new Error('El grupo destino está lleno')
     }
 
-    const oldGroupRef = doc(db, 'groups', oldGroupId)
+    // Read old enrollment and group to validate state before writing
     const oldEnrollmentRef = doc(db, 'enrollments', oldEnrollmentId)
+    const oldGroupRef = doc(db, 'groups', oldGroupId)
+
+    const [oldEnrollmentSnap, oldGroupSnap] = await Promise.all([
+      transaction.get(oldEnrollmentRef),
+      transaction.get(oldGroupRef),
+    ])
+
+    if (!oldEnrollmentSnap.exists() || !oldEnrollmentSnap.data().isActive) {
+      throw new Error('La inscripción original ya no está activa')
+    }
+    if (!oldGroupSnap.exists()) {
+      throw new Error('Grupo origen no encontrado')
+    }
+
     const newEnrollmentRef = doc(db, 'enrollments', newEnrollmentId)
 
     // Deactivate old enrollment
