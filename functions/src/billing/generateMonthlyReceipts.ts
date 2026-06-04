@@ -2,6 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
+import { isBillingMonth } from "./billing-utils";
 
 // ---------------------------------------------------------------------------
 // Spanish month names (1-indexed: index 0 unused)
@@ -33,6 +34,8 @@ interface Enrollment {
   tariffId: string;
   tariffName: string;
   customPrice?: number;
+  billingFrequency?: "monthly" | "quarterly" | "annual" | "installments";
+  billingAnchorMonth?: number;
   enrollmentDate: Timestamp;
   unenrollmentDate?: Timestamp;
   isActive: boolean;
@@ -43,8 +46,10 @@ interface Group {
   name: string;
   defaultTariffId: string;
   defaultTariffPrice: number;
-  billingFrequency: "monthly" | "installments";
+  billingFrequency: "monthly" | "quarterly" | "annual" | "installments";
   installmentMonths?: number[];
+  installmentPrices?: Record<string, number>;
+  startDate?: Timestamp;
   isActive: boolean;
 }
 
@@ -171,17 +176,31 @@ async function processClub(
     }
 
     // -----------------------------------------------------------------------
-    // Billing frequency check
+    // Billing frequency check — reads from enrollment, falls back to group
     // -----------------------------------------------------------------------
-    if (group.billingFrequency === "installments") {
-      const installmentMonths = group.installmentMonths ?? [];
-      if (!installmentMonths.includes(billingMonth)) {
-        // Current month is not an installment month for this group
+    const freq = enrollment.billingFrequency ?? group.billingFrequency;
+    const anchor = enrollment.billingAnchorMonth ?? (
+      group.startDate
+        ? group.startDate.toDate().getMonth() + 1
+        : 9  // fallback: September (typical season start)
+    );
+
+    if (!isBillingMonth(freq, anchor, billingMonth)) {
+      skipped++;
+      continue;
+    }
+
+    // For installments: verify the specific month is configured
+    if (freq === "installments") {
+      // Support both legacy installmentMonths (number[]) and installmentPrices (Record<YYYY-MM, number>)
+      const billingKey = `${billingYear}-${String(billingMonth).padStart(2, "0")}`;
+      const inPrices = group.installmentPrices?.[billingKey] !== undefined;
+      const inMonths = (group.installmentMonths ?? []).includes(billingMonth);
+      if (!inPrices && !inMonths) {
         skipped++;
         continue;
       }
     }
-    // If "monthly", always generate.
 
     // -----------------------------------------------------------------------
     // Idempotency check: skip if payment already exists for this
