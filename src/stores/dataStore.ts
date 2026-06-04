@@ -66,6 +66,7 @@ import {
   generateMonthlyReceiptsAtomic,
   createInvoiceAtomic,
   unlinkPaymentsFromInvoiceAtomic,
+  moveEnrollmentAtomic,
 } from '@/lib/firestoreSync'
 import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -154,6 +155,11 @@ export interface DataState {
   deleteEnrollment: (id: string) => void
   deactivateEnrollment: (id: string, effectiveDate?: Date, options?: { deleteInvoice?: boolean }) => Promise<void>
   checkPendingPaymentsForEnrollment: (enrollmentId: string) => Promise<boolean>
+  moveEnrollment: (
+    currentEnrollmentId: string,
+    destinationGroupId: string,
+    newEnrollmentData: Pick<Enrollment, 'tariffId' | 'tariffName' | 'customPrice' | 'billingFrequency' | 'billingAnchorMonth' | 'playerId' | 'playerName'>
+  ) => Promise<void>
 
   // --- Payments ---
   generatePartialReceipt: (enrollmentId: string, amount: number) => Promise<void>
@@ -769,7 +775,11 @@ export const useDataStore = create<DataState>()(
         })
       },
       addEnrollment: async (enrollmentData) => {
-        const newEnrollment: Enrollment = { ...enrollmentData, id: generateId() }
+        const newEnrollment: Enrollment = {
+          billingFrequency: 'monthly',
+          ...enrollmentData,
+          id: generateId(),
+        }
         const clubId = getClubId()
 
         if (!clubId) {
@@ -902,6 +912,76 @@ export const useDataStore = create<DataState>()(
           // Rollback
           const msg = error instanceof Error ? error.message : 'Error al guardar el recibo parcial'
           toast.error(msg)
+          throw error
+        }
+      },
+
+      moveEnrollment: async (currentEnrollmentId, destinationGroupId, newEnrollmentData) => {
+        const clubId = getClubId()
+        if (!clubId) throw new Error('No clubId found')
+
+        const currentEnrollment = get().enrollments.find(e => e.id === currentEnrollmentId)
+        if (!currentEnrollment) throw new Error('Inscripción no encontrada')
+
+        const destinationGroup = get().groups.find(g => g.id === destinationGroupId)
+        if (!destinationGroup) throw new Error('Grupo destino no encontrado')
+
+        const newEnrollmentId = generateId()
+        const now = new Date()
+
+        try {
+          await moveEnrollmentAtomic(
+            currentEnrollmentId,
+            currentEnrollment.groupId,
+            newEnrollmentId,
+            {
+              ...newEnrollmentData,
+              groupId: destinationGroupId,
+              groupName: destinationGroup.name,
+              enrollmentDate: now,
+              isActive: true,
+              billingFrequency: newEnrollmentData.billingFrequency ?? 'monthly',
+            },
+            destinationGroupId,
+            clubId
+          )
+
+          // Update local state optimistically
+          set((state) => ({
+            enrollments: state.enrollments
+              .map(e => e.id === currentEnrollmentId
+                ? { ...e, isActive: false, unenrollmentDate: now }
+                : e
+              )
+              .concat({
+                id: newEnrollmentId,
+                groupId: destinationGroupId,
+                groupName: destinationGroup.name,
+                enrollmentDate: now,
+                isActive: true,
+                billingFrequency: newEnrollmentData.billingFrequency ?? 'monthly',
+                ...newEnrollmentData,
+              } as Enrollment),
+            groups: state.groups.map(g => {
+              if (g.id === currentEnrollment.groupId) return { ...g, currentEnrollment: g.currentEnrollment - 1 }
+              if (g.id === destinationGroupId) return { ...g, currentEnrollment: g.currentEnrollment + 1 }
+              return g
+            }),
+          }))
+
+          const { userId, userName } = getCurrentUser()
+          get().addActivity({
+            type: 'enrollment_created',
+            description: `${newEnrollmentData.playerName} trasladado a ${destinationGroup.name}`,
+            relatedEntityId: newEnrollmentId,
+            userId,
+            userName,
+          })
+
+          queryClient.invalidateQueries({ queryKey: ['enrollments'] })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          toast.error(`Error al trasladar: ${message}`)
           throw error
         }
       },
