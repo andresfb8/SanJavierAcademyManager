@@ -91,7 +91,9 @@ export const COURT_SURFACES: { value: CourtSurface; label: string }[] = [
 
 // --- Frecuencia de Facturación ---
 export const BILLING_FREQUENCIES: { value: BillingFrequency; label: string }[] = [
-  { value: 'monthly', label: 'Mensual' },
+  { value: 'monthly',      label: 'Mensual' },
+  { value: 'quarterly',    label: 'Trimestral' },
+  { value: 'annual',       label: 'Anual' },
   { value: 'installments', label: 'Por plazos' },
 ]
 

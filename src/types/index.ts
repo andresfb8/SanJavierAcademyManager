@@ -64,7 +64,7 @@ export interface Court {
 }
 
 // --- Tarifa ---
-export type BillingFrequency = 'monthly' | 'installments'
+export type BillingFrequency = 'monthly' | 'quarterly' | 'annual' | 'installments'
 
 export interface Tariff {
   id: string
@@ -226,6 +226,8 @@ export interface Enrollment {
   tariffId: string
   tariffName: string
   customPrice?: number
+  billingFrequency?: BillingFrequency   // per-enrollment; falls back to group.billingFrequency if absent
+  billingAnchorMonth?: number           // 1-12; required when billingFrequency is 'quarterly' or 'annual'
   enrollmentDate: Date
   unenrollmentDate?: Date
   isActive: boolean
