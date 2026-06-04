@@ -1,0 +1,38 @@
+import type { BillingFrequency } from '@/types'
+
+/**
+ * Returns true if billingMonth is a payment month for the given frequency/anchor.
+ *
+ * - monthly: always true
+ * - quarterly: true when (billingMonth - anchorMonth) mod 3 === 0  (mod 12 arithmetic)
+ *   Example: anchorMonth=9 → payment months: 9, 12, 3, 6
+ * - annual: true only when billingMonth === anchorMonth
+ * - installments: always returns true — caller must additionally check
+ *   group.installmentPrices[YYYY-MM] exists and is > 0
+ */
+export function isBillingMonth(
+  frequency: BillingFrequency,
+  anchorMonth: number,   // 1-12
+  billingMonth: number,  // 1-12
+): boolean {
+  switch (frequency) {
+    case 'monthly':
+      return true
+    case 'quarterly':
+      return ((billingMonth - anchorMonth + 12) % 12) % 3 === 0
+    case 'annual':
+      return billingMonth === anchorMonth
+    case 'installments':
+      return true
+  }
+}
+
+/** Short display label for a billing frequency. */
+export function billingFrequencyLabel(freq: BillingFrequency): string {
+  switch (freq) {
+    case 'monthly':      return 'Mensual'
+    case 'quarterly':    return 'Trimestral'
+    case 'annual':       return 'Anual'
+    case 'installments': return 'Plazos'
+  }
+}
