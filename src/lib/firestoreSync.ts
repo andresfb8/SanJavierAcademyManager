@@ -24,6 +24,7 @@ import { db } from './firebase'
 import { toast } from '@/hooks/use-toast'
 import type { Invoice, Payment, Enrollment } from '@/types'
 import { MONTHS } from '@/constants'
+import { isBillingMonth } from './billing-utils'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -364,12 +365,13 @@ export async function generateMonthlyReceiptsAtomic(
     const groupsSnap = await getDocs(
       query(collection(db, 'groups'), where('clubId', '==', clubId))
     )
-    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; installmentPrices?: Record<string, number> }>()
+    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; startDate: any; installmentPrices?: Record<string, number> }>()
     for (const groupDoc of groupsSnap.docs) {
       const g = groupDoc.data()
       groupsMap.set(groupDoc.id, {
         defaultTariffPrice: g.defaultTariffPrice ?? 0,
         billingFrequency: g.billingFrequency ?? 'monthly',
+        startDate: g.startDate,
         installmentPrices: g.installmentPrices,
       })
     }
@@ -392,11 +394,23 @@ export async function generateMonthlyReceiptsAtomic(
         continue
       }
 
-      // Respetar frecuencia de facturación: si es por plazos, solo generar en los meses configurados
-      if (group.billingFrequency === 'installments') {
+      // Respetar frecuencia de facturación por matrícula (con fallback al grupo para matrículas antiguas)
+      const freq = enrollment.billingFrequency ?? group.billingFrequency
+      const anchor = enrollment.billingAnchorMonth ?? (
+        group.startDate instanceof Date
+          ? group.startDate.getMonth() + 1
+          : new Date((group.startDate as any).toDate?.() ?? group.startDate).getMonth() + 1
+      )
+
+      if (!isBillingMonth(freq, anchor, month)) {
+        continue
+      }
+
+      // For installments: additionally verify the specific month exists in the group's price map
+      if (freq === 'installments') {
         const billingKey = `${year}-${String(month).padStart(2, '0')}`
         if (!group.installmentPrices || !group.installmentPrices[billingKey]) {
-          continue // Este mes-año no es un plazo de este grupo
+          continue
         }
       }
 
@@ -420,7 +434,7 @@ export async function generateMonthlyReceiptsAtomic(
       // Calcular importe: customPrice tiene prioridad
       // Para plazos: usar el precio específico del mes (YYYY-MM), para mensual: usar precio base del grupo
       let baseAmount: number
-      if (group.billingFrequency === 'installments' && group.installmentPrices) {
+      if (freq === 'installments' && group.installmentPrices) {
         const billingKey = `${year}-${String(month).padStart(2, '0')}`
         baseAmount = group.installmentPrices[billingKey] ?? group.defaultTariffPrice
       } else {
