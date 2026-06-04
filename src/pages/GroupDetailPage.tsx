@@ -17,9 +17,11 @@ import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
 import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen, Pencil } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
-import { DAYS_OF_WEEK, PLAYER_LEVELS } from '@/constants'
+import { DAYS_OF_WEEK, PLAYER_LEVELS, BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
+import type { BillingFrequency } from '@/types'
+import { billingFrequencyLabel } from '@/lib/billing-utils'
 
 export default function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -40,6 +42,8 @@ export default function GroupDetailPage() {
   const [customPrice, setCustomPrice] = useState('')
   const [discountMode, setDiscountMode] = useState<'none' | 'percentage' | 'fixed_price'>('none')
   const [discountPercentage, setDiscountPercentage] = useState('')
+  const [selectedBillingFrequency, setSelectedBillingFrequency] = useState<BillingFrequency>('monthly')
+  const [selectedAnchorMonth, setSelectedAnchorMonth] = useState<number>(9)
 
   // Find the group
   const group = useMemo(() => groups.find((g) => g.id === id), [groups, id])
@@ -93,6 +97,8 @@ export default function GroupDetailPage() {
     setCustomPrice('')
     setDiscountMode('none')
     setDiscountPercentage('')
+    setSelectedBillingFrequency('monthly')
+    setSelectedAnchorMonth(group ? new Date(group.startDate).getMonth() + 1 : 9)
   }
 
   // Handle adding a player to the group
@@ -141,6 +147,10 @@ export default function GroupDetailPage() {
       tariffId: tariff.id,
       tariffName: tariff.name,
       customPrice: finalCustomPrice,
+      billingFrequency: selectedBillingFrequency,
+      billingAnchorMonth: (selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual')
+        ? selectedAnchorMonth
+        : undefined,
       enrollmentDate: new Date(),
       isActive: true,
     })
@@ -568,7 +578,14 @@ export default function GroupDetailPage() {
                 }))}
                 placeholder="Seleccionar tarifa"
                 value={selectedTariffId}
-                onChange={(e) => setSelectedTariffId(e.target.value)}
+                onChange={(e) => {
+                  const tariffId = e.target.value
+                  setSelectedTariffId(tariffId)
+                  const tariff = tariffs.find(t => t.id === tariffId)
+                  if (tariff) {
+                    setSelectedBillingFrequency(tariff.billingFrequency)
+                  }
+                }}
               />
             </div>
 
@@ -645,6 +662,41 @@ export default function GroupDetailPage() {
                     </span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Billing frequency */}
+            <div className="space-y-2">
+              <Label>Frecuencia de facturación</Label>
+              <Select
+                options={BILLING_FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))}
+                value={selectedBillingFrequency}
+                onChange={(e) => setSelectedBillingFrequency(e.target.value as BillingFrequency)}
+              />
+            </div>
+
+            {/* Anchor month — only for quarterly or annual */}
+            {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
+              <div className="space-y-2">
+                <Label>
+                  {selectedBillingFrequency === 'quarterly'
+                    ? 'Mes de inicio del ciclo trimestral'
+                    : 'Mes de pago anual'}
+                </Label>
+                <Select
+                  options={MONTHS.map((m) => ({ value: String(m.value), label: m.label }))}
+                  value={String(selectedAnchorMonth)}
+                  onChange={(e) => setSelectedAnchorMonth(Number(e.target.value))}
+                />
+                {selectedBillingFrequency === 'quarterly' && (
+                  <p className="text-xs text-muted-foreground">
+                    Los pagos se generarán en {
+                      [0, 3, 6, 9]
+                        .map(offset => MONTHS.find(m => m.value === ((selectedAnchorMonth - 1 + offset) % 12) + 1)?.label)
+                        .join(', ')
+                    }
+                  </p>
+                )}
               </div>
             )}
           </div>
