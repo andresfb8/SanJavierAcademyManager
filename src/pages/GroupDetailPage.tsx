@@ -11,11 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { MoveEnrollmentDialog } from '@/components/shared/MoveEnrollmentDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GroupTrainingPlanTab } from '@/components/groups/GroupTrainingPlanTab'
 import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
-import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen, Pencil } from 'lucide-react'
+import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen, Pencil, ArrowRightLeft } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
@@ -31,6 +32,7 @@ export default function GroupDetailPage() {
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [removeEnrollmentId, setRemoveEnrollmentId] = useState<string | null>(null)
+  const [moveEnrollmentId, setMoveEnrollmentId] = useState<string | null>(null)
   const [invoiceActionData, setInvoiceActionData] = useState<{ enrollmentId: string, hasPending: boolean } | null>(null)
   const [partialReceiptData, setPartialReceiptData] = useState<{ enrollmentId: string, amount: string } | null>(null)
   const [showEditTariff, setShowEditTariff] = useState(false)
@@ -466,6 +468,7 @@ export default function GroupDetailPage() {
                         <tr className="border-b bg-muted/50">
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground">Jugador</th>
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Tarifa</th>
+                          <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Frecuencia</th>
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden sm:table-cell">Precio</th>
                           <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden lg:table-cell">Fecha inscripción</th>
                           <th className="p-3 text-right text-sm font-medium text-muted-foreground w-20">Acciones</th>
@@ -499,6 +502,11 @@ export default function GroupDetailPage() {
                               <td className="p-3 hidden md:table-cell">
                                 <span className="text-sm">{enrollment.tariffName}</span>
                               </td>
+                              <td className="p-3 hidden lg:table-cell">
+                                <span className="text-sm text-muted-foreground">
+                                  {billingFrequencyLabel(enrollment.billingFrequency ?? group.billingFrequency)}
+                                </span>
+                              </td>
                               <td className="p-3 hidden sm:table-cell">
                                 <span className="text-sm font-medium">
                                   {formatCurrency(price)}
@@ -513,14 +521,25 @@ export default function GroupDetailPage() {
                                 </span>
                               </td>
                               <td className="p-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setRemoveEnrollmentId(enrollment.id)}
-                                >
-                                  <UserMinus className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-foreground"
+                                    onClick={() => setMoveEnrollmentId(enrollment.id)}
+                                    title="Mover a otro grupo"
+                                  >
+                                    <ArrowRightLeft className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => setRemoveEnrollmentId(enrollment.id)}
+                                  >
+                                    <UserMinus className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -842,6 +861,15 @@ export default function GroupDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move enrollment dialog */}
+      {moveEnrollmentId && (
+        <MoveEnrollmentDialog
+          enrollmentId={moveEnrollmentId}
+          currentGroupId={group.id}
+          onClose={() => setMoveEnrollmentId(null)}
+        />
+      )}
     </div>
   )
 }
