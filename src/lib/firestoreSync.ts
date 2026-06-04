@@ -634,13 +634,13 @@ export async function unlinkPaymentsFromInvoiceAtomic(
 
   return runTransaction(db, async (transaction) => {
     const paymentCollections = ['payments', 'eventPayments', 'privateLessonPayments']
-    
+
     for (const paymentId of paymentIds) {
       let found = false
       for (const collectionName of paymentCollections) {
         const paymentRef = doc(db, collectionName, paymentId)
         const paymentSnap = await transaction.get(paymentRef)
-        
+
         if (paymentSnap.exists()) {
           transaction.update(paymentRef, { invoiceId: null })
           found = true
@@ -651,5 +651,60 @@ export async function unlinkPaymentsFromInvoiceAtomic(
         console.warn(`[Firestore] Payment ${paymentId} not found during unlinking`)
       }
     }
+  })
+}
+
+// ==========================================
+// Movimiento de Matrículas entre Grupos
+// ==========================================
+
+// Mueve una matrícula de un grupo a otro en una transacción atómica.
+// Desactiva la matrícula actual y crea una nueva en el grupo destino.
+export async function moveEnrollmentAtomic(
+  oldEnrollmentId: string,
+  oldGroupId: string,
+  newEnrollmentId: string,
+  newEnrollmentData: Record<string, unknown>,
+  newGroupId: string,
+  clubId: string
+): Promise<void> {
+  return runTransaction(db, async (transaction) => {
+    const newGroupRef = doc(db, 'groups', newGroupId)
+    const newGroupSnap = await transaction.get(newGroupRef)
+
+    if (!newGroupSnap.exists()) {
+      throw new Error('Grupo destino no encontrado')
+    }
+
+    const newGroupData = newGroupSnap.data()
+    if ((newGroupData.currentEnrollment ?? 0) >= (newGroupData.maxCapacity ?? 0)) {
+      throw new Error('El grupo destino está lleno')
+    }
+
+    const oldGroupRef = doc(db, 'groups', oldGroupId)
+    const oldEnrollmentRef = doc(db, 'enrollments', oldEnrollmentId)
+    const newEnrollmentRef = doc(db, 'enrollments', newEnrollmentId)
+
+    // Deactivate old enrollment
+    transaction.update(oldEnrollmentRef, {
+      isActive: false,
+      unenrollmentDate: serverTimestamp(),
+    })
+
+    // Decrement old group counter
+    transaction.update(oldGroupRef, {
+      currentEnrollment: increment(-1),
+    })
+
+    // Create new enrollment
+    transaction.set(newEnrollmentRef, toFirestore({ ...newEnrollmentData, clubId }))
+
+    // Increment new group counter
+    transaction.update(newGroupRef, {
+      currentEnrollment: increment(1),
+    })
+  }).catch((error) => {
+    console.error(`[Firestore] moveEnrollmentAtomic failed: ${error}`)
+    throw error
   })
 }
