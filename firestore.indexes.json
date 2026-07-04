@@ -84,6 +84,22 @@
         { "fieldPath": "playerId", "order": "ASCENDING" },
         { "fieldPath": "invoiceDate", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "classReviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "coachId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "classReviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "playerId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -105,6 +105,13 @@ service cloud.firestore {
 
       allow create: if isAdmin() && (incomingBelongsToClub() || request.resource.data.clubId == null);
       allow update: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
+      // Jugador/tutor: solo pueden actualizar los datos de contacto propios / de sus hijos
+      allow update: if isAuthenticated() && (
+          (hasRole('jugador') && isOwnPlayer(playerId)) ||
+          (hasRole('tutor') && isChildPlayer(playerId))
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['phone', 'email', 'address', 'city', 'postalCode', 'updatedAt']);
       allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
     }
 
@@ -255,6 +262,21 @@ service cloud.firestore {
       allow create: if isAdmin() && (incomingBelongsToClub() || request.resource.data.clubId == null);
       allow update: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
       allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
+    }
+
+    // ─── Class Reviews Collection ───────────────────────────────────────
+
+    match /classReviews/{reviewId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        hasRole('entrenador') ||
+        (hasRole('jugador') && isOwnPlayer(resource.data.playerId))
+      );
+      allow create: if isAuthenticated() && (
+        hasRole('jugador') && request.resource.data.playerId == getUserData().linkedPlayerId
+      );
+      allow update: if false;
+      allow delete: if false;
     }
 
     // ─── Invoices Collection ────────────────────────────────────────────

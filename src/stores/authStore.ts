@@ -14,26 +14,30 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { migrateLocalToFirestore } from '@/lib/dataLoader'
 import { subscribeToAllData } from '@/lib/realtimeSync'
 import { retryFailedSyncs } from '@/lib/firestoreSync'
 import { useDataStore } from '@/stores/dataStore'
-import type { AppUser, UserRole } from '@/types'
+import type { AppUser, UserRole, Invitation } from '@/types'
 
 interface AuthState {
   user: AppUser | null
   isAuthenticated: boolean
   isLoading: boolean
   isDataLoading: boolean
+  activeChildId: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   resetPassword: (email: string) => Promise<void>
   changePassword: (currentPass: string, newPass: string) => Promise<void>
   setUser: (user: AppUser | null) => void
   setActiveRole: (role: UserRole) => void
+  setActiveChild: (playerId: string) => void
   signupPlayer: (email: string, pass: string, playerId: string) => Promise<void>
+  signupFromInvitation: (invitation: Invitation, pass: string) => Promise<void>
   initAuth: () => () => void
 }
 
@@ -175,6 +179,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
   isDataLoading: false,
+  activeChildId: localStorage.getItem('activeChildId'),
 
   login: async (email: string, password: string) => {
     set({ isLoading: true })
@@ -243,6 +248,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     }))
   },
 
+  setActiveChild: (playerId) => {
+    localStorage.setItem('activeChildId', playerId)
+    set({ activeChildId: playerId })
+  },
+
   signupPlayer: async (email, pass, playerId) => {
     set({ isLoading: true })
     try {
@@ -260,6 +270,40 @@ export const useAuthStore = create<AuthState>((set) => ({
         createdAt: new Date(),
       })
       
+      // Note: onAuthStateChanged will handle the rest (loadUserProfile, etc)
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  // Activa una cuenta desde una invitación de la colección 'invitations'
+  // (flujo de UsersPage / invitación masiva de tutores).
+  signupFromInvitation: async (invitation, pass) => {
+    set({ isLoading: true })
+    try {
+      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, invitation.email, pass)
+
+      const userData: Record<string, unknown> = {
+        email: invitation.email,
+        displayName: invitation.email.split('@')[0],
+        role: invitation.role,
+        roles: [invitation.role],
+        clubId: invitation.clubId,
+        isActive: true,
+        createdAt: new Date(),
+      }
+      if (invitation.linkedPlayerId) userData.linkedPlayerId = invitation.linkedPlayerId
+      if (invitation.linkedPlayerIds && invitation.linkedPlayerIds.length > 0) {
+        userData.linkedPlayerIds = invitation.linkedPlayerIds
+      }
+      await setDoc(doc(db, 'users', firebaseUser.uid), userData)
+
+      // Marcar la invitación como aceptada (las reglas lo permiten al propio invitado)
+      try {
+        await updateDoc(doc(db, 'invitations', invitation.id), { status: 'aceptada' })
+      } catch (err) {
+        console.warn('[Auth] No se pudo marcar la invitación como aceptada:', err)
+      }
       // Note: onAuthStateChanged will handle the rest (loadUserProfile, etc)
     } finally {
       set({ isLoading: false })

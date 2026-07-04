@@ -24,10 +24,12 @@ import {
   KeyRound,
   BarChart3,
   User,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
-import { useState, useMemo } from 'react'
+import { useEffectiveStudent } from '@/hooks/usePlayerData'
+import { useState } from 'react'
 import type { UserRole } from '@/types'
 import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
@@ -63,6 +65,7 @@ const navGroups: NavGroup[] = [
       { name: 'Informes Mensuales', href: '/informes-mensuales', icon: BarChart3, requiredModule: 'informes_mensuales' },
       { name: 'Metodología', href: '/methodology', icon: BookOpen, requiredModule: 'settings' },
       { name: 'Planificación', href: '/planificacion', icon: Map, requiredModule: 'settings' },
+      { name: 'Analítica', href: '/analitica', icon: TrendingUp, requiredModule: 'settings' },
     ],
   },
   {
@@ -113,8 +116,8 @@ export function Sidebar() {
   const filterItem = (item: NavItem) => {
     const activeRole = user?.activeRole ?? user?.role
 
-    // Jugador: solo ve el Dashboard (portal)
-    if (activeRole === 'jugador') {
+    // Jugador y tutor: solo ven el Dashboard (portal)
+    if (activeRole === 'jugador' || activeRole === 'tutor') {
       return item.href === '/'
     }
 
@@ -214,28 +217,20 @@ export function Sidebar() {
 
   // Bottom Nav items depending on active role
   const activeRole = user?.activeRole ?? user?.role
+  const { studentId: effectiveStudentId } = useEffectiveStudent()
 
-  // Para jugador: encontrar su grupo primario (si existe)
-  const playerGroupId = useMemo(() => {
-    if (activeRole !== 'jugador' || !user?.linkedPlayerId) return ''
-    // No tenemos acceso al dataStore aquí, se navega a /grupos como fallback
-    return ''
-  }, [activeRole, user?.linkedPlayerId])
-
-  const bottomNavItems = activeRole === 'jugador'
+  const bottomNavItems = activeRole === 'jugador' || activeRole === 'tutor'
     ? [
         { href: '/', label: 'Inicio', icon: LayoutDashboard },
-        { href: '/grupos', label: 'Mi Clase', icon: GraduationCap },
-        { href: '/pagos', label: 'Mis Pagos', icon: CreditCard },
-        { href: user?.linkedPlayerId ? `/jugadores/${user.linkedPlayerId}` : '/', label: 'Mi Perfil', icon: User },
+        { href: '/grupos', label: activeRole === 'tutor' ? 'Clases' : 'Mi Clase', icon: GraduationCap },
+        { href: '/pagos', label: activeRole === 'tutor' ? 'Pagos' : 'Mis Pagos', icon: CreditCard },
+        { href: effectiveStudentId ? `/jugadores/${effectiveStudentId}` : '/', label: 'Perfil', icon: User },
       ]
     : [
         { href: '/', label: 'Inicio', icon: LayoutDashboard },
         { href: '/grupos', label: 'Clases', icon: GraduationCap },
         { href: '/asistencia', label: 'Asistencia', icon: ClipboardCheck },
       ]
-  // Silencing unused warning
-  void playerGroupId
 
   const sidebarContent = (
     <div className="flex h-full flex-col">

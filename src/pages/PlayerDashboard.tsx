@@ -6,6 +6,7 @@ import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import {
   CalendarDays,
   Clock,
@@ -23,9 +24,13 @@ import {
   Award,
   ClipboardCheck,
   BellOff,
+  Star,
 } from 'lucide-react'
 import { cn, formatDate, ensureDate } from '@/lib/utils'
 import type { AttendanceNotice } from '@/types'
+import { useClassReviewsQuery } from '@/hooks/useQueries'
+import { collection, addDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { PlayerPaymentsList } from '@/components/player/PlayerPaymentsList'
 import { VoucherCard } from '@/components/vouchers/VoucherCard'
@@ -52,6 +57,7 @@ export default function PlayerDashboard() {
     matchReports,
     events,
     cancelledClasses,
+    attendance,
   } = useDataStore()
 
   const navigate = useNavigate()
@@ -59,9 +65,19 @@ export default function PlayerDashboard() {
   const [showVouchers, setShowVouchers] = useState(false)
   const [showProgress, setShowProgress] = useState(false)
   const [showAbsences, setShowAbsences] = useState(false)
+  const [surveySkipped, setSurveySkipped] = useState(false)
+  const [surveySubmitted, setSurveySubmitted] = useState(false)
+
+  // ── Survey state ──────────────────────────────────────────────────────────
+  const [surveyPunctual, setSurveyPunctual] = useState<boolean | null>(null)
+  const [surveyUsedPhone, setSurveyUsedPhone] = useState<boolean | null>(null)
+  const [surveyQuality, setSurveyQuality] = useState<number>(0)
+  const [surveyComment, setSurveyComment] = useState('')
+  const [surveySubmitting, setSurveySubmitting] = useState(false)
 
   const {
     studentId,
+    student,
     myGroups,
     nextClass,
     attendancePercent,
@@ -71,7 +87,65 @@ export default function PlayerDashboard() {
     activeVouchersCount,
   } = usePlayerData()
 
+  const { data: myReviews = [], refetch: refetchReviews } = useClassReviewsQuery(studentId ?? undefined)
+
   const now = new Date()
+
+  const activeRole = user?.activeRole ?? user?.role
+  const isTutor = activeRole === 'tutor'
+  const studentFirstName = student?.firstName ?? user?.displayName?.split(' ')[0] ?? ''
+  const studentFullName = student
+    ? `${student.firstName} ${student.lastName}`.trim()
+    : user?.displayName || 'Alumno'
+
+  // ── Cuestionario pendiente: clase en últimas 48h donde fui presente y no valoré ──
+  // La encuesta la responde el propio jugador; se oculta para tutores.
+  const pendingReview = useMemo(() => {
+    if (!studentId || isTutor || surveySkipped || surveySubmitted) return null
+    const cutoff = new Date(now)
+    cutoff.setHours(cutoff.getHours() - 48)
+
+    const reviewed = new Set(
+      myReviews.map(r => `${r.groupId}-${r.date}`)
+    )
+
+    for (const record of attendance) {
+      const d = record.date instanceof Date ? record.date : new Date(record.date)
+      if (d < cutoff || d > now) continue
+      const wasPresent = record.records.some(e => e.playerId === studentId && e.status === 'presente')
+      if (!wasPresent) continue
+      const dateStr = d.toISOString().split('T')[0]
+      const key = `${record.groupId}-${dateStr}`
+      if (!reviewed.has(key)) {
+        return { ...record, dateStr }
+      }
+    }
+    return null
+  }, [attendance, studentId, isTutor, myReviews, surveySkipped, surveySubmitted])
+
+  const handleSurveySubmit = async () => {
+    if (!pendingReview || !studentId || surveyQuality === 0 || surveyPunctual === null || surveyUsedPhone === null) return
+    setSurveySubmitting(true)
+    try {
+      const playerEntry = pendingReview.records.find(e => e.playerId === studentId)
+      await addDoc(collection(db, 'classReviews'), {
+        groupId: pendingReview.groupId,
+        coachId: pendingReview.coachId,
+        playerId: studentId,
+        playerName: playerEntry?.playerName ?? studentFullName,
+        date: pendingReview.dateStr,
+        punctual: surveyPunctual,
+        usedPhone: surveyUsedPhone,
+        quality: surveyQuality,
+        comment: surveyComment.trim() || null,
+        submittedAt: new Date(),
+      })
+      setSurveySubmitted(true)
+      refetchReviews()
+    } finally {
+      setSurveySubmitting(false)
+    }
+  }
 
   // ── Aviso de asistencia para la próxima clase ─────────────────────────────
   const nextClassDateStr = nextClass ? nextClass.classDate.toISOString().split('T')[0] : ''
@@ -90,7 +164,7 @@ export default function PlayerDashboard() {
     }
     const newNotice: Omit<AttendanceNotice, 'id' | 'createdAt'> = {
       playerId: studentId,
-      playerName: user?.displayName || 'Alumno',
+      playerName: studentFullName,
       groupId: nextClass.group.id,
       date: new Date(nextClassDateStr),
       type,
@@ -306,12 +380,110 @@ export default function PlayerDashboard() {
             <h1 className="text-2xl font-black text-slate-800 tracking-tight">
               Hola, {user?.displayName?.split(' ')[0]}
             </h1>
-            <p className="text-sm font-medium text-slate-400">{formatDate(now)}</p>
+            <p className="text-sm font-medium text-slate-400">
+              {isTutor ? <>Viendo a <span className="font-bold text-slate-600">{studentFirstName}</span> · {formatDate(now)}</> : formatDate(now)}
+            </p>
           </div>
           <div className="h-12 w-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-100/50">
             <Trophy className="h-6 w-6" />
           </div>
         </div>
+
+        {/* Survey post-entrenamiento */}
+        {pendingReview && !surveySubmitted && (
+          <Card className="border-emerald-100 bg-emerald-50/40">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4 text-emerald-600" />
+                  <p className="font-semibold text-sm text-foreground">¿Cómo fue tu clase?</p>
+                </div>
+                <button
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => setSurveySkipped(true)}
+                >
+                  Saltar
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">{pendingReview.groupName} · {pendingReview.dateStr}</p>
+
+              {/* Puntualidad */}
+              <div>
+                <p className="text-xs font-medium mb-2">¿El coach fue puntual?</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm" variant={surveyPunctual === true ? 'default' : 'outline'}
+                    className="h-8 text-xs flex-1"
+                    onClick={() => setSurveyPunctual(true)}
+                  >Sí</Button>
+                  <Button
+                    size="sm" variant={surveyPunctual === false ? 'destructive' : 'outline'}
+                    className="h-8 text-xs flex-1"
+                    onClick={() => setSurveyPunctual(false)}
+                  >No</Button>
+                </div>
+              </div>
+
+              {/* Móvil */}
+              <div>
+                <p className="text-xs font-medium mb-2">¿Usó el móvil en pista?</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm" variant={surveyUsedPhone === false ? 'default' : 'outline'}
+                    className="h-8 text-xs flex-1"
+                    onClick={() => setSurveyUsedPhone(false)}
+                  >No</Button>
+                  <Button
+                    size="sm" variant={surveyUsedPhone === true ? 'destructive' : 'outline'}
+                    className="h-8 text-xs flex-1"
+                    onClick={() => setSurveyUsedPhone(true)}
+                  >Sí</Button>
+                </div>
+              </div>
+
+              {/* Calidad */}
+              <div>
+                <p className="text-xs font-medium mb-2">Calidad de la clase</p>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button key={n} onClick={() => setSurveyQuality(n)}>
+                      <Star className={cn('h-7 w-7', n <= surveyQuality ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200')} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Comentario */}
+              <div>
+                <p className="text-xs font-medium mb-1">¿Algo a mejorar? <span className="text-muted-foreground">(opcional)</span></p>
+                <Textarea
+                  rows={2}
+                  placeholder="Escribe aquí..."
+                  className="text-sm resize-none"
+                  value={surveyComment}
+                  onChange={e => setSurveyComment(e.target.value)}
+                />
+              </div>
+
+              <Button
+                className="w-full"
+                disabled={surveyQuality === 0 || surveyPunctual === null || surveyUsedPhone === null || surveySubmitting}
+                onClick={handleSurveySubmit}
+              >
+                {surveySubmitting ? 'Enviando...' : 'Enviar valoración'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {surveySubmitted && (
+          <Card className="border-emerald-100 bg-emerald-50/40">
+            <CardContent className="p-4 flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+              <p className="text-sm font-medium text-emerald-700">¡Gracias por tu valoración!</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Botones de acción rápida — móvil */}
         <div className="grid grid-cols-2 gap-3">
@@ -447,7 +619,9 @@ export default function PlayerDashboard() {
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">
               Hola, {user?.displayName?.split(' ')[0]} 👋
             </h1>
-            <p className="text-sm font-medium text-slate-400 mt-1">{formatDate(now)}</p>
+            <p className="text-sm font-medium text-slate-400 mt-1">
+              {isTutor ? <>Viendo a <span className="font-bold text-slate-600">{studentFirstName}</span> · {formatDate(now)}</> : formatDate(now)}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {pendingPaymentsCount > 0 && (
@@ -569,7 +743,7 @@ export default function PlayerDashboard() {
           myGroups={myGroups}
           existingNotices={attendanceNotices}
           studentId={studentId}
-          playerName={user?.displayName || 'Alumno'}
+          playerName={studentFullName}
           onAdd={addAttendanceNotice}
           onDelete={deleteAttendanceNotice}
         />

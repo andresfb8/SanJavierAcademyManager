@@ -50,6 +50,7 @@ interface Group {
   installmentMonths?: number[];
   installmentPrices?: Record<string, number>;
   startDate?: Timestamp;
+  endDate?: Timestamp;
   isActive: boolean;
 }
 
@@ -173,6 +174,26 @@ async function processClub(
       );
       skipped++;
       continue;
+    }
+
+    // Skip inactive groups
+    if (!group.isActive) {
+      skipped++;
+      continue;
+    }
+
+    // Skip if the billing period starts after the group's end date
+    if (group.endDate) {
+      const billingPeriodStart = new Date(billingYear, billingMonth - 1, 1);
+      const groupEnd = group.endDate.toDate();
+      if (billingPeriodStart > groupEnd) {
+        logger.info(
+          `Club ${clubId}: group ${group.id} ended on ${groupEnd.toISOString().split("T")[0]}, ` +
+          `skipping payment for ${billingMonth}/${billingYear}.`,
+        );
+        skipped++;
+        continue;
+      }
     }
 
     // -----------------------------------------------------------------------

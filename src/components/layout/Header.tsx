@@ -1,4 +1,5 @@
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { ChildSwitcher } from '@/components/layout/ChildSwitcher'
 
 interface HeaderProps {
   title: string
@@ -24,6 +25,7 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
           )}
         </div>
         <div className="flex items-center gap-4 shrink-0">
+          <ChildSwitcher />
           {actions}
           <div className="h-6 w-px bg-border/60 mx-1 hidden sm:block" />
           <NotificationBell />

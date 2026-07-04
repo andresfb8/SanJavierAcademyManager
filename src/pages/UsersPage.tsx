@@ -9,11 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { BulkTutorInviteDialog } from '@/components/shared/BulkTutorInviteDialog'
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
-import { formatDate, generateId, normalizeText } from '@/lib/utils'
+import { formatDate, normalizeText } from '@/lib/utils'
+import { createInvitation } from '@/lib/invitations'
 import type { UserRole, InvitationStatus } from '@/types'
 import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, UserX, UserCog, UserCheck, Users, Gamepad2 } from 'lucide-react'
-import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore'
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 interface FirestoreUser {
@@ -48,6 +50,7 @@ export default function UsersPage() {
 
   // --- Dialog state ---
   const [showInviteDialog, setShowInviteDialog] = useState(false)
+  const [showBulkTutorDialog, setShowBulkTutorDialog] = useState(false)
 
   // --- Users state ---
   const [deactivateUserId, setDeactivateUserId] = useState<string | null>(null)
@@ -81,7 +84,7 @@ export default function UsersPage() {
   const [emailError, setEmailError] = useState('')
 
   // --- Store ---
-  const { invitations, addInvitation, deleteInvitation, players, coaches, addCoach, users } = useDataStore()
+  const { invitations, deleteInvitation, players, coaches, addCoach, users } = useDataStore()
   const { user } = useAuthStore()
 
   // --- Derived data ---
@@ -252,33 +255,6 @@ export default function UsersPage() {
     if (!validateEmail(inviteEmail.trim())) { setEmailError('El formato del email no es valido'); return }
     if (!inviteRole) { setEmailError('Selecciona un rol'); return }
 
-    const token = generateId()
-    const activationUrl = `${window.location.origin}/activar/${token}`
-
-    const now = new Date()
-    const expiresAt = new Date(now)
-    expiresAt.setDate(expiresAt.getDate() + 7)
-
-    const invitationData: Omit<import('@/types').Invitation, 'id'> = {
-      email: inviteEmail.trim().toLowerCase(),
-      role: inviteRole as UserRole,
-      clubId: user?.clubId ?? 'club-001',
-      status: 'pendiente',
-      token,
-      createdBy: user?.id ?? 'unknown',
-      createdAt: now,
-      expiresAt,
-    }
-
-    if (inviteRole === 'jugador' && linkedPlayerId) {
-      invitationData.linkedPlayerId = linkedPlayerId
-    }
-    if (inviteRole === 'tutor' && linkedPlayerIds.length > 0) {
-      invitationData.linkedPlayerIds = [...linkedPlayerIds]
-    }
-
-    addInvitation({ ...invitationData, id: token } as import('@/types').Invitation)
-
     if (inviteRole === 'entrenador' || inviteRole === 'coordinador') {
       const email = inviteEmail.trim().toLowerCase()
       const existingCoach = coaches.find((c) => c.email.toLowerCase() === email)
@@ -296,15 +272,20 @@ export default function UsersPage() {
     }
 
     try {
-      await setDoc(doc(db, 'invitations', token), invitationData)
+      const { activationUrl } = await createInvitation({
+        email: inviteEmail,
+        role: inviteRole as UserRole,
+        clubId: user?.clubId ?? 'club-001',
+        createdBy: user?.id ?? 'unknown',
+        linkedPlayerId: inviteRole === 'jugador' && linkedPlayerId ? linkedPlayerId : undefined,
+        linkedPlayerIds: inviteRole === 'tutor' && linkedPlayerIds.length > 0 ? linkedPlayerIds : undefined,
+      })
+      setInviteLink(activationUrl)
+      setInviteSuccess(true)
     } catch (err) {
       console.error('Error saving invitation to Firestore:', err)
       setEmailError('Error al guardar la invitacion. Intentalo de nuevo.')
-      return
     }
-
-    setInviteLink(activationUrl)
-    setInviteSuccess(true)
   }
 
   function handleCopyLink() {
@@ -416,10 +397,16 @@ export default function UsersPage() {
             Administra el acceso al sistema y el portal de jugadores
           </p>
         </div>
-        <Button onClick={handleOpenDialog}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Invitar usuario
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowBulkTutorDialog(true)}>
+            <Users className="h-4 w-4 mr-2" />
+            Invitar tutores
+          </Button>
+          <Button onClick={handleOpenDialog}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Invitar usuario
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -725,6 +712,11 @@ export default function UsersPage() {
       </div>
 
       {/* Deactivate User Confirmation Dialog */}
+      <BulkTutorInviteDialog
+        open={showBulkTutorDialog}
+        onOpenChange={setShowBulkTutorDialog}
+      />
+
       <ConfirmDialog
         open={deactivateUserId !== null}
         onOpenChange={(open) => !open && setDeactivateUserId(null)}

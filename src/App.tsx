@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import { useNotificationSetup } from '@/hooks/useNotificationSetup'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
+import { useEffectiveStudent } from '@/hooks/usePlayerData'
 import type { UserRole } from '@/types'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { Toaster } from '@/components/ui/toaster'
@@ -23,6 +24,7 @@ const PlanningPage = lazy(() => import('@/pages/PlanningPage'))
 const MethodologyPage = lazy(() => import('@/pages/MethodologyPage'))
 const UsersPage = lazy(() => import('@/pages/UsersPage'))
 const ActivateAccountPage = lazy(() => import('@/pages/ActivateAccountPage'))
+const ActivateInvitationPage = lazy(() => import('@/pages/ActivateInvitationPage'))
 const EventsActivitiesPage = lazy(() => import('@/pages/EventsActivitiesPage'))
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage'))
 const PrivateLessonDetailPage = lazy(() => import('@/pages/PrivateLessonDetailPage'))
@@ -36,6 +38,7 @@ const FinancialsPage = lazy(() => import('@/pages/FinancialsPage'))
 const PlayerDashboard = lazy(() => import('@/pages/PlayerDashboard'))
 const CoachDashboard = lazy(() => import('@/pages/CoachDashboard'))
 const FreeSlotsPage = lazy(() => import('@/pages/FreeSlotsPage'))
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -92,10 +95,11 @@ function GroupsRouter() {
 
 function PlayersRouter() {
   const { user } = useAuthStore()
+  const { studentId } = useEffectiveStudent()
   const activeRole = user?.activeRole ?? user?.role
   if (activeRole === 'jugador' || activeRole === 'tutor') {
-    if (user?.linkedPlayerId) {
-      return <Navigate to={`/jugadores/${user.linkedPlayerId}`} replace />
+    if (studentId) {
+      return <Navigate to={`/jugadores/${studentId}`} replace />
     }
     return <Navigate to="/" replace />
   }
@@ -123,6 +127,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/activar-cuenta" element={<ActivateAccountPage />} />
+          <Route path="/activar/:token" element={<ActivateInvitationPage />} />
           <Route
             element={
               <ProtectedRoute>
@@ -134,7 +139,7 @@ export default function App() {
               path="/"
               element={(() => {
                 const activeRole = user?.activeRole ?? user?.role
-                if (activeRole === 'jugador') return <PlayerDashboard />
+                if (activeRole === 'jugador' || activeRole === 'tutor') return <PlayerDashboard />
                 if (activeRole === 'entrenador') return <CoachDashboard />
                 return <DashboardPage />
               })()}
@@ -163,6 +168,7 @@ export default function App() {
             <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
             <Route path="/planificacion" element={<RoleRoute module="settings"><PlanningPage /></RoleRoute>} />
             <Route path="/methodology" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
+            <Route path="/analitica" element={<RoleRoute module="settings"><AnalyticsPage /></RoleRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

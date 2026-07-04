@@ -3,15 +3,24 @@ import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, MapPin, Clock, Users, ArrowRight, Sparkles } from 'lucide-react'
+import { Calendar, MapPin, Clock, Users, RefreshCw, Sparkles } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
 import { useAttendanceQuery } from '@/hooks/useQueries'
-import { AttendanceEntry } from '@/types'
+import { AttendanceEntry, AttendanceRecord } from '@/types'
+import { BookRecoveryDialog } from '@/components/shared/BookRecoveryDialog'
+
+interface RecoverySlot {
+  groupId: string
+  groupName: string
+  coachId: string
+  date: Date
+}
 
 export default function FreeSlotsPage() {
   const { groups } = useDataStore()
   const { data: attendance = [] } = useAttendanceQuery()
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [bookingSlot, setBookingSlot] = useState<RecoverySlot | null>(null)
 
   // Calculate free slots based on absences and group capacity
   const freeSlots = useMemo(() => {
@@ -51,6 +60,7 @@ export default function FreeSlotsPage() {
           id: `${group.id}-${selectedDate}`,
           groupId: group.id,
           groupName: group.name,
+          coachId: group.coachId,
           level: group.level,
           courtName: group.courtName,
           coachName: group.coachName,
@@ -63,6 +73,16 @@ export default function FreeSlotsPage() {
 
     return slots.sort((a: any, b: any) => a.time.localeCompare(b.time))
   }, [groups, attendance, selectedDate])
+
+  // Registro de asistencia existente para el hueco en reserva (grupo + fecha seleccionada).
+  const bookingRecord: AttendanceRecord | undefined = useMemo(() => {
+    if (!bookingSlot) return undefined
+    return attendance.find(
+      (a) =>
+        a.groupId === bookingSlot.groupId &&
+        new Date(a.date).toDateString() === bookingSlot.date.toDateString()
+    )
+  }, [attendance, bookingSlot])
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value)
@@ -159,9 +179,17 @@ export default function FreeSlotsPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="pt-0 pb-5 px-5">
-                    <Button className="w-full rounded-xl font-bold shadow-md hover:shadow-lg active:scale-[0.98] transition-all group">
-                      Unirme a la clase
-                      <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    <Button
+                      className="w-full rounded-xl font-bold shadow-md hover:shadow-lg active:scale-[0.98] transition-all group"
+                      onClick={() => setBookingSlot({
+                        groupId: slot.groupId,
+                        groupName: slot.groupName,
+                        coachId: slot.coachId,
+                        date: new Date(selectedDate + 'T00:00:00'),
+                      })}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-300" />
+                      Reservar recuperación
                     </Button>
                   </CardFooter>
                 </Card>
@@ -170,6 +198,13 @@ export default function FreeSlotsPage() {
           )}
         </div>
       </div>
+
+      <BookRecoveryDialog
+        open={bookingSlot !== null}
+        onOpenChange={(o) => { if (!o) setBookingSlot(null) }}
+        slot={bookingSlot}
+        existingRecord={bookingRecord}
+      />
     </div>
   )
 }

@@ -27,7 +27,7 @@ import { billingFrequencyLabel } from '@/lib/billing-utils'
 export default function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { groups, players, enrollments, tariffs, addEnrollment, deactivateEnrollment } = useDataStore()
+  const { groups, players, enrollments, tariffs, addEnrollment, deactivateEnrollment, addToWaitlist, promoteFromWaitlist, removeFromWaitlist } = useDataStore()
   const { user } = useAuthStore()
 
   const [showAddPlayer, setShowAddPlayer] = useState(false)
@@ -64,10 +64,33 @@ export default function GroupDetailPage() {
     [groupEnrollments]
   )
 
-  const availablePlayers = useMemo(
-    () => players.filter((p) => (p.status === 'activo' || p.status === 'lista_espera') && !enrolledPlayerIds.has(p.id)),
-    [players, enrolledPlayerIds]
+  // Cola de espera del grupo (enrollments isWaitlist ordenados por posición)
+  const waitlistEntries = useMemo(
+    () =>
+      enrollments
+        .filter((e) => e.groupId === id && e.isWaitlist && !e.isActive)
+        .sort((a, b) => (a.waitlistPosition ?? 0) - (b.waitlistPosition ?? 0)),
+    [enrollments, id]
   )
+
+  const waitlistPlayerIds = useMemo(
+    () => new Set(waitlistEntries.map((e) => e.playerId)),
+    [waitlistEntries]
+  )
+
+  const availablePlayers = useMemo(
+    () =>
+      players.filter(
+        (p) =>
+          (p.status === 'activo' || p.status === 'lista_espera') &&
+          !enrolledPlayerIds.has(p.id) &&
+          !waitlistPlayerIds.has(p.id)
+      ),
+    [players, enrolledPlayerIds, waitlistPlayerIds]
+  )
+
+  const hasFreeSpot = group ? group.currentEnrollment < group.maxCapacity : false
+  const isFull = group ? group.currentEnrollment >= group.maxCapacity : false
 
   // ===================
   // STATE - Bajas
@@ -141,6 +164,22 @@ export default function GroupDetailPage() {
       }
     }
 
+    // Grupo lleno: en vez de matricular, añadir a la lista de espera.
+    if (isFull) {
+      addToWaitlist({
+        playerId: player.id,
+        playerName: `${player.firstName} ${player.lastName}`,
+        groupId: group.id,
+        groupName: group.name,
+        tariffId: tariff.id,
+        tariffName: tariff.name,
+        customPrice: finalCustomPrice,
+      })
+      setShowAddPlayer(false)
+      resetAddForm()
+      return
+    }
+
     const { needsPartialReceipt, enrollmentId } = await addEnrollment({
       playerId: player.id,
       playerName: `${player.firstName} ${player.lastName}`,
@@ -165,6 +204,14 @@ export default function GroupDetailPage() {
         enrollmentId,
         amount: (finalCustomPrice ?? tariff.price).toString()
       })
+    }
+  }
+
+  const handlePromoteWaitlist = async (enrollmentId: string) => {
+    try {
+      await promoteFromWaitlist(enrollmentId)
+    } catch {
+      // Errores gestionados en el store (toast)
     }
   }
 
@@ -550,6 +597,76 @@ export default function GroupDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Waitlist Section */}
+            {(waitlistEntries.length > 0 || isFull) && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Lista de espera ({waitlistEntries.length})
+                  </CardTitle>
+                  {hasFreeSpot && waitlistEntries.length > 0 && (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-none">
+                      Plaza libre disponible
+                    </Badge>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {waitlistEntries.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      El grupo está completo. Los alumnos que añadas entrarán en lista de espera.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {waitlistEntries.map((entry, idx) => {
+                        const canPromote = hasFreeSpot && idx === 0
+                        return (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border p-3 hover:bg-muted/30 transition-colors"
+                          >
+                            <button
+                              className="flex items-center gap-3 text-left min-w-0"
+                              onClick={() => navigate(`/jugadores/${entry.playerId}`)}
+                            >
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold shrink-0">
+                                {entry.waitlistPosition ?? idx + 1}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate hover:underline">{entry.playerName}</p>
+                                <p className="text-xs text-muted-foreground truncate">{entry.tariffName}</p>
+                              </div>
+                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                size="sm"
+                                variant={canPromote ? 'default' : 'outline'}
+                                disabled={!hasFreeSpot}
+                                onClick={() => handlePromoteWaitlist(entry.id)}
+                                title={hasFreeSpot ? 'Promover a matrícula activa' : 'No hay plazas libres'}
+                              >
+                                <UserPlus className="h-4 w-4 mr-1" />
+                                Promover
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => removeFromWaitlist(entry.id)}
+                                title="Quitar de la lista de espera"
+                              >
+                                <UserMinus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="planificacion" className="mt-0">
@@ -562,9 +679,15 @@ export default function GroupDetailPage() {
       <Dialog open={showAddPlayer} onOpenChange={setShowAddPlayer}>
         <DialogContent className="max-w-lg sm:max-w-lg md:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Añadir jugador al grupo</DialogTitle>
+            <DialogTitle>{isFull ? 'Añadir a lista de espera' : 'Añadir jugador al grupo'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {isFull && (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
+                <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>El grupo está completo ({group.currentEnrollment}/{group.maxCapacity}). El alumno entrará en la lista de espera y podrás promoverlo cuando se libere una plaza.</span>
+              </div>
+            )}
             {/* Select Player */}
             <div className="space-y-2">
               <Label htmlFor="player">Jugador *</Label>
@@ -727,8 +850,11 @@ export default function GroupDetailPage() {
               onClick={handleAddPlayer}
               disabled={!selectedPlayerId || !selectedTariffId || availablePlayers.length === 0}
             >
-              <UserPlus className="h-4 w-4 mr-1" />
-              Inscribir
+              {isFull ? (
+                <><Clock className="h-4 w-4 mr-1" /> Añadir a lista de espera</>
+              ) : (
+                <><UserPlus className="h-4 w-4 mr-1" /> Inscribir</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

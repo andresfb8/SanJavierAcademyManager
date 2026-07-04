@@ -161,6 +161,21 @@ export interface DataState {
     newEnrollmentData: Pick<Enrollment, 'tariffId' | 'tariffName' | 'customPrice' | 'billingFrequency' | 'billingAnchorMonth' | 'playerId' | 'playerName'>
   ) => Promise<void>
 
+  // --- Lista de espera (cola por grupo, modelada como enrollments isActive:false + isWaitlist) ---
+  addToWaitlist: (data: Pick<Enrollment, 'playerId' | 'playerName' | 'groupId' | 'groupName' | 'tariffId' | 'tariffName' | 'customPrice'>) => void
+  promoteFromWaitlist: (enrollmentId: string) => Promise<void>
+  removeFromWaitlist: (enrollmentId: string) => void
+
+  // --- Recuperaciones (reserva por admin/entrenador en un hueco libre) ---
+  bookRecovery: (params: {
+    groupId: string
+    groupName: string
+    date: Date
+    coachId: string
+    player: { id: string; firstName: string; lastName: string; recoveryCredits: number }
+    existingRecord?: AttendanceRecord
+  }) => void
+
   // --- Payments ---
   generatePartialReceipt: (enrollmentId: string, amount: number) => Promise<void>
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => void
@@ -312,6 +327,57 @@ export function computePlayerRecoveryBalance(
   return unconsumedEarned.filter(
     (earnedDate) => now.getTime() - earnedDate.getTime() < expiryMs
   ).length
+}
+
+// Reasigna posiciones 1..n a las entradas de cola de un grupo tras quitar/promover una,
+// sincronizando solo las que cambian.
+function recompactWaitlist(
+  groupId: string,
+  get: () => DataState,
+  set: (partial: Partial<DataState> | ((state: DataState) => Partial<DataState>)) => void
+): void {
+  const clubId = getClubId()
+  const queue = get().enrollments
+    .filter((e) => e.groupId === groupId && e.isWaitlist && !e.isActive)
+    .sort((a, b) => (a.waitlistPosition ?? 0) - (b.waitlistPosition ?? 0))
+
+  const updates = new Map<string, number>()
+  queue.forEach((e, idx) => {
+    const newPos = idx + 1
+    if (e.waitlistPosition !== newPos) updates.set(e.id, newPos)
+  })
+  if (updates.size === 0) return
+
+  set((state) => ({
+    enrollments: state.enrollments.map((e) =>
+      updates.has(e.id) ? { ...e, waitlistPosition: updates.get(e.id)! } : e
+    ),
+  }))
+  if (clubId) {
+    for (const [id, pos] of updates) {
+      const updated = get().enrollments.find((e) => e.id === id)
+      if (updated) syncDoc('enrollments', id, updated as any, clubId)
+    }
+  }
+}
+
+// Si al liberar una plaza el grupo tiene cola de espera y hay hueco, avisa al admin.
+function notifyWaitlistSpot(groupId: string, get: () => DataState): void {
+  const group = get().groups.find((g) => g.id === groupId)
+  if (!group) return
+  const queueLength = get().enrollments.filter(
+    (e) => e.groupId === groupId && e.isWaitlist && !e.isActive
+  ).length
+  if (queueLength === 0 || group.currentEnrollment >= group.maxCapacity) return
+
+  const { userId, userName } = getCurrentUser()
+  get().addActivity({
+    type: 'waitlist_spot_available',
+    description: `Plaza libre en ${group.name}: ${queueLength} en lista de espera`,
+    relatedEntityId: groupId,
+    userId,
+    userName,
+  })
 }
 
 export const useDataStore = create<DataState>()(
@@ -973,6 +1039,9 @@ export const useDataStore = create<DataState>()(
             }),
           }))
 
+          // Plaza liberada en el grupo origen: avisar si tiene cola de espera.
+          notifyWaitlistSpot(currentEnrollment.groupId, get)
+
           const { userId, userName } = getCurrentUser()
           get().addActivity({
             type: 'enrollment_created',
@@ -1099,6 +1168,9 @@ export const useDataStore = create<DataState>()(
               console.info(`[deactivateEnrollment] Player ${enrollment.playerId} moved to lista_espera`)
             }
           }
+
+          // Plaza liberada: avisar si hay cola de espera en el grupo.
+          notifyWaitlistSpot(enrollment.groupId, get)
 
           const { userId, userName } = getCurrentUser()
           get().addActivity({
@@ -1454,6 +1526,127 @@ export const useDataStore = create<DataState>()(
       deleteAttendanceRecord: (id: string) => {
         deleteFirestoreDoc('attendance', id)
         queryClient.invalidateQueries({ queryKey: ['attendance'] })
+      },
+
+      // Reserva una recuperación: añade la entry isRecovery al registro de asistencia
+      // del grupo+fecha (creándolo si no existe) y descuenta un crédito.
+      bookRecovery: ({ groupId, groupName, date, coachId, player, existingRecord }) => {
+        if ((player.recoveryCredits || 0) <= 0) return
+
+        const playerName = `${player.firstName} ${player.lastName}`.trim()
+        const entry: AttendanceEntry = {
+          playerId: player.id,
+          playerName,
+          status: 'presente',
+          isRecovery: true,
+          notes: 'Clase de recuperación',
+        }
+
+        if (existingRecord) {
+          // Ya presente en el registro: no duplicar ni descontar de nuevo.
+          if (existingRecord.records.some((e) => e.playerId === player.id)) return
+          // La ruta de update NO procesa el descuento de crédito automáticamente,
+          // así que lo hacemos aquí explícitamente (a diferencia de addAttendanceRecord).
+          get().updateAttendanceRecord(existingRecord.id, {
+            records: [...existingRecord.records, entry],
+          })
+          get().updatePlayer(player.id, { recoveryCredits: player.recoveryCredits - 1 })
+        } else {
+          // addAttendanceRecord descuenta el crédito por su side-effect (isRecovery -> -1).
+          get().addAttendanceRecord({
+            groupId,
+            groupName,
+            date,
+            records: [entry],
+            coachId,
+          })
+        }
+
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'recovery_used',
+          description: `${playerName} reservó una recuperación en ${groupName} (${date.toLocaleDateString('es-ES')})`,
+          relatedEntityId: player.id,
+          userId,
+          userName,
+        })
+        queryClient.invalidateQueries({ queryKey: ['players'] })
+      },
+
+      addToWaitlist: (data) => {
+        const clubId = getClubId()
+        if (!clubId) return
+        const currentQueue = get().enrollments.filter(
+          (e) => e.groupId === data.groupId && e.isWaitlist && !e.isActive
+        )
+        // Evitar duplicados en la cola del mismo grupo.
+        if (currentQueue.some((e) => e.playerId === data.playerId)) return
+        const maxPos = currentQueue.reduce((m, e) => Math.max(m, e.waitlistPosition ?? 0), 0)
+
+        const newEntry: Enrollment = {
+          ...data,
+          id: generateId(),
+          enrollmentDate: new Date(),
+          isActive: false,
+          isWaitlist: true,
+          waitlistPosition: maxPos + 1,
+        }
+
+        set((state) => ({ enrollments: [...state.enrollments, newEntry] }))
+        syncDoc('enrollments', newEntry.id, newEntry as any, clubId)
+
+        // Si el jugador no tiene ninguna matrícula activa, marcarlo lista_espera.
+        const player = get().players.find((p) => p.id === data.playerId)
+        if (player && player.status !== 'activo') {
+          get().updatePlayer(data.playerId, { status: 'lista_espera' })
+        }
+
+        const { userId, userName } = getCurrentUser()
+        get().addActivity({
+          type: 'enrollment_created',
+          description: `${data.playerName} añadido a la lista de espera de ${data.groupName}`,
+          relatedEntityId: newEntry.id,
+          userId,
+          userName,
+        })
+        queryClient.invalidateQueries({ queryKey: ['enrollments'] })
+      },
+
+      removeFromWaitlist: (enrollmentId) => {
+        const entry = get().enrollments.find((e) => e.id === enrollmentId)
+        if (!entry || !entry.isWaitlist) return
+        set((state) => ({ enrollments: state.enrollments.filter((e) => e.id !== enrollmentId) }))
+        deleteFirestoreDoc('enrollments', enrollmentId)
+        // Recompactar posiciones de la cola restante.
+        recompactWaitlist(entry.groupId, get, set)
+        queryClient.invalidateQueries({ queryKey: ['enrollments'] })
+      },
+
+      promoteFromWaitlist: async (enrollmentId) => {
+        const entry = get().enrollments.find((e) => e.id === enrollmentId)
+        if (!entry || !entry.isWaitlist) return
+
+        // Quitar de la cola primero (para no dejar duplicado playerId+group).
+        set((state) => ({ enrollments: state.enrollments.filter((e) => e.id !== enrollmentId) }))
+        deleteFirestoreDoc('enrollments', enrollmentId)
+
+        // Crear matrícula real reutilizando addEnrollment (sube currentEnrollment y promueve status).
+        await get().addEnrollment({
+          playerId: entry.playerId,
+          playerName: entry.playerName,
+          groupId: entry.groupId,
+          groupName: entry.groupName,
+          tariffId: entry.tariffId,
+          tariffName: entry.tariffName,
+          customPrice: entry.customPrice,
+          billingFrequency: entry.billingFrequency,
+          billingAnchorMonth: entry.billingAnchorMonth,
+          enrollmentDate: new Date(),
+          isActive: true,
+        })
+
+        recompactWaitlist(entry.groupId, get, set)
+        queryClient.invalidateQueries({ queryKey: ['enrollments'] })
       },
       addActivity: (activityData) => {
         const newActivity: Activity = { ...activityData, id: generateId(), createdAt: new Date() }

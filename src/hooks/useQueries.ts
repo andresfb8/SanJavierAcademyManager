@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, orderBy, limit, QueryConstraint } fr
 import { db } from '@/lib/firebase'
 import { fromFirestore } from '@/lib/firestoreSync'
 import { normalizeAllPayments, type NormalizedPayment } from '@/lib/payment-utils'
-import type { Payment, EventPayment, PrivateLessonPayment, AttendanceRecord, Invoice, Evaluation, MatchReport, Activity } from '@/types'
+import type { Payment, EventPayment, PrivateLessonPayment, AttendanceRecord, Invoice, Evaluation, MatchReport, Activity, ClassReview } from '@/types'
 import { useAuthStore } from '@/stores/authStore'
 
 function getClubId() {
@@ -251,6 +251,26 @@ export function useMatchReportsQuery(playerId?: string) {
         reports = reports.filter(r => r.playerIds.includes(playerId))
       }
       return reports
+    },
+    enabled: !!clubId
+  })
+}
+
+// --- CLASS REVIEWS ---
+
+export function useClassReviewsQuery(playerId?: string) {
+  const clubId = getClubId()
+  return useQuery({
+    queryKey: ['classReviews', clubId, playerId],
+    queryFn: async () => {
+      if (!clubId) return []
+      const constraints: QueryConstraint[] = []
+      if (playerId) {
+        constraints.push(where('playerId', '==', playerId))
+      }
+      const q = query(collection(db, 'classReviews'), ...constraints)
+      const snap = await getDocs(q)
+      return snap.docs.map(d => ({ ...fromFirestore(d.data()), id: d.id } as ClassReview))
     },
     enabled: !!clubId
   })

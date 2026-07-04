@@ -15,7 +15,8 @@ import { useAuthStore, hasPermission } from '@/stores/authStore'
 import type { UserRole } from '@/types'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
-import { useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
+import { useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery, useClassReviewsQuery } from '@/hooks/useQueries'
+import { IntelligenceCards } from '@/components/shared/analytics/IntelligenceCards'
 import {
   Users,
   DollarSign,
@@ -111,6 +112,8 @@ export default function DashboardPage() {
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
+
+  const { data: classReviewsData = [] } = useClassReviewsQuery()
 
   const payments = useMemo(() => {
     return allBasePayments.filter(p => p.billingYear === currentYear || p.billingYear === currentYear - 1)
@@ -949,6 +952,11 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+
+        {/* ── Inteligencia del Club ────────────────────────────── */}
+        {isAdmin && (
+          <IntelligenceCards classReviews={classReviewsData} />
+        )}
 
         {/* ── Charts row 1 ────────────────────────────────────── */}
         {!isCoach && (kpiConfig.attendanceChart || kpiConfig.levelChart) && (

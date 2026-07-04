@@ -19,6 +19,18 @@ import argparse
 import subprocess
 from pathlib import Path
 
+# Force UTF-8 encoding for standard streams to prevent UnicodeEncodeError on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 AGENT_DIR = Path(".agent")
 PID_FILE = AGENT_DIR / "preview.pid"
 LOG_FILE = AGENT_DIR / "preview.log"
@@ -65,6 +77,9 @@ def start_server(port=3000):
         print("❌ No 'dev' or 'start' script found in package.json")
         sys.exit(1)
     
+    if isinstance(cmd, list):
+        cmd = " ".join(cmd)
+        
     # Add port env var if needed (simple heuristic)
     env = os.environ.copy()
     env["PORT"] = str(port)

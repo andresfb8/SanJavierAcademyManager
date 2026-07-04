@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDataStore, computePlayerRecoveryBalance } from '@/stores/dataStore'
-import type { Group, ScheduleSlot, Enrollment } from '@/types'
+import type { Group, ScheduleSlot, Enrollment, Player } from '@/types'
 
 export interface NextClassInfo {
   group: Group
@@ -10,8 +10,37 @@ export interface NextClassInfo {
   diffHours: number
 }
 
+/**
+ * Resuelve el alumno "efectivo" del portal:
+ * - jugador → su propio linkedPlayerId
+ * - tutor   → el hijo activo (activeChildId) si sigue vinculado; si no, el primero
+ */
+export function useEffectiveStudent(): { studentId: string | undefined; student: Player | undefined } {
+  const { user, activeChildId } = useAuthStore()
+  const players = useDataStore((s) => s.players)
+
+  const activeRole = user?.activeRole ?? user?.role
+
+  const studentId = useMemo(() => {
+    if (activeRole === 'tutor') {
+      const childIds = user?.linkedPlayerIds ?? []
+      if (activeChildId && childIds.includes(activeChildId)) return activeChildId
+      return childIds[0]
+    }
+    return user?.linkedPlayerId
+  }, [activeRole, user?.linkedPlayerIds, user?.linkedPlayerId, activeChildId])
+
+  const student = useMemo(
+    () => players.find((p) => p.id === studentId),
+    [players, studentId]
+  )
+
+  return { studentId, student }
+}
+
 export interface PlayerDataResult {
   studentId: string | undefined
+  student: Player | undefined
   myEnrollments: Enrollment[]
   myGroups: Group[]
   nextClass: NextClassInfo | null
@@ -27,7 +56,6 @@ export interface PlayerDataResult {
  * Encapsula la lógica de "próxima clase", asistencia mensual y estado de pagos.
  */
 export function usePlayerData(): PlayerDataResult {
-  const { user } = useAuthStore()
   const {
     groups,
     enrollments,
@@ -36,7 +64,7 @@ export function usePlayerData(): PlayerDataResult {
     vouchers,
   } = useDataStore()
 
-  const studentId = user?.linkedPlayerId
+  const { studentId, student } = useEffectiveStudent()
 
   const myEnrollments = useMemo(
     () => enrollments.filter((e) => e.playerId === studentId && e.isActive),
@@ -142,6 +170,7 @@ export function usePlayerData(): PlayerDataResult {
 
   return {
     studentId,
+    student,
     myEnrollments,
     myGroups,
     nextClass,

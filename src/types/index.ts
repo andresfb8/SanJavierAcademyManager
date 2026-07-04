@@ -231,6 +231,9 @@ export interface Enrollment {
   enrollmentDate: Date
   unenrollmentDate?: Date
   isActive: boolean
+  // Lista de espera: una entrada en cola es un enrollment con isActive:false + isWaitlist:true.
+  isWaitlist?: boolean
+  waitlistPosition?: number             // 1-based; orden en la cola del grupo
 }
 
 // --- Asistencia ---
@@ -368,6 +371,7 @@ export type ActivityType =
   | 'enrollment_deleted'
   | 'attendance_recorded'
   | 'recovery_used'
+  | 'waitlist_spot_available'
   | 'evaluation_created'
   | 'evaluation_updated'
   | 'evaluation_deleted'
@@ -629,5 +633,20 @@ export interface ClubTransaction {
   relatedId?: string    // Ej: coachId para vincular la nómina a un entrenador
   notes?: string
   createdAt: Date
+}
+
+// --- Cuestionario Post-Entrenamiento ---
+export interface ClassReview {
+  id: string
+  groupId: string
+  coachId: string
+  playerId: string
+  playerName: string
+  date: string          // YYYY-MM-DD (fecha de la clase)
+  punctual: boolean     // ¿El coach fue puntual?
+  usedPhone: boolean    // ¿Usó el móvil en pista?
+  quality: number       // 1-5 estrellas
+  comment?: string
+  submittedAt: Date
 }
 

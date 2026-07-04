@@ -123,7 +123,7 @@ export default function ClassDetailPage() {
   const { user } = useAuthStore()
   const canEditPayments = hasPermission(user?.role as UserRole, 'payments', 'write')
 
-  const { groups, players, enrollments, markPaymentPaid, addAttendanceRecord, updateAttendanceRecord, addEventPayment } = useDataStore()
+  const { groups, players, enrollments, markPaymentPaid, addAttendanceRecord, updateAttendanceRecord, addEventPayment, bookRecovery } = useDataStore()
   const { data: attendance = [] } = useAttendanceQuery()
   const { data: payments = [] } = usePaymentsQuery(new Date().getFullYear())
   const { data: _prevPayments = [] } = usePaymentsQuery(new Date().getFullYear() - 1)
@@ -333,41 +333,28 @@ export default function ClassDetailPage() {
   /** Opcion 1: Anadir jugador con credito de recuperacion */
   const handleAddWithRecovery = useCallback(
     (playerId: string, playerName: string) => {
-      const entry: AttendanceEntry = {
-        playerId,
-        playerName,
-        status: 'presente',
-        isRecovery: true,
-        notes: 'Clase de recuperacion',
-      }
+      if (!groupId || !date || !group) return
+      const player = players.find((p) => p.id === playerId)
+      if (!player) return
 
-      if (existingAttendance) {
-        // updateAttendanceRecord now handles credit synchronization automatically
-        updateAttendanceRecord(existingAttendance.id, {
-          records: [...existingAttendance.records, entry],
-        })
-      } else {
-        // addAttendanceRecord also handles credits automatically (isRecovery -> -1)
-        addAttendanceRecord({
-          groupId: groupId!,
-          groupName: group!.name,
-          date: new Date(date! + 'T00:00:00'),
-          records: [entry],
-          coachId: group!.coachId,
-        })
-      }
+      // Lógica centralizada en el store (crea o actualiza el registro y descuenta crédito).
+      bookRecovery({
+        groupId,
+        groupName: group.name,
+        date: new Date(date + 'T00:00:00'),
+        coachId: group.coachId,
+        player: {
+          id: player.id,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          recoveryCredits: player.recoveryCredits || 0,
+        },
+        existingRecord: existingAttendance ?? undefined,
+      })
 
       showToast(`${playerName} anadido con credito de recuperacion`)
     },
-    [
-      existingAttendance,
-      groupId,
-      date,
-      group,
-      updateAttendanceRecord,
-      addAttendanceRecord,
-      showToast,
-    ]
+    [existingAttendance, groupId, date, group, players, bookRecovery, showToast]
   )
 
   /** Opcion 2: Anadir jugador con pago extra */
