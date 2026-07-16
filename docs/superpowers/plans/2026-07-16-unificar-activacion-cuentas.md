@@ -592,12 +592,45 @@ En el `results.map` (línea ~142), dentro del `<div className="min-w-0">` que mu
                 </div>
 ```
 
-- [ ] **Step 8: Comprobar que compila**
+- [ ] **Step 8: Añadir botón de copiar enlace a la tabla de invitaciones**
 
-Run: `npm run build`
-Expected: `✓ built` sin errores.
+Motivo: cuando falla el envío del correo, los toasts de `invitePlayer` dicen "Copia el enlace en Usuarios → Invitaciones", pero esa pestaña solo muestra Email / Rol / Estado / Jugador vinculado / Fecha y un botón de borrar — **el enlace no aparece por ningún sitio**. Hoy esa instrucción es imposible de seguir. El enlace se reconstruye desde el token, que sí está en el registro (`inv.token`).
 
-- [ ] **Step 9: Commit**
+En la tabla de invitaciones de `src/pages/UsersPage.tsx`, en la celda de acciones de cada fila (junto al botón de borrar), añadir un botón de copiar visible solo para las pendientes:
+
+```tsx
+                        {inv.status === 'pendiente' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Copiar enlace de activación"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/activar/${inv.token}`)
+                              setCopiedInvitationId(inv.id)
+                              setTimeout(() => setCopiedInvitationId(''), 2000)
+                            }}
+                          >
+                            {copiedInvitationId === inv.id
+                              ? <Check className="h-4 w-4 text-green-600" />
+                              : <Copy className="h-4 w-4" />}
+                          </Button>
+                        )}
+```
+
+Añadir el estado junto a los demás `useState` de la página:
+
+```ts
+  const [copiedInvitationId, setCopiedInvitationId] = useState('')
+```
+
+`Copy` y `Check` ya se importan en este archivo (los usa el diálogo de éxito); reutilízalos.
+
+- [ ] **Step 9: Comprobar que compila**
+
+Run: `npm run build && npm test`
+Expected: `✓ built` sin errores y 12 tests en PASS.
+
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/pages/UsersPage.tsx src/components/shared/BulkTutorInviteDialog.tsx
