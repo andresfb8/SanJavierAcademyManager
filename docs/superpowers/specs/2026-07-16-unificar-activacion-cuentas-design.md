@@ -84,10 +84,16 @@ getPlayerPortalStatus(player, users, invitations, now?): PortalStatus
 ```
 
 - `activo`: existe un usuario activo con `linkedPlayerId === player.id` o `linkedPlayerIds` que lo incluya.
-- `invitado`: existe una invitación con el email del jugador, `status === 'pendiente'` y sin caducar.
+- `invitado`: existe una invitación `pendiente` y sin caducar que **o bien lo enlaza por id** (`linkedPlayerId` / `linkedPlayerIds`) **o bien va dirigida a su email**.
 - `sin_acceso`: ninguna de las dos.
 
-Precedencia: `activo` gana sobre `invitado`. Emails comparados normalizados (trim + minúsculas). Si el jugador no tiene email, solo puede ser `activo` o `sin_acceso`.
+Precedencia: `activo` gana sobre `invitado`. Emails comparados normalizados (trim + minúsculas).
+
+**Por qué el enlace por id y no solo el email:** las invitaciones de tutor se envían al email del **guardián** (`player.guardian.email`) y enlazan a los hijos por `linkedPlayerIds`. Si `invitado` mirase solo el email del jugador, un menor con invitación de tutor pendiente aparecería como `sin_acceso` justo durante la ventana en la que la insignia importa — y pasaría a `activo` al aceptarse, porque esa rama sí mira los enlaces. Las dos ramas deben ser simétricas.
+
+Un jugador sin email propio (caso habitual en menores) puede por tanto ser `invitado` si una invitación lo enlaza por id.
+
+**Nota sobre `expiresAt`:** está tipado `Date`, pero `invitations` se persiste en localStorage vía el `partialize` del store, así que tras rehidratar llega como string ISO. La coerción `new Date(inv.expiresAt)` es obligatoria y debe quedar cubierta por un test para que nadie la "simplifique".
 
 ### Manejo de errores
 
