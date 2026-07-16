@@ -77,27 +77,36 @@ export function normalizeSalaryConfig(doc: Record<string, unknown>): Record<stri
 
 export function subscribeToAllData(
   clubId: string,
-  userRole: string,
+  dbRole: string,
   onFirstLoad: () => void
 ): () => void {
   const unsubscribers: Array<() => void> = []
   const loaded = new Set<string>()
-  
+
+  // IMPORTANTE: `dbRole` debe ser el campo `role` del documento de usuario en
+  // Firestore, NO `activeRole`. Las security rules resuelven los permisos con
+  // `hasRole()` → `getUserData().get('role')`, así que el alcance de la
+  // suscripción (qué colecciones y con qué filtro) tiene que calcularse con el
+  // mismo rol que aplican las reglas; si no, o pedimos datos que las reglas
+  // deniegan, o nos auto-restringimos de más.
+  // Efecto secundario deseado: como `role` no cambia durante la sesión, cambiar
+  // de rol activo con el RoleSwitcher no invalida estas suscripciones.
+
   // Filtrar colecciones según permisos del rol
   const allowedCollections = COLLECTIONS.filter(coll => {
     // Reglas de suscripción básicas por rol
-    if (userRole === 'director' || userRole === 'coordinador') return true
-    
-    if (userRole === 'entrenador') {
+    if (dbRole === 'director' || dbRole === 'coordinador') return true
+
+    if (dbRole === 'entrenador') {
       // Entrenadores no ven finanzas ni configs de otros
       return !['coachSalaryConfigs', 'clubTransactions', 'invitations'].includes(coll.name)
     }
-    
-    if (userRole === 'jugador' || userRole === 'tutor') {
+
+    if (dbRole === 'jugador' || dbRole === 'tutor') {
       // Jugadores solo ven lo esencial para su portal
       return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments', 'attendanceNotices', 'vouchers', 'evaluations', 'matchReports'].includes(coll.name)
     }
-    
+
     return true
   })
 
@@ -120,13 +129,13 @@ export function subscribeToAllData(
 
     // Firebase Security Rules for 'jugador' and 'tutor' restrict reading ALL documents in certain collections.
     // We must narrow the query to match the security rules, otherwise the entire query is rejected.
+    // Se usa el mismo `dbRole` que el filtro de colecciones (ver nota arriba).
     const currentUser = useAuthStore.getState().user
-    const actualRole = currentUser?.role // The real role in DB, not activeRole
 
-    if (actualRole === 'jugador' || actualRole === 'tutor') {
+    if (dbRole === 'jugador' || dbRole === 'tutor') {
       const isPlayerRestricted = ['players', 'payments', 'privateLessonPayments', 'eventPayments', 'invoices', 'evaluations'].includes(name)
       if (isPlayerRestricted) {
-        const playerIds = actualRole === 'tutor' 
+        const playerIds = dbRole === 'tutor'
           ? (currentUser?.linkedPlayerIds?.length ? currentUser.linkedPlayerIds : ['none'])
           : (currentUser?.linkedPlayerId ? [currentUser.linkedPlayerId] : ['none'])
 

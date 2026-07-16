@@ -160,8 +160,11 @@ async function loadUserProfile(
         if (retriedCount > 0) {
           console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
         }
-        // Iniciar listeners en tiempo real
-        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.activeRole, () => {
+        // Iniciar listeners en tiempo real.
+        // Se pasa `role` (el de BD), NO `activeRole`: es el rol que aplican las
+        // security rules, y al no cambiar en toda la sesión, el RoleSwitcher no
+        // deja suscripciones con un alcance obsoleto.
+        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
           setDataLoading(false)
         })
       })
