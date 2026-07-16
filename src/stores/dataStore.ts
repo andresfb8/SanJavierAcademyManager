@@ -695,7 +695,11 @@ export const useDataStore = create<DataState>()(
         if (!player || !player.email) return
 
         const clubId = getClubId()
-        if (!clubId) return
+        if (!clubId) {
+          console.error('[DataStore] invitePlayer: no hay clubId')
+          toast.error('No se pudo invitar: falta el club del usuario')
+          return
+        }
         const { userId } = getCurrentUser()
 
         // Import dinámico: evita el ciclo dataStore → invitations → dataStore
@@ -728,7 +732,7 @@ export const useDataStore = create<DataState>()(
         } catch (error) {
           console.error('[DataStore] invitePlayer: error enviando el correo:', error)
           toast.error(
-            `Invitación creada, pero no se pudo enviar el correo. Copia el enlace en Usuarios → Invitaciones.`
+            'Invitación creada, pero no se pudo enviar el correo. Copia el enlace en Usuarios → Invitaciones.'
           )
         }
       },
@@ -738,7 +742,11 @@ export const useDataStore = create<DataState>()(
         if (players.length === 0) return
 
         const clubId = getClubId()
-        if (!clubId) return
+        if (!clubId) {
+          console.error('[DataStore] bulkInvitePlayers: no hay clubId')
+          toast.error('No se pudo invitar: falta el club del usuario')
+          return
+        }
         const { userId } = getCurrentUser()
 
         toast.info(`Procesando ${players.length} invitaciones...`)
@@ -766,7 +774,8 @@ export const useDataStore = create<DataState>()(
                 'jugador'
               )
               sentCount++
-            } catch {
+            } catch (err) {
+              console.error(`[DataStore] bulkInvitePlayers: correo no enviado a ${player.email}`, err)
               createdOnlyCount++
             }
           } catch (err) {
