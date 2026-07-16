@@ -78,4 +78,21 @@ describe('getPlayerPortalStatus', () => {
     const player = makePlayer({ email: '' })
     expect(getPlayerPortalStatus(player, [], [makeInvitation()], NOW)).toBe('sin_acceso')
   })
+
+  it('devuelve invitado con una invitación de tutor que lo enlaza en linkedPlayerIds', () => {
+    const player = makePlayer({ email: '' })
+    const invitations = [makeInvitation({ email: 'madre@example.com', linkedPlayerIds: ['p9', 'p1'] })]
+    expect(getPlayerPortalStatus(player, [], invitations, NOW)).toBe('invitado')
+  })
+
+  it('devuelve invitado con una invitación que lo enlaza por linkedPlayerId', () => {
+    const player = makePlayer({ email: 'otro@example.com' })
+    const invitations = [makeInvitation({ email: 'madre@example.com', linkedPlayerId: 'p1' })]
+    expect(getPlayerPortalStatus(player, [], invitations, NOW)).toBe('invitado')
+  })
+
+  it('acepta expiresAt como string ISO (rehidratado de localStorage)', () => {
+    const invitations = [makeInvitation({ expiresAt: '2026-07-20T12:00:00Z' as unknown as Date })]
+    expect(getPlayerPortalStatus(makePlayer(), [], invitations, NOW)).toBe('invitado')
+  })
 })

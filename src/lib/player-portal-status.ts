@@ -10,7 +10,14 @@ function normalizeEmail(email?: string): string {
 /**
  * Deduce el estado del portal de un jugador. No hay campo persistido: la verdad
  * está en si existe un usuario vinculado (activo) o una invitación pendiente
- * y vigente para su email (invitado).
+ * y vigente que lo cubre (invitado).
+ *
+ * Una invitación "cubre" al jugador si lo enlaza por id (`linkedPlayerId` /
+ * `linkedPlayerIds`) o si va dirigida a su propio email. El enlace por id es
+ * imprescindible: las invitaciones de tutor se envían al email del guardián,
+ * no al del jugador, y enlazan a los hijos por id — por eso la rama `activo`
+ * (una vez aceptada la invitación y creado el usuario) y la rama `invitado`
+ * (mientras está pendiente) deben ser simétricas en cómo enlazan al jugador.
  *
  * `activo` tiene precedencia sobre `invitado`.
  */
@@ -28,14 +35,16 @@ export function getPlayerPortalStatus(
   if (hasActiveUser) return 'activo'
 
   const email = normalizeEmail(player.email)
-  if (!email) return 'sin_acceso'
 
-  const hasPendingInvitation = invitations.some(
-    (inv) =>
-      inv.status === 'pendiente' &&
-      normalizeEmail(inv.email) === email &&
-      new Date(inv.expiresAt).getTime() > now.getTime()
-  )
+  const hasPendingInvitation = invitations.some((inv) => {
+    if (inv.status !== 'pendiente') return false
+    if (new Date(inv.expiresAt).getTime() <= now.getTime()) return false
+    // Invitación de tutor: va al email del guardián pero enlaza a los hijos por id.
+    if (inv.linkedPlayerId === player.id) return true
+    if (inv.linkedPlayerIds?.includes(player.id)) return true
+    // Invitación directa al alumno: casa por su email.
+    return email !== '' && normalizeEmail(inv.email) === email
+  })
 
   return hasPendingInvitation ? 'invitado' : 'sin_acceso'
 }
