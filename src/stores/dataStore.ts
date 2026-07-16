@@ -1326,16 +1326,22 @@ export const useDataStore = create<DataState>()(
       },
 
       deletePayment: (id) => {
+        // Actualización optimista del estado local (igual que deleteEnrollment):
+        // los cálculos derivados (tasa de cobro, ingresos del mes) leen este array,
+        // no la query de React Query, así que hay que quitarlo aquí explícitamente.
+        set((state) => ({ payments: state.payments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('payments', id)
         queryClient.invalidateQueries({ queryKey: ['payments'] });
       },
 
       deleteEventPayment: (id) => {
+        set((state) => ({ eventPayments: state.eventPayments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('eventPayments', id)
         queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
       },
 
       deletePrivateLessonPayment: (id) => {
+        set((state) => ({ privateLessonPayments: state.privateLessonPayments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('privateLessonPayments', id)
         queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
       },
