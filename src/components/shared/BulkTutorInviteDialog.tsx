@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { createInvitation } from '@/lib/invitations'
+import { sendInvitationEmail } from '@/lib/emailService'
 import { Copy, Check, Users, AlertCircle } from 'lucide-react'
 import type { Player } from '@/types'
 
@@ -19,6 +20,7 @@ interface BulkResult {
   email: string
   guardianName: string
   activationUrl?: string
+  emailed?: boolean
   error?: boolean
 }
 
@@ -104,7 +106,20 @@ export function BulkTutorInviteDialog({ open, onOpenChange }: BulkTutorInviteDia
           createdBy: user?.id ?? 'unknown',
           linkedPlayerIds: family.players.map((p) => p.id),
         })
-        outcome.push({ email: family.email, guardianName: family.guardianName, activationUrl })
+
+        let emailed = false
+        try {
+          await sendInvitationEmail(
+            { name: family.guardianName, email: family.email },
+            activationUrl,
+            'tutor'
+          )
+          emailed = true
+        } catch (emailErr) {
+          console.error(`No se pudo enviar el correo a ${family.email}:`, emailErr)
+        }
+
+        outcome.push({ email: family.email, guardianName: family.guardianName, activationUrl, emailed })
       } catch (err) {
         console.error(`Error creating tutor invitation for ${family.email}:`, err)
         outcome.push({ email: family.email, guardianName: family.guardianName, error: true })
@@ -144,6 +159,13 @@ export function BulkTutorInviteDialog({ open, onOpenChange }: BulkTutorInviteDia
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate">{r.guardianName}</p>
                   <p className="text-xs text-muted-foreground truncate">{r.email}</p>
+                  {!r.error && (
+                    r.emailed ? (
+                      <p className="text-[11px] font-medium text-emerald-600">Correo enviado</p>
+                    ) : (
+                      <p className="text-[11px] font-medium text-amber-600">Sin enviar — copia el enlace</p>
+                    )
+                  )}
                 </div>
                 {r.error ? (
                   <Badge variant="destructive" className="shrink-0">

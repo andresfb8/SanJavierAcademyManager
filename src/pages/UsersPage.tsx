@@ -13,6 +13,7 @@ import { BulkTutorInviteDialog } from '@/components/shared/BulkTutorInviteDialog
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
 import { formatDate, normalizeText } from '@/lib/utils'
 import { createInvitation } from '@/lib/invitations'
+import { sendInvitationEmail } from '@/lib/emailService'
 import type { UserRole, InvitationStatus } from '@/types'
 import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, UserX, UserCog, UserCheck, Users, Gamepad2 } from 'lucide-react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
@@ -78,10 +79,14 @@ export default function UsersPage() {
   // --- Success state ---
   const [inviteSuccess, setInviteSuccess] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
+  const [inviteEmailSent, setInviteEmailSent] = useState(false)
   const [copied, setCopied] = useState(false)
 
   // --- Validation state ---
   const [emailError, setEmailError] = useState('')
+
+  // --- Invitation link copy state ---
+  const [copiedInvitationId, setCopiedInvitationId] = useState('')
 
   // --- Store ---
   const { invitations, deleteInvitation, players, coaches, addCoach, users } = useDataStore()
@@ -229,6 +234,7 @@ export default function UsersPage() {
     setAddingPlayerId('')
     setInviteSuccess(false)
     setInviteLink('')
+    setInviteEmailSent(false)
     setCopied(false)
     setEmailError('')
   }
@@ -282,6 +288,18 @@ export default function UsersPage() {
       })
       setInviteLink(activationUrl)
       setInviteSuccess(true)
+
+      try {
+        await sendInvitationEmail(
+          { name: inviteEmail.split('@')[0], email: inviteEmail },
+          activationUrl,
+          inviteRole as UserRole
+        )
+        setInviteEmailSent(true)
+      } catch (emailErr) {
+        console.error('No se pudo enviar el correo de invitación:', emailErr)
+        setInviteEmailSent(false)
+      }
     } catch (err) {
       console.error('Error saving invitation to Firestore:', err)
       setEmailError('Error al guardar la invitacion. Intentalo de nuevo.')
@@ -540,6 +558,22 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>{formatDate(inv.createdAt)}</TableCell>
                       <TableCell className="text-right">
+                        {inv.status === 'pendiente' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Copiar enlace de activación"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/activar/${inv.token}`)
+                              setCopiedInvitationId(inv.id)
+                              setTimeout(() => setCopiedInvitationId(''), 2000)
+                            }}
+                          >
+                            {copiedInvitationId === inv.id
+                              ? <Check className="h-4 w-4 text-green-600" />
+                              : <Copy className="h-4 w-4" />}
+                          </Button>
+                        )}
                         {inv.status === 'pendiente' && (
                           <Button
                             variant="ghost"
@@ -928,7 +962,9 @@ export default function UsersPage() {
                   Invitacion creada correctamente
                 </DialogTitle>
                 <DialogDescription>
-                  Comparte el siguiente enlace con el usuario para que pueda activar su cuenta.
+                  {inviteEmailSent
+                    ? `Hemos enviado un correo a ${inviteEmail} con el enlace de activación. También puedes compartirlo tú mismo.`
+                    : 'No se pudo enviar el correo automáticamente. Comparte tú este enlace para que pueda activar su cuenta.'}
                 </DialogDescription>
               </DialogHeader>
 
