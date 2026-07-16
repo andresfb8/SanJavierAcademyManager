@@ -1,4 +1,5 @@
 import type { AppUser, Invitation, Player } from '@/types'
+import { isInvitationLive } from '@/lib/invitation-utils'
 
 /** Estado de acceso de un jugador al portal, deducido de users + invitations. */
 export type PortalStatus = 'activo' | 'invitado' | 'sin_acceso'
@@ -37,8 +38,7 @@ export function getPlayerPortalStatus(
   const email = normalizeEmail(player.email)
 
   const hasPendingInvitation = invitations.some((inv) => {
-    if (inv.status !== 'pendiente') return false
-    if (new Date(inv.expiresAt).getTime() <= now.getTime()) return false
+    if (!isInvitationLive(inv, now)) return false
     // Invitación de tutor: va al email del guardián pero enlaza a los hijos por id.
     if (inv.linkedPlayerId === player.id) return true
     if (inv.linkedPlayerIds?.includes(player.id)) return true

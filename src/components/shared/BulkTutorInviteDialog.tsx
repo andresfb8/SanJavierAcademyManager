@@ -110,7 +110,7 @@ export function BulkTutorInviteDialog({ open, onOpenChange }: BulkTutorInviteDia
         let emailed = false
         try {
           await sendInvitationEmail(
-            { name: family.guardianName, email: family.email },
+            { name: family.guardianName === family.email ? undefined : family.guardianName, email: family.email },
             activationUrl,
             'tutor'
           )
@@ -153,7 +153,11 @@ export function BulkTutorInviteDialog({ open, onOpenChange }: BulkTutorInviteDia
         </DialogHeader>
 
         {results ? (
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {results.filter((r) => r.emailed).length} de {results.length} correos enviados
+            </p>
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
             {results.map((r) => (
               <div key={r.email} className="flex items-center justify-between gap-3 rounded-lg border p-3">
                 <div className="min-w-0">
@@ -182,6 +186,7 @@ export function BulkTutorInviteDialog({ open, onOpenChange }: BulkTutorInviteDia
                 )}
               </div>
             ))}
+            </div>
           </div>
         ) : families.length === 0 ? (
           <div className="py-8 text-center">

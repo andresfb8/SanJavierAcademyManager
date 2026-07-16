@@ -57,7 +57,7 @@ export async function sendEmail({ to, subject, htmlContent }: SendEmailParams) {
  * (createInvitation), para que exista un único formato de URL: /activar/{token}
  */
 export async function sendInvitationEmail(
-  recipient: { name: string; email: string },
+  recipient: { name?: string; email: string },
   activationUrl: string,
   role: UserRole
 ) {
@@ -77,7 +77,7 @@ export async function sendInvitationEmail(
         <h1 style="color: white; margin: 0; font-size: 24px;">¡Bienvenido a San Javier Academy!</h1>
       </div>
       <div style="padding: 32px; color: #334155; line-height: 1.6;">
-        <p>Hola <strong>${recipient.name}</strong>,</p>
+        <p>Hola${recipient.name ? ` <strong>${recipient.name}</strong>` : ''},</p>
         <p>${intro}</p>
         <div style="text-align: center; margin: 40px 0;">
           <a href="${activationUrl}" style="background-color: #059669; color: white; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; display: inline-block;">Activar mi cuenta</a>
@@ -93,7 +93,7 @@ export async function sendInvitationEmail(
   `;
 
   return sendEmail({
-    to: [{ email: recipient.email, name: recipient.name }],
+    to: [recipient.name ? { email: recipient.email, name: recipient.name } : { email: recipient.email }],
     subject,
     htmlContent,
   });
