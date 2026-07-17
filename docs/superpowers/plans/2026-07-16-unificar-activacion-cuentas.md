@@ -836,10 +836,24 @@ git commit -m "fix: enlace de activacion heredado muestra aviso y se elimina sig
 
 ---
 
-### Task 6: Deprecar los campos de invitación del jugador
+### Task 6: Terminar la retirada del flujo antiguo
+
+> **Ampliada tras la revisión de la Task 5.** El inventario de huérfanos reveló que `PlayerProfilePage` seguía leyendo `invitationStatus` (quedó fuera de la migración de la Task 4), y que `addPlayer` sigue escribiendo campos que ya no lee nadie. Deprecar solo los tipos no bastaba: hay lectores y escritores vivos.
 
 **Files:**
+- Modify: `src/pages/PlayerProfilePage.tsx` (botón de invitar, ~líneas 359-377)
+- Modify: `src/stores/dataStore.ts` (`addPlayer`, ~líneas 562-571)
 - Modify: `src/types/index.ts` (`Player`, ~líneas 158-163)
+
+- [ ] **Step 0a: Migrar `PlayerProfilePage` al estado deducido**
+
+Motivo: la única escritura de `invitationStatus: 'active'` estaba en la `ActivateAccountPage` que borró la Task 5, y nada escribe `'sent'` desde la Task 2. El botón queda clavado en "Invitar al Portal" para siempre: nunca mostrará "Acceso Activo" ni se deshabilitará, así que un admin puede reinvitar a alguien ya activo sin ninguna señal. Además hoy es visible para entrenadores, que no pueden crear invitaciones (las reglas lo deniegan) ni deducir el estado (no sincronizan `invitations` ni `users`).
+
+Sustituir el bloque del botón por la versión deducida y restringida a admin, con el mismo criterio que `PlayersPage`.
+
+- [ ] **Step 0b: Dejar de escribir los campos muertos en `addPlayer`**
+
+`addPlayer` genera y sincroniza `invitationToken` e `inviteCode` en cada alta; ninguno tiene ya lectores. Eliminar esas escrituras (no los campos del tipo, que se mantienen por compatibilidad).
 
 - [ ] **Step 1: Marcar los campos como deprecados**
 
