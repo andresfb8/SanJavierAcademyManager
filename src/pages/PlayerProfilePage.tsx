@@ -19,6 +19,7 @@ import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
 import { useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 import { useAuthStore } from '@/stores/authStore'
+import { getPlayerPortalStatus } from '@/lib/player-portal-status'
 
 
 // =========================================
@@ -88,9 +89,14 @@ export default function PlayerProfilePage() {
     attendance,
     evaluations,
     generateScheduledInstallments,
+    users,
+    invitations,
   } = useDataStore()
   const { user, isDataLoading } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
+
+  // Invitar al portal es cosa de admin (mismo criterio que isAdmin() en las rules).
+  const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
 
   const payments = useMemo(() => {
     const currentYear = new Date().getFullYear()
@@ -103,6 +109,11 @@ export default function PlayerProfilePage() {
   const [viewingEvaluation, setViewingEvaluation] = useState<Evaluation | null>(null)
 
   const player = useMemo(() => players.find((p) => p.id === id), [players, id])
+
+  const portalStatus = useMemo(
+    () => (player ? getPlayerPortalStatus(player, users, invitations) : 'sin_acceso'),
+    [player, users, invitations]
+  )
 
   // Player payments
   const playerPayments = useMemo(() => {
@@ -356,23 +367,23 @@ export default function PlayerProfilePage() {
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={player.status} />
-            {player.email && activeRole !== 'jugador' && activeRole !== 'tutor' && (
-              <Button 
-                variant={player.invitationStatus === 'active' ? "ghost" : "outline"} 
-                size="sm" 
+            {isAdmin && player.email && (
+              <Button
+                variant={portalStatus === 'activo' ? "ghost" : "outline"}
+                size="sm"
                 className={cn(
                   "gap-2",
-                  player.invitationStatus === 'active' && "text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700"
+                  portalStatus === 'activo' && "text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700"
                 )}
                 onClick={() => invitePlayer(player.id)}
-                disabled={player.invitationStatus === 'active'}
+                disabled={portalStatus === 'activo'}
               >
-                {player.invitationStatus === 'active' ? (
+                {portalStatus === 'activo' ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {player.invitationStatus === 'active' ? 'Acceso Activo' : player.invitationStatus === 'sent' ? 'Re-enviar Acceso' : 'Invitar al Portal'}
+                {portalStatus === 'activo' ? 'Acceso Activo' : portalStatus === 'invitado' ? 'Re-enviar Acceso' : 'Invitar al Portal'}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>

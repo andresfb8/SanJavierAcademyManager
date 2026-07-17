@@ -559,16 +559,11 @@ export const useDataStore = create<DataState>()(
 
       addPlayer: (playerData) => {
         const now = new Date()
-        const invitationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-        
+
         const newPlayer: Player = {
           ...playerData,
           id: generateId(),
           recoveryCredits: 0,
-          invitationToken,
-          inviteCode,
-          invitationStatus: 'pending',
           createdAt: now,
           updatedAt: now,
         }
