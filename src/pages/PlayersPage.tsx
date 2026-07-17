@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -48,6 +48,12 @@ export default function PlayersPage() {
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [portalFilter, setPortalFilter] = useState<string>('')
+  // El filtro de portal se oculta para no-admins. Cambiar de rol activo no
+  // remonta esta página, así que un filtro puesto sobreviviría al cambio y
+  // dejaría la lista filtrada sin ningún control visible para limpiarla.
+  useEffect(() => {
+    if (!isAdmin) setPortalFilter('')
+  }, [isAdmin])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
