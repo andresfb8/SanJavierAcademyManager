@@ -131,7 +131,9 @@ export interface DataState {
   deleteTariff: (id: string) => void
 
   // --- Players CRUD ---
-  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus'>) => string
+  // Los campos de invitación siguen excluidos, pero ya no porque addPlayer los
+  // calcule: están deprecados y la exclusión impide escribirlos de nuevo.
+  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus' | 'portalUid'>) => string
   updatePlayer: (id: string, updates: Partial<Player>) => void
   invitePlayer: (id: string) => Promise<void>
   bulkInvitePlayers: (ids: string[]) => Promise<void>

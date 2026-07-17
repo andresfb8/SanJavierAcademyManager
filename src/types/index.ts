@@ -163,9 +163,12 @@ export interface Player {
   /** @deprecated Ya no se escribe ni se lee. El estado del portal se deduce con
    *  `getPlayerPortalStatus()` a partir de `users` + `invitations`. */
   invitationStatus?: 'pending' | 'sent' | 'active'
-  /** @deprecated Sin lectores ni escritores. */
+  /** @deprecated Sin lectores ni escritores. El vínculo usuario↔jugador vive en
+   *  `AppUser.linkedPlayerId` / `linkedPlayerIds`. Se mantiene por compatibilidad
+   *  con documentos existentes en Firestore. */
   portalUid?: string
-  /** @deprecated Sin lectores ni escritores. */
+  /** @deprecated Sin lectores ni escritores. Era del flujo antiguo de activación
+   *  manual. Se mantiene por compatibilidad con documentos existentes en Firestore. */
   inviteCode?: string
   userId?: string
   createdAt: Date

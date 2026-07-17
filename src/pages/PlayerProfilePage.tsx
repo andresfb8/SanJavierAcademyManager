@@ -96,6 +96,8 @@ export default function PlayerProfilePage() {
   const activeRole = user?.activeRole ?? user?.role
 
   // Invitar al portal es cosa de admin (mismo criterio que isAdmin() en las rules).
+  // Además, con rol de BD entrenador no se sincronizan `invitations` ni `users`,
+  // así que el estado derivado no sería fiable para ellos.
   const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
 
   const payments = useMemo(() => {
@@ -383,7 +385,7 @@ export default function PlayerProfilePage() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {portalStatus === 'activo' ? 'Acceso Activo' : portalStatus === 'invitado' ? 'Re-enviar Acceso' : 'Invitar al Portal'}
+                {portalStatus === 'activo' ? 'Acceso activo' : portalStatus === 'invitado' ? 'Reenviar invitación' : 'Invitar al portal'}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
