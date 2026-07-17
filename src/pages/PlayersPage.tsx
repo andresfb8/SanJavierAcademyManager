@@ -40,8 +40,9 @@ export default function PlayersPage() {
   const { players, users, invitations, addPlayer, updatePlayer, cancelPlayer, deletePlayer, invitePlayer } = useDataStore()
   const { user } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
-  // Invitar al portal es cosa de admin; los entrenadores ademas no sincronizan
-  // `invitations`, asi que para ellos el estado no seria fiable.
+  // Invitar al portal es cosa de admin (mismo criterio que isAdmin() en las rules).
+  // Además, con rol de BD entrenador no se sincronizan `invitations` ni `users`,
+  // así que el estado derivado no sería fiable para ellos.
   const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
@@ -66,6 +67,9 @@ export default function PlayersPage() {
   }, [allPendingPayments])
 
   const portalStatusById = useMemo(() => {
+    // `now` se congela hasta que cambie alguno de los tres arrays. Con caducidad
+    // de 7 días no merece un timer: como mucho el menú ofrece "Reenviar" en vez
+    // de "Invitar", y ambos hacen lo mismo.
     const now = new Date()
     const map: Record<string, ReturnType<typeof getPlayerPortalStatus>> = {}
     for (const p of players) {
@@ -255,12 +259,12 @@ export default function PlayersPage() {
               <p className="text-xs text-muted-foreground">
                 {player.isMinor && '👶 Menor · '}{player.dni}
               </p>
-              {portalStatusById[player.id] === 'invitado' && (
+              {isAdmin && portalStatusById[player.id] === 'invitado' && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded-md">
                   <Mail className="h-3 w-3" /> Invitación enviada
                 </div>
               )}
-              {portalStatusById[player.id] === 'activo' && (
+              {isAdmin && portalStatusById[player.id] === 'activo' && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-1.5 py-0.5 rounded-md">
                   <CheckCircle2 className="h-3 w-3" /> Portal Activo
                 </div>
@@ -351,7 +355,7 @@ export default function PlayersPage() {
       enableSorting: false,
       size: 40,
     },
-  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin])
+  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin, pendingByPlayer])
 
   const table = useReactTable({
     data: filteredPlayers,
@@ -409,17 +413,19 @@ export default function PlayersPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="w-full sm:w-40"
           />
-          <Select
-            options={[
-              { value: '', label: 'Portal: todos' },
-              { value: 'active', label: 'Portal activo' },
-              { value: 'sent', label: 'Invitación enviada' },
-              { value: 'none', label: 'Sin acceso' },
-            ]}
-            value={portalFilter}
-            onChange={(e) => setPortalFilter(e.target.value)}
-            className="w-full sm:w-44"
-          />
+          {isAdmin && (
+            <Select
+              options={[
+                { value: '', label: 'Portal: todos' },
+                { value: 'active', label: 'Portal activo' },
+                { value: 'sent', label: 'Invitación enviada' },
+                { value: 'none', label: 'Sin acceso' },
+              ]}
+              value={portalFilter}
+              onChange={(e) => setPortalFilter(e.target.value)}
+              className="w-full sm:w-44"
+            />
+          )}
         </div>
 
         {/* Bulk actions */}
@@ -487,19 +493,21 @@ export default function PlayersPage() {
             </DropdownMenu>
 
             {/* Invitar al portal */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-              onClick={() => {
-                const { bulkInvitePlayers } = useDataStore.getState()
-                bulkInvitePlayers(Array.from(selectedIds))
-                setSelectedIds(new Set())
-              }}
-            >
-              <Mail className="h-3.5 w-3.5" />
-              Enviar invitaciones
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                onClick={() => {
+                  const { bulkInvitePlayers } = useDataStore.getState()
+                  bulkInvitePlayers(Array.from(selectedIds))
+                  setSelectedIds(new Set())
+                }}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Enviar invitaciones
+              </Button>
+            )}
 
             <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
               Deseleccionar
