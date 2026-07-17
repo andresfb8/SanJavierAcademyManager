@@ -36,7 +36,6 @@ interface AuthState {
   setUser: (user: AppUser | null) => void
   setActiveRole: (role: UserRole) => void
   setActiveChild: (playerId: string) => void
-  signupPlayer: (email: string, pass: string, playerId: string) => Promise<void>
   signupFromInvitation: (invitation: Invitation, pass: string) => Promise<void>
   initAuth: () => () => void
 }
@@ -254,29 +253,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   setActiveChild: (playerId) => {
     localStorage.setItem('activeChildId', playerId)
     set({ activeChildId: playerId })
-  },
-
-  signupPlayer: async (email, pass, playerId) => {
-    set({ isLoading: true })
-    try {
-      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, pass)
-      
-      // Crear perfil de usuario en Firestore con rol jugador
-      const userDocRef = doc(db, 'users', firebaseUser.uid)
-      await setDoc(userDocRef, {
-        email,
-        displayName: email.split('@')[0],
-        role: 'jugador',
-        clubId: 'club-001',
-        linkedPlayerId: playerId,
-        isActive: true,
-        createdAt: new Date(),
-      })
-      
-      // Note: onAuthStateChanged will handle the rest (loadUserProfile, etc)
-    } finally {
-      set({ isLoading: false })
-    }
   },
 
   // Activa una cuenta desde una invitación de la colección 'invitations'
