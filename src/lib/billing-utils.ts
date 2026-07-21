@@ -36,3 +36,13 @@ export function billingFrequencyLabel(freq: BillingFrequency): string {
     case 'installments': return 'Plazos'
   }
 }
+
+/** Nº de meses que cubre un recibo de esta frecuencia. */
+export function cycleLength(frequency: BillingFrequency): number {
+  switch (frequency) {
+    case 'monthly':      return 1
+    case 'quarterly':    return 3
+    case 'annual':       return 12
+    case 'installments': return 1   // plazos usa su propio precio por mes, no se multiplica
+  }
+}
