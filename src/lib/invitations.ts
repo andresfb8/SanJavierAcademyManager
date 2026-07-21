@@ -12,11 +12,13 @@ export interface CreateInvitationParams {
   createdBy: string
   linkedPlayerId?: string
   linkedPlayerIds?: string[]
+  coachId?: string
 }
 
 /**
  * Crea una invitación (store local + Firestore) y devuelve el enlace de activación.
- * Lógica compartida entre la invitación individual (UsersPage) y la masiva de tutores.
+ * Único punto que persiste invitaciones: lo usan la invitación individual y masiva
+ * (UsersPage / tutores) y el alta de personal (CoachesPage).
  */
 export async function createInvitation(
   params: CreateInvitationParams
@@ -44,6 +46,9 @@ export async function createInvitation(
   }
   if (params.linkedPlayerIds && params.linkedPlayerIds.length > 0) {
     invitationData.linkedPlayerIds = [...params.linkedPlayerIds]
+  }
+  if (params.coachId) {
+    invitationData.coachId = params.coachId
   }
 
   useDataStore.getState().addInvitation({ ...invitationData, id: token } as Invitation)

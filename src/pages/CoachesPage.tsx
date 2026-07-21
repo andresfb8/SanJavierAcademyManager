@@ -43,12 +43,14 @@ import {
   Eye,
   UserPlus,
 } from 'lucide-react'
-import { formatDate, formatCurrency, generateId, normalizeText } from '@/lib/utils'
+import { formatDate, formatCurrency, normalizeText } from '@/lib/utils'
 import { STAFF_ROLES } from '@/constants'
 import type { Coach, StaffRole } from '@/types'
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/authStore'
+import { createInvitation } from '@/lib/invitations'
+import { sendInvitationEmail } from '@/lib/emailService'
 import { useEventPaymentsQuery } from '@/hooks/useQueries'
 import { calculateEventSalary } from '@/lib/salary-utils'
 
@@ -108,12 +110,10 @@ export default function CoachesPage() {
     coachSalaryConfigs,
     privateLessons,
     events,
-    invitations,
     addCoach,
     updateCoach,
     deleteCoach,
     updateCoachSalaryConfig,
-    addInvitation,
   } = useDataStore()
 
   const { data: eventPayments = [] } = useEventPaymentsQuery()
@@ -130,6 +130,8 @@ export default function CoachesPage() {
   const [form, setForm] = useState<CoachForm>({ ...emptyForm })
   const [showInviteSuccess, setShowInviteSuccess] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteEmailStatus, setInviteEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ fixed: number; message: string } | null>(null)
 
@@ -300,28 +302,45 @@ export default function CoachesPage() {
     }
   }
 
-  const handleCreateAccount = (coach: Coach) => {
-    const token = generateId()
-    const activationUrl = `${window.location.origin}/activar/${token}`
-    const now = new Date()
-    const expiresAt = new Date(now)
-    expiresAt.setDate(expiresAt.getDate() + 7)
-
+  const handleCreateAccount = async (coach: Coach) => {
+    if (!coach.email) return
     const role = coach.staffRole === 'coordinador' ? 'coordinador' : 'entrenador'
-    addInvitation({
-      email: coach.email,
-      role,
-      clubId: 'club-001',
-      status: 'pendiente',
-      token,
-      createdBy: 'system',
-      coachId: coach.id,
-      createdAt: now,
-      expiresAt,
-    })
 
+    let activationUrl: string
+    try {
+      // createInvitation persiste en Firestore (la ruta /activar/{token} la lee de
+      // ahí); addInvitation solo escribía el store local, así que el enlace nunca
+      // se podía activar. Mismo mecanismo que jugadores y tutores.
+      const result = await createInvitation({
+        email: coach.email,
+        role,
+        clubId: user?.clubId ?? 'club-001',
+        createdBy: user?.id ?? 'unknown',
+        coachId: coach.id,
+      })
+      activationUrl = result.activationUrl
+    } catch (err) {
+      console.error('[CoachesPage] handleCreateAccount: error creando la invitación:', err)
+      setSyncResult({ fixed: 0, message: `No se pudo crear la invitación para ${coach.email}.` })
+      return
+    }
+
+    setInviteEmail(coach.email)
     setInviteLink(activationUrl)
     setShowInviteSuccess(true)
+    setInviteEmailStatus('sending')
+
+    try {
+      await sendInvitationEmail(
+        { name: `${coach.firstName} ${coach.lastName}`.trim(), email: coach.email },
+        activationUrl,
+        role
+      )
+      setInviteEmailStatus('sent')
+    } catch (err) {
+      console.error('[CoachesPage] handleCreateAccount: error enviando el correo:', err)
+      setInviteEmailStatus('failed')
+    }
   }
 
   const activeCount = coaches.filter((c) => c.isActive).length
@@ -969,7 +988,11 @@ export default function CoachesPage() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Se ha creado una invitacion para el miembro. Comparte el siguiente enlace para que active su cuenta.
+              {inviteEmailStatus === 'sending'
+                ? 'Enviando el correo de activación…'
+                : inviteEmailStatus === 'sent'
+                ? `Hemos enviado un correo a ${inviteEmail} con el enlace de activación. También puedes compartirlo tú mismo.`
+                : 'No se pudo enviar el correo automáticamente. Comparte tú este enlace para que active su cuenta.'}
             </p>
             <div className="flex gap-2">
               <Input readOnly value={inviteLink} className="flex-1 font-mono text-xs" />
