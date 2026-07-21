@@ -225,7 +225,7 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                       )}
                       {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
                         <p className="text-xs text-muted-foreground">
-                          Se cobrará {formatCurrency(periodBasePrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
+                          Base del periodo: {formatCurrency(periodBasePrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
                           {' '}({cycleLength(selectedBillingFrequency)} × {formatCurrency(selectedTariffPrice)})
                         </p>
                       )}
