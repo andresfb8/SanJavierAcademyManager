@@ -9,6 +9,7 @@ import { useDataStore } from '@/stores/dataStore'
 import { BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import type { BillingFrequency } from '@/types'
+import { cycleLength, billingFrequencyLabel } from '@/lib/billing-utils'
 
 interface Props {
   enrollmentId: string
@@ -42,20 +43,23 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
   const activeTariffs = tariffs.filter(t => t.isActive)
   const selectedTariff = tariffs.find(t => t.id === selectedTariffId)
   const selectedTariffPrice = selectedTariff?.price ?? 0
+  // Precio de referencia del periodo completo: cuota mensual x meses del ciclo
+  // seleccionado. Los descuentos operan sobre este total, no sobre el mes.
+  const periodBasePrice = selectedTariffPrice * cycleLength(selectedBillingFrequency)
 
   const computedFinalPrice = useMemo(() => {
     if (discountMode === 'percentage') {
       const pct = parseFloat(discountPercentage)
       if (!isNaN(pct) && pct > 0 && pct <= 100) {
-        return Math.round(selectedTariffPrice * (1 - pct / 100) * 100) / 100
+        return Math.round(periodBasePrice * (1 - pct / 100) * 100) / 100
       }
     }
     if (discountMode === 'fixed_price') {
       const parsed = parseFloat(customPrice)
       if (!isNaN(parsed) && parsed >= 0) return parsed
     }
-    return selectedTariffPrice
-  }, [discountMode, discountPercentage, customPrice, selectedTariffPrice])
+    return periodBasePrice
+  }, [discountMode, discountPercentage, customPrice, periodBasePrice])
 
   const handleSelectDestination = (groupId: string) => {
     setDestinationGroupId(groupId)
@@ -84,11 +88,12 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
       } else {
         const tariff = tariffs.find(t => t.id === selectedTariffId)
         if (!tariff) return
+        const tariffPeriodPrice = tariff.price * cycleLength(selectedBillingFrequency)
         let finalCustomPrice: number | undefined
         if (discountMode === 'percentage') {
           const pct = parseFloat(discountPercentage)
           if (!isNaN(pct) && pct > 0 && pct <= 100) {
-            finalCustomPrice = Math.round(tariff.price * (1 - pct / 100) * 100) / 100
+            finalCustomPrice = Math.round(tariffPeriodPrice * (1 - pct / 100) * 100) / 100
           }
         } else if (discountMode === 'fixed_price') {
           const parsed = parseFloat(customPrice)
@@ -196,7 +201,7 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                       <div className="space-y-2">
                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                           <input type="radio" name="dm" checked={discountMode === 'none'} onChange={() => setDiscountMode('none')} className="accent-primary" />
-                          Precio tarifa ({formatCurrency(selectedTariffPrice)})
+                          Precio tarifa ({formatCurrency(periodBasePrice)})
                         </label>
                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                           <input type="radio" name="dm" checked={discountMode === 'percentage'} onChange={() => setDiscountMode('percentage')} className="accent-primary" />
@@ -216,6 +221,12 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                       {discountMode !== 'none' && (
                         <p className="text-xs text-muted-foreground">
                           Precio final: <span className="font-medium">{formatCurrency(computedFinalPrice)}</span>
+                        </p>
+                      )}
+                      {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
+                        <p className="text-xs text-muted-foreground">
+                          Se cobrará {formatCurrency(periodBasePrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
+                          {' '}({cycleLength(selectedBillingFrequency)} × {formatCurrency(selectedTariffPrice)})
                         </p>
                       )}
                     </div>
