@@ -156,10 +156,20 @@ export interface Player {
   // Metadata
   notes?: string
   // Invitation & Portal fields
+  /** @deprecated Flujo antiguo de activación. Ya no se escribe ni se lee: el
+   *  acceso se gestiona con la colección `invitations`. Se mantiene por
+   *  compatibilidad con documentos existentes en Firestore. */
   invitationToken?: string
+  /** @deprecated Ya no se escribe ni se lee. El estado del portal se deduce con
+   *  `getPlayerPortalStatus()` a partir de `users` + `invitations`. */
   invitationStatus?: 'pending' | 'sent' | 'active'
-  portalUid?: string // Firebase Auth UID linked to this player
-  inviteCode?: string // Simple code for manual linking
+  /** @deprecated Sin lectores ni escritores. El vínculo usuario↔jugador vive en
+   *  `AppUser.linkedPlayerId` / `linkedPlayerIds`. Se mantiene por compatibilidad
+   *  con documentos existentes en Firestore. */
+  portalUid?: string
+  /** @deprecated Sin lectores ni escritores. Era del flujo antiguo de activación
+   *  manual. Se mantiene por compatibilidad con documentos existentes en Firestore. */
+  inviteCode?: string
   userId?: string
   createdAt: Date
   updatedAt: Date

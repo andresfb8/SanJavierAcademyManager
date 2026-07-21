@@ -13,6 +13,8 @@ import { BulkTutorInviteDialog } from '@/components/shared/BulkTutorInviteDialog
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
 import { formatDate, normalizeText } from '@/lib/utils'
 import { createInvitation } from '@/lib/invitations'
+import { sendInvitationEmail } from '@/lib/emailService'
+import { buildActivationUrl, isInvitationLive } from '@/lib/invitation-utils'
 import type { UserRole, InvitationStatus } from '@/types'
 import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, UserX, UserCog, UserCheck, Users, Gamepad2 } from 'lucide-react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
@@ -78,10 +80,14 @@ export default function UsersPage() {
   // --- Success state ---
   const [inviteSuccess, setInviteSuccess] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
+  const [inviteEmailStatus, setInviteEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [copied, setCopied] = useState(false)
 
   // --- Validation state ---
   const [emailError, setEmailError] = useState('')
+
+  // --- Invitation link copy state ---
+  const [copiedInvitationId, setCopiedInvitationId] = useState('')
 
   // --- Store ---
   const { invitations, deleteInvitation, players, coaches, addCoach, users } = useDataStore()
@@ -229,6 +235,7 @@ export default function UsersPage() {
     setAddingPlayerId('')
     setInviteSuccess(false)
     setInviteLink('')
+    setInviteEmailStatus('idle')
     setCopied(false)
     setEmailError('')
   }
@@ -282,6 +289,19 @@ export default function UsersPage() {
       })
       setInviteLink(activationUrl)
       setInviteSuccess(true)
+      setInviteEmailStatus('sending')
+
+      try {
+        await sendInvitationEmail(
+          { email: inviteEmail.trim() },
+          activationUrl,
+          inviteRole as UserRole
+        )
+        setInviteEmailStatus('sent')
+      } catch (emailErr) {
+        console.error('No se pudo enviar el correo de invitación:', emailErr)
+        setInviteEmailStatus('failed')
+      }
     } catch (err) {
       console.error('Error saving invitation to Firestore:', err)
       setEmailError('Error al guardar la invitacion. Intentalo de nuevo.')
@@ -540,6 +560,25 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>{formatDate(inv.createdAt)}</TableCell>
                       <TableCell className="text-right">
+                        {isInvitationLive(inv) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Copiar enlace de activación"
+                            onClick={() => {
+                              navigator.clipboard.writeText(buildActivationUrl(inv.token))
+                                .then(() => {
+                                  setCopiedInvitationId(inv.id)
+                                  setTimeout(() => setCopiedInvitationId(''), 2000)
+                                })
+                                .catch((err) => console.error('No se pudo copiar el enlace:', err))
+                            }}
+                          >
+                            {copiedInvitationId === inv.id
+                              ? <Check className="h-4 w-4 text-green-600" />
+                              : <Copy className="h-4 w-4" />}
+                          </Button>
+                        )}
                         {inv.status === 'pendiente' && (
                           <Button
                             variant="ghost"
@@ -928,7 +967,11 @@ export default function UsersPage() {
                   Invitacion creada correctamente
                 </DialogTitle>
                 <DialogDescription>
-                  Comparte el siguiente enlace con el usuario para que pueda activar su cuenta.
+                  {inviteEmailStatus === 'sending'
+                    ? 'Enviando el correo de activación…'
+                    : inviteEmailStatus === 'sent'
+                    ? `Hemos enviado un correo a ${inviteEmail} con el enlace de activación. También puedes compartirlo tú mismo.`
+                    : 'No se pudo enviar el correo automáticamente. Comparte tú este enlace para que pueda activar su cuenta.'}
                 </DialogDescription>
               </DialogHeader>
 

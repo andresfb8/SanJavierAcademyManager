@@ -36,7 +36,6 @@ interface AuthState {
   setUser: (user: AppUser | null) => void
   setActiveRole: (role: UserRole) => void
   setActiveChild: (playerId: string) => void
-  signupPlayer: (email: string, pass: string, playerId: string) => Promise<void>
   signupFromInvitation: (invitation: Invitation, pass: string) => Promise<void>
   initAuth: () => () => void
 }
@@ -160,8 +159,11 @@ async function loadUserProfile(
         if (retriedCount > 0) {
           console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
         }
-        // Iniciar listeners en tiempo real
-        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.activeRole, () => {
+        // Iniciar listeners en tiempo real.
+        // Se pasa `role` (el de BD), NO `activeRole`: es el rol que aplican las
+        // security rules, y al no cambiar en toda la sesión, el RoleSwitcher no
+        // deja suscripciones con un alcance obsoleto.
+        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
           setDataLoading(false)
         })
       })
@@ -251,29 +253,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   setActiveChild: (playerId) => {
     localStorage.setItem('activeChildId', playerId)
     set({ activeChildId: playerId })
-  },
-
-  signupPlayer: async (email, pass, playerId) => {
-    set({ isLoading: true })
-    try {
-      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, pass)
-      
-      // Crear perfil de usuario en Firestore con rol jugador
-      const userDocRef = doc(db, 'users', firebaseUser.uid)
-      await setDoc(userDocRef, {
-        email,
-        displayName: email.split('@')[0],
-        role: 'jugador',
-        clubId: 'club-001',
-        linkedPlayerId: playerId,
-        isActive: true,
-        createdAt: new Date(),
-      })
-      
-      // Note: onAuthStateChanged will handle the rest (loadUserProfile, etc)
-    } finally {
-      set({ isLoading: false })
-    }
   },
 
   // Activa una cuenta desde una invitación de la colección 'invitations'

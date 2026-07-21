@@ -72,7 +72,6 @@ import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc } from
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
-import { sendPlayerInvitation } from '@/lib/emailService'
 
 // Helper: obtiene el clubId del usuario autenticado para sync con Firestore
 function getClubId(): string | undefined {
@@ -132,7 +131,9 @@ export interface DataState {
   deleteTariff: (id: string) => void
 
   // --- Players CRUD ---
-  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus'>) => string
+  // Los campos de invitación siguen excluidos, pero ya no porque addPlayer los
+  // calcule: están deprecados y la exclusión impide escribirlos de nuevo.
+  addPlayer: (player: Omit<Player, 'id' | 'recoveryCredits' | 'createdAt' | 'updatedAt' | 'invitationToken' | 'inviteCode' | 'invitationStatus' | 'portalUid'>) => string
   updatePlayer: (id: string, updates: Partial<Player>) => void
   invitePlayer: (id: string) => Promise<void>
   bulkInvitePlayers: (ids: string[]) => Promise<void>
@@ -560,16 +561,11 @@ export const useDataStore = create<DataState>()(
 
       addPlayer: (playerData) => {
         const now = new Date()
-        const invitationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-        
+
         const newPlayer: Player = {
           ...playerData,
           id: generateId(),
           recoveryCredits: 0,
-          invitationToken,
-          inviteCode,
-          invitationStatus: 'pending',
           createdAt: now,
           updatedAt: now,
         }
@@ -695,19 +691,46 @@ export const useDataStore = create<DataState>()(
         const player = get().players.find(p => p.id === playerId)
         if (!player || !player.email) return
 
+        const clubId = getClubId()
+        if (!clubId) {
+          console.error('[DataStore] invitePlayer: no hay clubId')
+          toast.error('No se pudo invitar: falta el club del usuario')
+          return
+        }
+        const { userId } = getCurrentUser()
+
+        // Import dinámico: evita el ciclo dataStore → invitations → dataStore
+        const { createInvitation } = await import('@/lib/invitations')
+        const { sendInvitationEmail } = await import('@/lib/emailService')
+
+        let activationUrl: string
         try {
-          const token = player.invitationToken || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15))
-          await sendPlayerInvitation({ name: player.firstName, email: player.email }, token)
-          
-          get().updatePlayer(playerId, { 
-            invitationToken: token,
-            invitationStatus: 'sent' 
+          const result = await createInvitation({
+            email: player.email,
+            role: 'jugador',
+            clubId,
+            createdBy: userId,
+            linkedPlayerId: player.id,
           })
-          
-          toast.success(`Se ha enviado el acceso a ${player.email}`)
+          activationUrl = result.activationUrl
         } catch (error) {
-          console.error('[DataStore] invitePlayer error:', error)
-          toast.error(`No se pudo enviar a ${player.email}`)
+          console.error('[DataStore] invitePlayer: error creando la invitación:', error)
+          toast.error(`No se pudo crear la invitación para ${player.email}`)
+          return
+        }
+
+        try {
+          await sendInvitationEmail(
+            { name: player.firstName, email: player.email },
+            activationUrl,
+            'jugador'
+          )
+          toast.success(`Invitación enviada a ${player.email}`)
+        } catch (error) {
+          console.error('[DataStore] invitePlayer: error enviando el correo:', error)
+          toast.error(
+            'Invitación creada, pero no se pudo enviar el correo. Copia el enlace en Usuarios → Invitaciones.'
+          )
         }
       },
 
@@ -715,29 +738,56 @@ export const useDataStore = create<DataState>()(
         const players = get().players.filter(p => playerIds.includes(p.id) && p.email)
         if (players.length === 0) return
 
-        toast.info(`Procesando ${players.length} correos...`)
+        const clubId = getClubId()
+        if (!clubId) {
+          console.error('[DataStore] bulkInvitePlayers: no hay clubId')
+          toast.error('No se pudo invitar: falta el club del usuario')
+          return
+        }
+        const { userId } = getCurrentUser()
 
-        let successCount = 0
+        toast.info(`Procesando ${players.length} invitaciones...`)
+
+        const { createInvitation } = await import('@/lib/invitations')
+        const { sendInvitationEmail } = await import('@/lib/emailService')
+
+        let sentCount = 0
+        let createdOnlyCount = 0
+        let failedCount = 0
+
         for (const player of players) {
           try {
-            const token = player.invitationToken || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15))
-            await sendPlayerInvitation({ name: player.firstName, email: player.email }, token)
-            
-            get().updatePlayer(player.id, { 
-              invitationToken: token,
-              invitationStatus: 'sent' 
+            const { activationUrl } = await createInvitation({
+              email: player.email,
+              role: 'jugador',
+              clubId,
+              createdBy: userId,
+              linkedPlayerId: player.id,
             })
-            successCount++
+            try {
+              await sendInvitationEmail(
+                { name: player.firstName, email: player.email },
+                activationUrl,
+                'jugador'
+              )
+              sentCount++
+            } catch (err) {
+              console.error(`[DataStore] bulkInvitePlayers: correo no enviado a ${player.email}`, err)
+              createdOnlyCount++
+            }
           } catch (err) {
-            console.error(`Failed to invite ${player.email}:`, err)
+            console.error(`[DataStore] bulkInvitePlayers: falló ${player.email}`, err)
+            failedCount++
           }
         }
 
-        if (successCount > 0) {
-          toast.success(`Se han enviado ${successCount} invitaciones correctamente.`)
-        } else {
-          toast.error("No se pudo enviar ninguna invitación.")
+        if (sentCount > 0) toast.success(`${sentCount} invitaciones enviadas`)
+        if (createdOnlyCount > 0) {
+          toast.error(
+            `${createdOnlyCount} invitaciones creadas sin enviar el correo. Copia los enlaces en Usuarios → Invitaciones.`
+          )
         }
+        if (failedCount > 0) toast.error(`${failedCount} invitaciones no se pudieron crear`)
       },
 
       addCoach: (coachData) => {
@@ -1326,16 +1376,22 @@ export const useDataStore = create<DataState>()(
       },
 
       deletePayment: (id) => {
+        // Actualización optimista del estado local (igual que deleteEnrollment):
+        // los cálculos derivados (tasa de cobro, ingresos del mes) leen este array,
+        // no la query de React Query, así que hay que quitarlo aquí explícitamente.
+        set((state) => ({ payments: state.payments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('payments', id)
         queryClient.invalidateQueries({ queryKey: ['payments'] });
       },
 
       deleteEventPayment: (id) => {
+        set((state) => ({ eventPayments: state.eventPayments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('eventPayments', id)
         queryClient.invalidateQueries({ queryKey: ['eventPayments'] });
       },
 
       deletePrivateLessonPayment: (id) => {
+        set((state) => ({ privateLessonPayments: state.privateLessonPayments.filter((p) => p.id !== id) }))
         deleteFirestoreDoc('privateLessonPayments', id)
         queryClient.invalidateQueries({ queryKey: ['privateLessonPayments'] });
       },

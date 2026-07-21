@@ -77,27 +77,36 @@ export function normalizeSalaryConfig(doc: Record<string, unknown>): Record<stri
 
 export function subscribeToAllData(
   clubId: string,
-  userRole: string,
+  dbRole: string,
   onFirstLoad: () => void
 ): () => void {
   const unsubscribers: Array<() => void> = []
   const loaded = new Set<string>()
-  
+
+  // IMPORTANTE: `dbRole` debe ser el campo `role` del documento de usuario en
+  // Firestore, NO `activeRole`. Las security rules resuelven los permisos con
+  // `hasRole()` → `getUserData().get('role')`, así que el alcance de la
+  // suscripción (qué colecciones y con qué filtro) tiene que calcularse con el
+  // mismo rol que aplican las reglas; si no, o pedimos datos que las reglas
+  // deniegan, o nos auto-restringimos de más.
+  // Efecto secundario deseado: como `role` no cambia durante la sesión, cambiar
+  // de rol activo con el RoleSwitcher no invalida estas suscripciones.
+
   // Filtrar colecciones según permisos del rol
   const allowedCollections = COLLECTIONS.filter(coll => {
     // Reglas de suscripción básicas por rol
-    if (userRole === 'director' || userRole === 'coordinador') return true
-    
-    if (userRole === 'entrenador') {
+    if (dbRole === 'director' || dbRole === 'coordinador') return true
+
+    if (dbRole === 'entrenador') {
       // Entrenadores no ven finanzas ni configs de otros
       return !['coachSalaryConfigs', 'clubTransactions', 'invitations'].includes(coll.name)
     }
-    
-    if (userRole === 'jugador' || userRole === 'tutor') {
+
+    if (dbRole === 'jugador' || dbRole === 'tutor') {
       // Jugadores solo ven lo esencial para su portal
       return ['players', 'groups', 'enrollments', 'attendance', 'payments', 'events', 'invoices', 'privateLessonPayments', 'eventPayments', 'attendanceNotices', 'vouchers', 'evaluations', 'matchReports'].includes(coll.name)
     }
-    
+
     return true
   })
 
@@ -120,13 +129,13 @@ export function subscribeToAllData(
 
     // Firebase Security Rules for 'jugador' and 'tutor' restrict reading ALL documents in certain collections.
     // We must narrow the query to match the security rules, otherwise the entire query is rejected.
+    // Se usa el mismo `dbRole` que el filtro de colecciones (ver nota arriba).
     const currentUser = useAuthStore.getState().user
-    const actualRole = currentUser?.role // The real role in DB, not activeRole
 
-    if (actualRole === 'jugador' || actualRole === 'tutor') {
+    if (dbRole === 'jugador' || dbRole === 'tutor') {
       const isPlayerRestricted = ['players', 'payments', 'privateLessonPayments', 'eventPayments', 'invoices', 'evaluations'].includes(name)
       if (isPlayerRestricted) {
-        const playerIds = actualRole === 'tutor' 
+        const playerIds = dbRole === 'tutor'
           ? (currentUser?.linkedPlayerIds?.length ? currentUser.linkedPlayerIds : ['none'])
           : (currentUser?.linkedPlayerId ? [currentUser.linkedPlayerId] : ['none'])
 
@@ -151,16 +160,20 @@ export function subscribeToAllData(
           return { ...normalized, id: d.id }
         })
 
-        // Safety guard: never replace existing local data with an empty Firestore
-        // result. This prevents data loss when a Firestore write failed silently
-        // (permission denied, wrong clubId) and the snapshot comes back empty.
+        // Safety guard: no reemplazar datos locales con un resultado vacío que
+        // provenga SOLO de la caché (fromCache) — evita el "flash" a vacío durante
+        // la carga inicial u offline mientras el servidor aún no ha respondido.
+        // Un vacío CONFIRMADO por el servidor (fromCache=false) sí se aplica: es un
+        // borrado real (p.ej. eliminar el último recibo/inscripción del mes). Antes
+        // se ignoraba cualquier snapshot vacío, dejando el elemento borrado en el
+        // store y falseando cálculos derivados (tasa de cobro, ocupación, etc.).
         const current = (useDataStore.getState() as unknown as Record<string, unknown>)[stateKey]
         const currentCount = Array.isArray(current) ? current.length : 0
 
-        if (docs.length === 0 && currentCount > 0) {
+        if (docs.length === 0 && currentCount > 0 && snapshot.metadata.fromCache) {
           console.warn(
-            `[realtimeSync] "${name}": Firestore returned 0 docs but store has ${currentCount}. ` +
-            `Skipping overwrite — check Firestore permissions and clubId on your documents.`
+            `[realtimeSync] "${name}": snapshot vacío desde caché con ${currentCount} en store. ` +
+            `Se ignora hasta confirmación del servidor.`
           )
           markLoaded(name)
           return

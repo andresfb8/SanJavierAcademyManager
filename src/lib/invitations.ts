@@ -2,6 +2,7 @@ import { doc, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { generateId } from '@/lib/utils'
 import { useDataStore } from '@/stores/dataStore'
+import { buildActivationUrl } from '@/lib/invitation-utils'
 import type { Invitation, UserRole } from '@/types'
 
 export interface CreateInvitationParams {
@@ -21,7 +22,7 @@ export async function createInvitation(
   params: CreateInvitationParams
 ): Promise<{ token: string; activationUrl: string }> {
   const token = generateId()
-  const activationUrl = `${window.location.origin}/activar/${token}`
+  const activationUrl = buildActivationUrl(token)
 
   const now = new Date()
   const expiresAt = new Date(now)

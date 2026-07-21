@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -14,6 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useDataStore } from '@/stores/dataStore'
+import { useAuthStore } from '@/stores/authStore'
+import { getPlayerPortalStatus } from '@/lib/player-portal-status'
 import { cn, isMinor as checkIsMinor, formatDate, normalizeText, formatCurrency } from '@/lib/utils'
 import { PLAYER_LEVELS, PLAYER_STATUSES } from '@/constants'
 import {
@@ -35,11 +37,23 @@ import {
 
 export default function PlayersPage() {
   const navigate = useNavigate()
-  const { players, addPlayer, updatePlayer, cancelPlayer, deletePlayer, invitePlayer } = useDataStore()
+  const { players, users, invitations, addPlayer, updatePlayer, cancelPlayer, deletePlayer, invitePlayer } = useDataStore()
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  // Invitar al portal es cosa de admin (mismo criterio que isAdmin() en las rules).
+  // Además, con rol de BD entrenador no se sincronizan `invitations` ni `users`,
+  // así que el estado derivado no sería fiable para ellos.
+  const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [portalFilter, setPortalFilter] = useState<string>('')
+  // El filtro de portal se oculta para no-admins. Cambiar de rol activo no
+  // remonta esta página, así que un filtro puesto sobreviviría al cambio y
+  // dejaría la lista filtrada sin ningún control visible para limpiarla.
+  useEffect(() => {
+    if (!isAdmin) setPortalFilter('')
+  }, [isAdmin])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
@@ -58,6 +72,18 @@ export default function PlayersPage() {
     return map
   }, [allPendingPayments])
 
+  const portalStatusById = useMemo(() => {
+    // `now` se congela hasta que cambie alguno de los tres arrays. Con caducidad
+    // de 7 días no merece un timer: como mucho el menú ofrece "Reenviar" en vez
+    // de "Invitar", y ambos hacen lo mismo.
+    const now = new Date()
+    const map: Record<string, ReturnType<typeof getPlayerPortalStatus>> = {}
+    for (const p of players) {
+      map[p.id] = getPlayerPortalStatus(p, users, invitations, now)
+    }
+    return map
+  }, [players, users, invitations])
+
   const filteredPlayers = useMemo(() => {
     const q = normalizeText(search)
     return players.filter((p) => {
@@ -67,15 +93,16 @@ export default function PlayersPage() {
         p.phone.includes(search)
       const matchesLevel = levelFilter === '' || p.level === levelFilter
       const matchesStatus = statusFilter === '' || p.status === statusFilter
+      const portalStatus = portalStatusById[p.id] ?? 'sin_acceso'
       const matchesPortal =
         portalFilter === '' ? true :
-        portalFilter === 'active' ? p.invitationStatus === 'active' :
-        portalFilter === 'sent' ? p.invitationStatus === 'sent' :
-        portalFilter === 'none' ? !p.invitationStatus || p.invitationStatus === 'pending' :
+        portalFilter === 'active' ? portalStatus === 'activo' :
+        portalFilter === 'sent' ? portalStatus === 'invitado' :
+        portalFilter === 'none' ? portalStatus === 'sin_acceso' :
         true
       return matchesSearch && matchesLevel && matchesStatus && matchesPortal
     })
-  }, [players, search, levelFilter, statusFilter, portalFilter])
+  }, [players, search, levelFilter, statusFilter, portalFilter, portalStatusById])
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -238,12 +265,12 @@ export default function PlayersPage() {
               <p className="text-xs text-muted-foreground">
                 {player.isMinor && '👶 Menor · '}{player.dni}
               </p>
-              {player.invitationStatus === 'sent' && (
+              {isAdmin && portalStatusById[player.id] === 'invitado' && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded-md">
                   <Mail className="h-3 w-3" /> Invitación enviada
                 </div>
               )}
-              {player.invitationStatus === 'active' && (
+              {isAdmin && portalStatusById[player.id] === 'activo' && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-1.5 py-0.5 rounded-md">
                   <CheckCircle2 className="h-3 w-3" /> Portal Activo
                 </div>
@@ -305,7 +332,7 @@ export default function PlayersPage() {
               <DropdownMenuItem onClick={() => { setEditingPlayer(player); setShowCreateDialog(true) }}>
                 <Edit className="h-4 w-4 mr-2" /> Editar
               </DropdownMenuItem>
-              {player.email && player.invitationStatus !== 'active' && (
+              {isAdmin && player.email && portalStatusById[player.id] !== 'activo' && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -313,7 +340,7 @@ export default function PlayersPage() {
                     className="text-blue-700 focus:text-blue-700"
                   >
                     <Gamepad2 className="h-4 w-4 mr-2" />
-                    {player.invitationStatus === 'sent' ? 'Reenviar invitación' : 'Invitar al portal'}
+                    {portalStatusById[player.id] === 'invitado' ? 'Reenviar invitación' : 'Invitar al portal'}
                   </DropdownMenuItem>
                 </>
               )}
@@ -334,7 +361,7 @@ export default function PlayersPage() {
       enableSorting: false,
       size: 40,
     },
-  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer])
+  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin, pendingByPlayer])
 
   const table = useReactTable({
     data: filteredPlayers,
@@ -392,17 +419,19 @@ export default function PlayersPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="w-full sm:w-40"
           />
-          <Select
-            options={[
-              { value: '', label: 'Portal: todos' },
-              { value: 'active', label: 'Portal activo' },
-              { value: 'sent', label: 'Invitación enviada' },
-              { value: 'none', label: 'Sin acceso' },
-            ]}
-            value={portalFilter}
-            onChange={(e) => setPortalFilter(e.target.value)}
-            className="w-full sm:w-44"
-          />
+          {isAdmin && (
+            <Select
+              options={[
+                { value: '', label: 'Portal: todos' },
+                { value: 'active', label: 'Portal activo' },
+                { value: 'sent', label: 'Invitación enviada' },
+                { value: 'none', label: 'Sin acceso' },
+              ]}
+              value={portalFilter}
+              onChange={(e) => setPortalFilter(e.target.value)}
+              className="w-full sm:w-44"
+            />
+          )}
         </div>
 
         {/* Bulk actions */}
@@ -470,19 +499,21 @@ export default function PlayersPage() {
             </DropdownMenu>
 
             {/* Invitar al portal */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-              onClick={() => {
-                const { bulkInvitePlayers } = useDataStore.getState()
-                bulkInvitePlayers(Array.from(selectedIds))
-                setSelectedIds(new Set())
-              }}
-            >
-              <Mail className="h-3.5 w-3.5" />
-              Enviar invitaciones
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                onClick={() => {
+                  const { bulkInvitePlayers } = useDataStore.getState()
+                  bulkInvitePlayers(Array.from(selectedIds))
+                  setSelectedIds(new Set())
+                }}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Enviar invitaciones
+              </Button>
+            )}
 
             <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
               Deseleccionar
