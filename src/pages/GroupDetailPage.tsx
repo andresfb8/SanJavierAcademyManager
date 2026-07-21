@@ -22,7 +22,7 @@ import { DAYS_OF_WEEK, PLAYER_LEVELS, BILLING_FREQUENCIES, MONTHS } from '@/cons
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
 import type { BillingFrequency } from '@/types'
-import { billingFrequencyLabel } from '@/lib/billing-utils'
+import { billingFrequencyLabel, cycleLength } from '@/lib/billing-utils'
 
 export default function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -129,20 +129,23 @@ export default function GroupDetailPage() {
   // Handle adding a player to the group
   // Compute final price based on discount mode
   const selectedTariffPrice = tariffs.find((t) => t.id === selectedTariffId)?.price ?? 0
+  // Precio de referencia del periodo completo: cuota mensual x meses del ciclo
+  // seleccionado. Los descuentos operan sobre este total, no sobre el mes.
+  const periodBasePrice = selectedTariffPrice * cycleLength(selectedBillingFrequency)
   const computedFinalPrice = useMemo(() => {
     if (discountMode === 'percentage') {
       const pct = parseFloat(discountPercentage)
       if (!isNaN(pct) && pct > 0 && pct <= 100) {
-        return Math.round(selectedTariffPrice * (1 - pct / 100) * 100) / 100
+        return Math.round(periodBasePrice * (1 - pct / 100) * 100) / 100
       }
-      return selectedTariffPrice
+      return periodBasePrice
     }
     if (discountMode === 'fixed_price') {
       const parsed = parseFloat(customPrice)
-      return !isNaN(parsed) && parsed >= 0 ? parsed : selectedTariffPrice
+      return !isNaN(parsed) && parsed >= 0 ? parsed : periodBasePrice
     }
-    return selectedTariffPrice
-  }, [discountMode, discountPercentage, customPrice, selectedTariffPrice])
+    return periodBasePrice
+  }, [discountMode, discountPercentage, customPrice, periodBasePrice])
 
   const handleAddPlayer = async () => {
     if (!group || !selectedPlayerId || !selectedTariffId) return
@@ -151,11 +154,12 @@ export default function GroupDetailPage() {
     const tariff = tariffs.find((t) => t.id === selectedTariffId)
     if (!player || !tariff) return
 
+    const tariffPeriodPrice = tariff.price * cycleLength(selectedBillingFrequency)
     let finalCustomPrice: number | undefined
     if (discountMode === 'percentage') {
       const pct = parseFloat(discountPercentage)
       if (!isNaN(pct) && pct > 0 && pct <= 100) {
-        finalCustomPrice = Math.round(tariff.price * (1 - pct / 100) * 100) / 100
+        finalCustomPrice = Math.round(tariffPeriodPrice * (1 - pct / 100) * 100) / 100
       }
     } else if (discountMode === 'fixed_price') {
       const parsed = parseFloat(customPrice)
@@ -202,7 +206,7 @@ export default function GroupDetailPage() {
     if (needsPartialReceipt) {
       setPartialReceiptData({
         enrollmentId,
-        amount: (finalCustomPrice ?? tariff.price).toString()
+        amount: (finalCustomPrice ?? tariffPeriodPrice).toString()
       })
     }
   }
@@ -744,7 +748,7 @@ export default function GroupDetailPage() {
                       onChange={() => setDiscountMode('none')}
                       className="accent-primary"
                     />
-                    Precio tarifa ({formatCurrency(selectedTariffPrice)})
+                    Precio tarifa ({formatCurrency(periodBasePrice)})
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
@@ -804,6 +808,12 @@ export default function GroupDetailPage() {
                     </span>
                   )}
                 </div>
+                {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
+                  <p className="text-xs text-muted-foreground">
+                    Se cobrará {formatCurrency(computedFinalPrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
+                    {' '}({cycleLength(selectedBillingFrequency)} × {formatCurrency(selectedTariffPrice)})
+                  </p>
+                )}
               </div>
             )}
 
