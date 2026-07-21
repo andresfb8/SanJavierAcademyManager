@@ -810,7 +810,7 @@ export default function GroupDetailPage() {
                 </div>
                 {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
                   <p className="text-xs text-muted-foreground">
-                    Se cobrará {formatCurrency(computedFinalPrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
+                    Se cobrará {formatCurrency(periodBasePrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
                     {' '}({cycleLength(selectedBillingFrequency)} × {formatCurrency(selectedTariffPrice)})
                   </p>
                 )}
