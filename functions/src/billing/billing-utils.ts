@@ -20,3 +20,20 @@ export function isBillingMonth(
       return true;
   }
 }
+
+/**
+ * Nº de meses que cubre un recibo de esta frecuencia.
+ * See src/lib/billing-utils.ts for full documentation.
+ */
+export function cycleLength(frequency: BillingFrequency): number {
+  switch (frequency) {
+    case "monthly":
+      return 1;
+    case "quarterly":
+      return 3;
+    case "annual":
+      return 12;
+    case "installments":
+      return 1; // plazos usa su propio precio por mes, no se multiplica
+  }
+}
