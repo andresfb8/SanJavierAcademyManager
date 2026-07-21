@@ -2,7 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import { isBillingMonth } from "./billing-utils";
+import { isBillingMonth, cycleLength } from "./billing-utils";
 
 // ---------------------------------------------------------------------------
 // Spanish month names (1-indexed: index 0 unused)
@@ -244,7 +244,10 @@ async function processClub(
     // -----------------------------------------------------------------------
     // Calculate amount and concept
     // -----------------------------------------------------------------------
-    const amount = enrollment.customPrice ?? group.defaultTariffPrice;
+    // Trimestral/anual generan menos recibos pero por el total del periodo
+    // (cuota base x meses del ciclo); customPrice, si está definido, es
+    // siempre el importe exacto del recibo y no se multiplica.
+    const amount = enrollment.customPrice ?? (group.defaultTariffPrice * cycleLength(freq));
     const concept = `Cuota ${monthName} ${billingYear} - ${group.name}`;
 
     // Create the payment document
