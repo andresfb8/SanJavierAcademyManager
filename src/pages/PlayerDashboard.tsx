@@ -625,6 +625,7 @@ export default function PlayerDashboard() {
                 AVATAR_GRADIENT
               )}
               title="Ver mi perfil"
+              aria-label="Ver mi perfil"
             >
               {user?.displayName?.charAt(0)?.toUpperCase() || 'U'}
             </button>
