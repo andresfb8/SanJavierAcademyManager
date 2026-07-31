@@ -24,7 +24,7 @@ import { db } from './firebase'
 import { toast } from '@/hooks/use-toast'
 import type { Invoice, Payment, Enrollment } from '@/types'
 import { MONTHS } from '@/constants'
-import { isBillingMonth } from './billing-utils'
+import { isBillingMonth, cycleLength } from './billing-utils'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -432,13 +432,15 @@ export async function generateMonthlyReceiptsAtomic(
       }
 
       // Calcular importe: customPrice tiene prioridad
-      // Para plazos: usar el precio específico del mes (YYYY-MM), para mensual: usar precio base del grupo
+      // Para plazos: usar el precio específico del mes (YYYY-MM) sin multiplicar.
+      // Para mensual/trimestral/anual: precio base del grupo x meses del ciclo
+      // (trimestral/anual generan menos recibos pero por el total del periodo).
       let baseAmount: number
       if (freq === 'installments' && group.installmentPrices) {
         const billingKey = `${year}-${String(month).padStart(2, '0')}`
         baseAmount = group.installmentPrices[billingKey] ?? group.defaultTariffPrice
       } else {
-        baseAmount = group.defaultTariffPrice
+        baseAmount = group.defaultTariffPrice * cycleLength(freq)
       }
       const amount = enrollment.customPrice ?? baseAmount
 
