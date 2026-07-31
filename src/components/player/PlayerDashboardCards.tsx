@@ -280,9 +280,10 @@ export function UltimasEvaluacionesCard({ evaluations, studentId, onClick }: Ult
 interface AsistenciaMensualChartProps {
   studentId: string
   groupIds: string[]
+  onClick?: () => void
 }
 
-export function AsistenciaMensualChart({ studentId, groupIds }: AsistenciaMensualChartProps) {
+export function AsistenciaMensualChart({ studentId, groupIds, onClick }: AsistenciaMensualChartProps) {
   const { attendance } = useDataStore()
 
   const data = useMemo(() => {
@@ -320,7 +321,13 @@ export function AsistenciaMensualChart({ studentId, groupIds }: AsistenciaMensua
   }, [attendance, studentId, groupIds])
 
   return (
-    <Card className="border border-slate-100 shadow-sm">
+    <Card
+      className={cn(
+        'border border-slate-100 shadow-sm transition-all',
+        onClick && 'cursor-pointer hover:shadow-md'
+      )}
+      onClick={onClick}
+    >
       <CardHeader className="pb-2 pt-4 px-4">
         <CardTitle className="text-sm font-bold text-slate-600 flex items-center gap-2">
           <Trophy className="h-4 w-4" />
