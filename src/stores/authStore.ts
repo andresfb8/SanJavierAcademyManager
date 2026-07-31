@@ -65,6 +65,7 @@ function clearDataStore(): void {
     evaluations: [],
     matchReports: [],
     invoices: [],
+    users: [],
   })
 }
 
