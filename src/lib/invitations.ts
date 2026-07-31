@@ -53,7 +53,12 @@ export async function createInvitation(
 
   useDataStore.getState().addInvitation({ ...invitationData, id: token } as Invitation)
 
-  await setDoc(doc(db, 'invitations', token), invitationData)
+  try {
+    await setDoc(doc(db, 'invitations', token), invitationData)
+  } catch (error) {
+    useDataStore.getState().deleteInvitation(token)
+    throw error
+  }
 
   return { token, activationUrl }
 }
