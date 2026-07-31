@@ -49,6 +49,15 @@ export interface Holiday {
   createdAt: Date
 }
 
+// --- Temporada ---
+export interface Season {
+  id: string
+  name: string
+  startDate: Date
+  endDate: Date
+  createdAt: Date
+}
+
 // --- Pista ---
 export type CourtType = 'indoor' | 'outdoor'
 export type CourtSurface = 'cristal' | 'muro' | 'cesped'
@@ -222,6 +231,9 @@ export interface Group {
   installmentPrices?: Record<string, number>
   startDate: Date
   endDate: Date
+  seasonId?: string           // temporada a la que pertenece; ausente = "sin temporada asignada"
+  renewedFromGroupId?: string // si este grupo nació de un traspaso, el id del grupo viejo
+  renewedToGroupId?: string   // si este grupo ya fue traspasado, el id del grupo nuevo
   isActive: boolean
   createdAt: Date
 }
@@ -382,6 +394,7 @@ export type ActivityType =
   | 'attendance_recorded'
   | 'recovery_used'
   | 'waitlist_spot_available'
+  | 'season_group_renewed'
   | 'evaluation_created'
   | 'evaluation_updated'
   | 'evaluation_deleted'
