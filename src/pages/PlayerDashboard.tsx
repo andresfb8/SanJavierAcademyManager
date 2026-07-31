@@ -647,28 +647,6 @@ export default function PlayerDashboard() {
           </div>
         </div>
 
-        {/* Quick Actions Desktop */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          {quickActions.map((action) => {
-            const Icon = action.icon
-            return (
-              <button
-                key={action.label}
-                onClick={action.onClick}
-                className="flex items-center gap-4 p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm text-left hover:shadow-md hover:border-slate-200 transition-all active:scale-95 group"
-              >
-                <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110', action.color)}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-black text-slate-800 leading-tight">{action.label}</p>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">{action.sub}</p>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-
         <div className="grid grid-cols-3 gap-6">
           {/* Columna izquierda */}
           <div className="col-span-1 space-y-4">
@@ -726,6 +704,7 @@ export default function PlayerDashboard() {
               <AsistenciaMensualChart
                 studentId={studentId}
                 groupIds={myGroups.map((g) => g.id)}
+                onClick={() => navigate('/asistencia')}
               />
             )}
           </div>
