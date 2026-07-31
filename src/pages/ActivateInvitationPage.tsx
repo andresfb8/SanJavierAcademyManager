@@ -10,6 +10,7 @@ import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/c
 import { GraduationCap, Lock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { USER_ROLES } from '@/constants'
+import { isInvitationLive } from '@/lib/invitation-utils'
 import type { Invitation } from '@/types'
 
 function toDate(value: unknown): Date {
@@ -60,7 +61,7 @@ export default function ActivateInvitationPage() {
           setError('Esta invitación ya fue utilizada. Inicia sesión con tu cuenta.')
           return
         }
-        if (inv.status === 'expirada' || inv.expiresAt < new Date()) {
+        if (!isInvitationLive(inv)) {
           setError('Esta invitación ha expirado. Solicita una nueva a tu academia.')
           return
         }
