@@ -40,6 +40,7 @@ import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery,
 import { QuickAttendanceSheet } from '@/components/attendance/QuickAttendanceSheet'
 import { AttendanceCalendar } from '@/components/attendance/AttendanceCalendar'
 import { useNextClass } from '@/hooks/useNextClass'
+import { MyAttendanceView } from '@/components/attendance/MyAttendanceView'
 
 // ==========================================
 // AttendancePage - Registro de Asistencia
@@ -73,6 +74,7 @@ export default function AttendancePage() {
   const activeRole = user?.activeRole ?? user?.role
   const isEntrenador = activeRole === 'entrenador'
   const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
+  const isPlayerOrTutor = activeRole === 'jugador' || activeRole === 'tutor'
 
   // --- Registros de asistencia en edición ---
   const [entries, setEntries] = useState<AttendanceEntry[]>([])
@@ -525,6 +527,19 @@ export default function AttendancePage() {
     () => groups.find((g) => g.id === selectedGroupId) ?? null,
     [groups, selectedGroupId]
   )
+
+  // Jugador/tutor: solo lectura de su propio historial, sin acceso al
+  // editor de gestión (no deben poder ver ni marcar la asistencia de otros).
+  if (isPlayerOrTutor) {
+    return (
+      <div>
+        <Header title="Mi Asistencia" subtitle="Historial de tus clases" />
+        <div className="p-4 sm:p-6">
+          <MyAttendanceView />
+        </div>
+      </div>
+    )
+  }
 
   if (pageView === 'sheet' && sheetGroup) {
     return (
