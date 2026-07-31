@@ -46,6 +46,8 @@ import {
   VouchersDesktopCard,
 } from '@/components/player/PlayerDashboardCards'
 
+const AVATAR_GRADIENT = 'from-blue-500 to-blue-600'
+
 export default function PlayerDashboard() {
   const { user } = useAuthStore()
   const {
@@ -615,13 +617,25 @@ export default function PlayerDashboard() {
       <div className="hidden lg:block px-8 py-8 max-w-7xl mx-auto">
         {/* Saludo Desktop */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-              Hola, {user?.displayName?.split(' ')[0]} 👋
-            </h1>
-            <p className="text-sm font-medium text-slate-400 mt-1">
-              {isTutor ? <>Viendo a <span className="font-bold text-slate-600">{studentFirstName}</span> · {formatDate(now)}</> : formatDate(now)}
-            </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { if (studentId) navigate(`/jugadores/${studentId}`) }}
+              className={cn(
+                'h-12 w-12 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-black text-lg shrink-0 hover:scale-105 transition-transform',
+                AVATAR_GRADIENT
+              )}
+              title="Ver mi perfil"
+            >
+              {user?.displayName?.charAt(0)?.toUpperCase() || 'U'}
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+                Hola, {user?.displayName?.split(' ')[0]} 👋
+              </h1>
+              <p className="text-sm font-medium text-slate-400 mt-1">
+                {isTutor ? <>Viendo a <span className="font-bold text-slate-600">{studentFirstName}</span> · {formatDate(now)}</> : formatDate(now)}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {pendingPaymentsCount > 0 && (
