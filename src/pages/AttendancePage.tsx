@@ -528,6 +528,8 @@ export default function AttendancePage() {
     [groups, selectedGroupId]
   )
 
+  // Jugador/tutor: solo lectura de su propio historial, sin acceso al
+  // editor de gestión (no deben poder ver ni marcar la asistencia de otros).
   if (isPlayerOrTutor) {
     return (
       <div>
