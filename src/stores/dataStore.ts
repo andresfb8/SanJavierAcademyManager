@@ -40,6 +40,7 @@ import type {
   Voucher,
   VoucherType,
   VoucherStatus,
+  Season,
 } from '@/types'
 import {
   demoCourts,
@@ -98,6 +99,7 @@ export interface DataState {
   players: Player[]
   coaches: Coach[]
   groups: Group[]
+  seasons: Season[]
   enrollments: Enrollment[]
   privateLessons: PrivateLesson[]
   invitations: Invitation[]
@@ -149,6 +151,9 @@ export interface DataState {
   addGroup: (group: Omit<Group, 'id' | 'createdAt' | 'currentEnrollment'>) => void
   updateGroup: (id: string, data: Partial<Group>) => void
   deleteGroup: (id: string) => void
+
+  // --- Seasons CRUD ---
+  addSeason: (season: Omit<Season, 'id' | 'createdAt'>) => Season
 
   // --- Enrollments CRUD ---
   addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<{ needsPartialReceipt: boolean; enrollmentId: string }>
@@ -391,6 +396,7 @@ export const useDataStore = create<DataState>()(
       players: [],
       coaches: [],
       groups: [],
+      seasons: [],
       enrollments: [],
       privateLessons: [],
       invitations: [],
@@ -850,6 +856,14 @@ export const useDataStore = create<DataState>()(
           userId,
           userName,
         })
+      },
+
+      addSeason: (seasonData) => {
+        const newSeason: Season = { ...seasonData, id: generateId(), createdAt: new Date() }
+        set((state) => ({ seasons: [...state.seasons, newSeason] }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('seasons', newSeason.id, newSeason as any, clubId)
+        return newSeason
       },
 
       updateGroup: (id, data) => {
