@@ -23,6 +23,34 @@ export interface CreateInvitationParams {
 export async function createInvitation(
   params: CreateInvitationParams
 ): Promise<{ token: string; activationUrl: string }> {
+  const existingInvitations = useDataStore.getState().invitations
+
+  let priorInvitations: Invitation[] = []
+  if (params.coachId) {
+    priorInvitations = existingInvitations.filter(
+      (inv) => inv.coachId === params.coachId
+    )
+  } else if (params.linkedPlayerId) {
+    priorInvitations = existingInvitations.filter(
+      (inv) => inv.linkedPlayerId === params.linkedPlayerId
+    )
+  } else if (params.linkedPlayerIds && params.linkedPlayerIds.length > 0) {
+    priorInvitations = existingInvitations.filter(
+      (inv) =>
+        inv.linkedPlayerIds &&
+        inv.linkedPlayerIds.some((id) => params.linkedPlayerIds!.includes(id))
+    )
+  } else {
+    const normalizedEmail = params.email.trim().toLowerCase()
+    priorInvitations = existingInvitations.filter(
+      (inv) => inv.email.trim().toLowerCase() === normalizedEmail
+    )
+  }
+
+  for (const prior of priorInvitations) {
+    useDataStore.getState().deleteInvitation(prior.id)
+  }
+
   const token = generateId()
   const activationUrl = buildActivationUrl(token)
 
