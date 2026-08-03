@@ -1246,9 +1246,10 @@ export const useDataStore = create<DataState>()(
           console.info('[renewGroup] Success:', newGroupId)
 
           // 5. Jugadores excluidos sin otras matriculas activas: pasan a lista_espera
+          const includedPlayerIdSet = new Set(includedEnrollments.map((e) => e.playerId))
           const excludedPlayerIds = activeEnrollments
             .map((e) => e.playerId)
-            .filter((playerId) => !includedPlayerIds.includes(playerId))
+            .filter((playerId) => !includedPlayerIdSet.has(playerId))
           for (const playerId of excludedPlayerIds) {
             const stillActive = get().enrollments.some(
               (e) => e.playerId === playerId && e.isActive
