@@ -25,6 +25,7 @@ import {
   BarChart3,
   User,
   TrendingUp,
+  CalendarRange,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
@@ -81,6 +82,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: 'Configuración', href: '/configuracion', icon: Settings, requiredModule: 'settings' },
       { name: 'Registro de actividad', href: '/actividad', icon: History, requiredModule: 'settings' },
+      { name: 'Temporadas', href: '/temporadas', icon: CalendarRange, requiredModule: 'settings' },
       { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
     ],
   },

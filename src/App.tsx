@@ -39,6 +39,7 @@ const PlayerDashboard = lazy(() => import('@/pages/PlayerDashboard'))
 const CoachDashboard = lazy(() => import('@/pages/CoachDashboard'))
 const FreeSlotsPage = lazy(() => import('@/pages/FreeSlotsPage'))
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
+const SeasonsPage = lazy(() => import('@/pages/SeasonsPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -166,6 +167,7 @@ export default function App() {
             <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
             <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
             <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
+            <Route path="/temporadas" element={<RoleRoute module="settings"><SeasonsPage /></RoleRoute>} />
             <Route path="/planificacion" element={<RoleRoute module="settings"><PlanningPage /></RoleRoute>} />
             <Route path="/methodology" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
             <Route path="/analitica" element={<RoleRoute module="settings"><AnalyticsPage /></RoleRoute>} />
