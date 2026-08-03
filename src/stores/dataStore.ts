@@ -41,6 +41,9 @@ import type {
   VoucherType,
   VoucherStatus,
   Season,
+  PlayerLevel,
+  ScheduleSlot,
+  BillingFrequency,
 } from '@/types'
 import {
   demoCourts,
@@ -166,6 +169,31 @@ export interface DataState {
     destinationGroupId: string,
     newEnrollmentData: Pick<Enrollment, 'tariffId' | 'tariffName' | 'customPrice' | 'billingFrequency' | 'billingAnchorMonth' | 'playerId' | 'playerName'>
   ) => Promise<void>
+  renewGroup: (params: {
+    oldGroupId: string
+    seasonId: string
+    groupData: {
+      name: string
+      level: PlayerLevel
+      coachId: string
+      coachName: string
+      courtId: string
+      courtName: string
+      schedule: ScheduleSlot[]
+      maxCapacity: number
+      defaultTariffId: string
+      defaultTariffPrice: number
+      billingFrequency: BillingFrequency
+      billingAnchorMonth?: number
+      startDate: Date
+      endDate: Date
+    }
+    includeStudents: boolean
+    includedPlayerIds: string[]
+  }) => Promise<{ newGroupId: string }>
+  renewGroups: (
+    items: Array<Parameters<DataState['renewGroup']>[0]>
+  ) => Promise<{ newGroupId: string }[]>
 
   // --- Lista de espera (cola por grupo, modelada como enrollments isActive:false + isWaitlist) ---
   addToWaitlist: (data: Pick<Enrollment, 'playerId' | 'playerName' | 'groupId' | 'groupName' | 'tariffId' | 'tariffName' | 'customPrice'>) => void
@@ -1121,6 +1149,122 @@ export const useDataStore = create<DataState>()(
           toast.error(`Error al trasladar: ${message}`)
           throw error
         }
+      },
+
+      renewGroup: async ({ oldGroupId, seasonId, groupData, includeStudents, includedPlayerIds }) => {
+        const clubId = getClubId()
+        if (!clubId) throw new Error('No clubId found')
+
+        const oldGroup = get().groups.find((g) => g.id === oldGroupId)
+        if (!oldGroup) throw new Error('Grupo no encontrado')
+
+        const tariff = get().tariffs.find((t) => t.id === groupData.defaultTariffId)
+        if (!tariff) throw new Error('Tarifa no encontrada')
+
+        const now = new Date()
+        const newGroupId = generateId()
+
+        const activeEnrollments = get().enrollments.filter(
+          (e) => e.groupId === oldGroupId && e.isActive
+        )
+        const includedEnrollments = includeStudents
+          ? activeEnrollments.filter((e) => includedPlayerIds.includes(e.playerId))
+          : []
+
+        const newGroup: Group = {
+          ...groupData,
+          id: newGroupId,
+          seasonId,
+          renewedFromGroupId: oldGroupId,
+          currentEnrollment: includedEnrollments.length,
+          isActive: true,
+          createdAt: now,
+        }
+
+        const newEnrollments: Enrollment[] = includedEnrollments.map((e) => ({
+          id: generateId(),
+          playerId: e.playerId,
+          playerName: e.playerName,
+          groupId: newGroupId,
+          groupName: newGroup.name,
+          tariffId: tariff.id,
+          tariffName: tariff.name,
+          billingFrequency: groupData.billingFrequency,
+          billingAnchorMonth: groupData.billingAnchorMonth,
+          enrollmentDate: now,
+          isActive: true,
+        }))
+
+        try {
+          // 1. Crear el grupo nuevo
+          set((state) => ({ groups: [...state.groups, newGroup] }))
+          await syncDoc('groups', newGroupId, newGroup as any, clubId)
+
+          // 2. Crear las matriculas nuevas para los alumnos incluidos
+          for (const enrollment of newEnrollments) {
+            await syncDoc('enrollments', enrollment.id, enrollment as any, clubId)
+          }
+          set((state) => ({ enrollments: [...state.enrollments, ...newEnrollments] }))
+
+          // 3. Cerrar TODAS las matriculas activas del grupo viejo (se traspasen o no)
+          for (const enrollment of activeEnrollments) {
+            const closed = { ...enrollment, isActive: false, unenrollmentDate: now }
+            await syncDoc('enrollments', enrollment.id, closed as any, clubId)
+          }
+          set((state) => ({
+            enrollments: state.enrollments.map((e) =>
+              activeEnrollments.some((ae) => ae.id === e.id)
+                ? { ...e, isActive: false, unenrollmentDate: now }
+                : e
+            ),
+          }))
+
+          // 4. Archivar el grupo viejo
+          const archivedOldGroup = { ...oldGroup, isActive: false, renewedToGroupId: newGroupId }
+          await syncDoc('groups', oldGroupId, archivedOldGroup as any, clubId)
+          set((state) => ({
+            groups: state.groups.map((g) => (g.id === oldGroupId ? archivedOldGroup : g)),
+          }))
+
+          // 5. Jugadores excluidos sin otras matriculas activas: pasan a lista_espera
+          const excludedPlayerIds = activeEnrollments
+            .map((e) => e.playerId)
+            .filter((playerId) => !includedPlayerIds.includes(playerId))
+          for (const playerId of excludedPlayerIds) {
+            const stillActive = get().enrollments.some(
+              (e) => e.playerId === playerId && e.isActive
+            )
+            if (!stillActive) {
+              const player = get().players.find((p) => p.id === playerId)
+              if (player && player.status === 'activo') {
+                get().updatePlayer(playerId, { status: 'lista_espera' })
+              }
+            }
+          }
+
+          const { userId, userName } = getCurrentUser()
+          get().addActivity({
+            type: 'season_group_renewed',
+            description: `Grupo ${oldGroup.name} traspasado a ${newGroup.name}`,
+            relatedEntityId: newGroupId,
+            userId,
+            userName,
+          })
+
+          return { newGroupId }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          toast.error(`Error al traspasar el grupo: ${message}`)
+          throw error
+        }
+      },
+
+      renewGroups: async (items) => {
+        const results: { newGroupId: string }[] = []
+        for (const item of items) {
+          results.push(await get().renewGroup(item))
+        }
+        return results
       },
 
       updateEnrollment: (id, data) => {
