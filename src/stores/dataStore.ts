@@ -71,8 +71,9 @@ import {
   createInvoiceAtomic,
   unlinkPaymentsFromInvoiceAtomic,
   moveEnrollmentAtomic,
+  toFirestore,
 } from '@/lib/firestoreSync'
-import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
@@ -1195,36 +1196,54 @@ export const useDataStore = create<DataState>()(
           isActive: true,
         }))
 
+        const closedEnrollments = activeEnrollments.map((enrollment) => ({
+          ...enrollment,
+          isActive: false,
+          unenrollmentDate: now,
+        }))
+        const archivedOldGroup = { ...oldGroup, isActive: false, renewedToGroupId: newGroupId }
+
         try {
+          // Fase de escritura atómica: todo o nada via writeBatch
+          const batch = writeBatch(db)
+
           // 1. Crear el grupo nuevo
-          set((state) => ({ groups: [...state.groups, newGroup] }))
-          await syncDoc('groups', newGroupId, newGroup as any, clubId)
+          batch.set(doc(db, 'groups', newGroupId), toFirestore({ ...newGroup, clubId }))
 
           // 2. Crear las matriculas nuevas para los alumnos incluidos
           for (const enrollment of newEnrollments) {
-            await syncDoc('enrollments', enrollment.id, enrollment as any, clubId)
+            batch.set(doc(db, 'enrollments', enrollment.id), toFirestore({ ...enrollment, clubId }))
           }
-          set((state) => ({ enrollments: [...state.enrollments, ...newEnrollments] }))
 
           // 3. Cerrar TODAS las matriculas activas del grupo viejo (se traspasen o no)
-          for (const enrollment of activeEnrollments) {
-            const closed = { ...enrollment, isActive: false, unenrollmentDate: now }
-            await syncDoc('enrollments', enrollment.id, closed as any, clubId)
+          for (const enrollment of closedEnrollments) {
+            batch.set(doc(db, 'enrollments', enrollment.id), toFirestore({ ...enrollment, clubId }), {
+              merge: true,
+            })
           }
+
+          // 4. Archivar el grupo viejo
+          batch.set(doc(db, 'groups', oldGroupId), toFirestore({ ...archivedOldGroup, clubId }), {
+            merge: true,
+          })
+
+          await batch.commit()
+
+          // Solo tras confirmar el commit remoto, aplicar los cambios locales
+          set((state) => ({ groups: [...state.groups, newGroup] }))
+          set((state) => ({ enrollments: [...state.enrollments, ...newEnrollments] }))
           set((state) => ({
             enrollments: state.enrollments.map((e) =>
-              activeEnrollments.some((ae) => ae.id === e.id)
+              closedEnrollments.some((ce) => ce.id === e.id)
                 ? { ...e, isActive: false, unenrollmentDate: now }
                 : e
             ),
           }))
-
-          // 4. Archivar el grupo viejo
-          const archivedOldGroup = { ...oldGroup, isActive: false, renewedToGroupId: newGroupId }
-          await syncDoc('groups', oldGroupId, archivedOldGroup as any, clubId)
           set((state) => ({
             groups: state.groups.map((g) => (g.id === oldGroupId ? archivedOldGroup : g)),
           }))
+
+          console.info('[renewGroup] Success:', newGroupId)
 
           // 5. Jugadores excluidos sin otras matriculas activas: pasan a lista_espera
           const excludedPlayerIds = activeEnrollments
@@ -1254,6 +1273,7 @@ export const useDataStore = create<DataState>()(
           return { newGroupId }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Error desconocido'
+          console.error('[renewGroup] Failed:', message)
           toast.error(`Error al traspasar el grupo: ${message}`)
           throw error
         }
