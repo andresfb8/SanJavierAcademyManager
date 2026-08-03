@@ -124,6 +124,13 @@ service cloud.firestore {
       allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
     }
 
+    match /seasons/{seasonId} {
+      allow read: if isAuthenticated() && (isAdmin() || belongsToClub());
+      allow create: if isAdmin() && (incomingBelongsToClub() || request.resource.data.clubId == null);
+      allow update: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
+      allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
+    }
+
     // ─── Enrollments Collection ─────────────────────────────────────────
 
     match /enrollments/{enrollmentId} {

@@ -40,6 +40,10 @@ import type {
   Voucher,
   VoucherType,
   VoucherStatus,
+  Season,
+  PlayerLevel,
+  ScheduleSlot,
+  BillingFrequency,
 } from '@/types'
 import {
   demoCourts,
@@ -67,8 +71,9 @@ import {
   createInvoiceAtomic,
   unlinkPaymentsFromInvoiceAtomic,
   moveEnrollmentAtomic,
+  toFirestore,
 } from '@/lib/firestoreSync'
-import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
@@ -98,6 +103,7 @@ export interface DataState {
   players: Player[]
   coaches: Coach[]
   groups: Group[]
+  seasons: Season[]
   enrollments: Enrollment[]
   privateLessons: PrivateLesson[]
   invitations: Invitation[]
@@ -150,6 +156,9 @@ export interface DataState {
   updateGroup: (id: string, data: Partial<Group>) => void
   deleteGroup: (id: string) => void
 
+  // --- Seasons CRUD ---
+  addSeason: (season: Omit<Season, 'id' | 'createdAt'>) => Season
+
   // --- Enrollments CRUD ---
   addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<{ needsPartialReceipt: boolean; enrollmentId: string }>
   updateEnrollment: (id: string, data: Partial<Enrollment>) => void
@@ -161,6 +170,31 @@ export interface DataState {
     destinationGroupId: string,
     newEnrollmentData: Pick<Enrollment, 'tariffId' | 'tariffName' | 'customPrice' | 'billingFrequency' | 'billingAnchorMonth' | 'playerId' | 'playerName'>
   ) => Promise<void>
+  renewGroup: (params: {
+    oldGroupId: string
+    seasonId: string
+    groupData: {
+      name: string
+      level: PlayerLevel
+      coachId: string
+      coachName: string
+      courtId: string
+      courtName: string
+      schedule: ScheduleSlot[]
+      maxCapacity: number
+      defaultTariffId: string
+      defaultTariffPrice: number
+      billingFrequency: BillingFrequency
+      billingAnchorMonth?: number
+      startDate: Date
+      endDate: Date
+    }
+    includeStudents: boolean
+    includedPlayerIds: string[]
+  }) => Promise<{ newGroupId: string }>
+  renewGroups: (
+    items: Array<Parameters<DataState['renewGroup']>[0]>
+  ) => Promise<{ newGroupId: string }[]>
 
   // --- Lista de espera (cola por grupo, modelada como enrollments isActive:false + isWaitlist) ---
   addToWaitlist: (data: Pick<Enrollment, 'playerId' | 'playerName' | 'groupId' | 'groupName' | 'tariffId' | 'tariffName' | 'customPrice'>) => void
@@ -391,6 +425,7 @@ export const useDataStore = create<DataState>()(
       players: [],
       coaches: [],
       groups: [],
+      seasons: [],
       enrollments: [],
       privateLessons: [],
       invitations: [],
@@ -852,6 +887,14 @@ export const useDataStore = create<DataState>()(
         })
       },
 
+      addSeason: (seasonData) => {
+        const newSeason: Season = { ...seasonData, id: generateId(), createdAt: new Date() }
+        set((state) => ({ seasons: [...state.seasons, newSeason] }))
+        const clubId = getClubId()
+        if (clubId) syncDoc('seasons', newSeason.id, newSeason as any, clubId)
+        return newSeason
+      },
+
       updateGroup: (id, data) => {
         set((state) => ({
           groups: state.groups.map((g) => (g.id === id ? { ...g, ...data } : g)),
@@ -1107,6 +1150,142 @@ export const useDataStore = create<DataState>()(
           toast.error(`Error al trasladar: ${message}`)
           throw error
         }
+      },
+
+      renewGroup: async ({ oldGroupId, seasonId, groupData, includeStudents, includedPlayerIds }) => {
+        const clubId = getClubId()
+        if (!clubId) throw new Error('No clubId found')
+
+        const oldGroup = get().groups.find((g) => g.id === oldGroupId)
+        if (!oldGroup) throw new Error('Grupo no encontrado')
+
+        const tariff = get().tariffs.find((t) => t.id === groupData.defaultTariffId)
+        if (!tariff) throw new Error('Tarifa no encontrada')
+
+        const now = new Date()
+        const newGroupId = generateId()
+
+        const activeEnrollments = get().enrollments.filter(
+          (e) => e.groupId === oldGroupId && e.isActive
+        )
+        const includedEnrollments = includeStudents
+          ? activeEnrollments.filter((e) => includedPlayerIds.includes(e.playerId))
+          : []
+
+        const newGroup: Group = {
+          ...groupData,
+          id: newGroupId,
+          seasonId,
+          renewedFromGroupId: oldGroupId,
+          currentEnrollment: includedEnrollments.length,
+          isActive: true,
+          createdAt: now,
+        }
+
+        const newEnrollments: Enrollment[] = includedEnrollments.map((e) => ({
+          id: generateId(),
+          playerId: e.playerId,
+          playerName: e.playerName,
+          groupId: newGroupId,
+          groupName: newGroup.name,
+          tariffId: tariff.id,
+          tariffName: tariff.name,
+          billingFrequency: groupData.billingFrequency,
+          billingAnchorMonth: groupData.billingAnchorMonth,
+          enrollmentDate: now,
+          isActive: true,
+        }))
+
+        const closedEnrollments = activeEnrollments.map((enrollment) => ({
+          ...enrollment,
+          isActive: false,
+          unenrollmentDate: now,
+        }))
+        const archivedOldGroup = { ...oldGroup, isActive: false, renewedToGroupId: newGroupId }
+
+        try {
+          // Fase de escritura atómica: todo o nada via writeBatch
+          const batch = writeBatch(db)
+
+          // 1. Crear el grupo nuevo
+          batch.set(doc(db, 'groups', newGroupId), toFirestore({ ...newGroup, clubId }))
+
+          // 2. Crear las matriculas nuevas para los alumnos incluidos
+          for (const enrollment of newEnrollments) {
+            batch.set(doc(db, 'enrollments', enrollment.id), toFirestore({ ...enrollment, clubId }))
+          }
+
+          // 3. Cerrar TODAS las matriculas activas del grupo viejo (se traspasen o no)
+          for (const enrollment of closedEnrollments) {
+            batch.set(doc(db, 'enrollments', enrollment.id), toFirestore({ ...enrollment, clubId }), {
+              merge: true,
+            })
+          }
+
+          // 4. Archivar el grupo viejo
+          batch.set(doc(db, 'groups', oldGroupId), toFirestore({ ...archivedOldGroup, clubId }), {
+            merge: true,
+          })
+
+          await batch.commit()
+
+          // Solo tras confirmar el commit remoto, aplicar los cambios locales
+          set((state) => ({ groups: [...state.groups, newGroup] }))
+          set((state) => ({ enrollments: [...state.enrollments, ...newEnrollments] }))
+          set((state) => ({
+            enrollments: state.enrollments.map((e) =>
+              closedEnrollments.some((ce) => ce.id === e.id)
+                ? { ...e, isActive: false, unenrollmentDate: now }
+                : e
+            ),
+          }))
+          set((state) => ({
+            groups: state.groups.map((g) => (g.id === oldGroupId ? archivedOldGroup : g)),
+          }))
+
+          console.info('[renewGroup] Success:', newGroupId)
+
+          // 5. Jugadores excluidos sin otras matriculas activas: pasan a lista_espera
+          const includedPlayerIdSet = new Set(includedEnrollments.map((e) => e.playerId))
+          const excludedPlayerIds = activeEnrollments
+            .map((e) => e.playerId)
+            .filter((playerId) => !includedPlayerIdSet.has(playerId))
+          for (const playerId of excludedPlayerIds) {
+            const stillActive = get().enrollments.some(
+              (e) => e.playerId === playerId && e.isActive
+            )
+            if (!stillActive) {
+              const player = get().players.find((p) => p.id === playerId)
+              if (player && player.status === 'activo') {
+                get().updatePlayer(playerId, { status: 'lista_espera' })
+              }
+            }
+          }
+
+          const { userId, userName } = getCurrentUser()
+          get().addActivity({
+            type: 'season_group_renewed',
+            description: `Grupo ${oldGroup.name} traspasado a ${newGroup.name}`,
+            relatedEntityId: newGroupId,
+            userId,
+            userName,
+          })
+
+          return { newGroupId }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido'
+          console.error('[renewGroup] Failed:', message)
+          toast.error(`Error al traspasar el grupo: ${message}`)
+          throw error
+        }
+      },
+
+      renewGroups: async (items) => {
+        const results: { newGroupId: string }[] = []
+        for (const item of items) {
+          results.push(await get().renewGroup(item))
+        }
+        return results
       },
 
       updateEnrollment: (id, data) => {
