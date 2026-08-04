@@ -5,24 +5,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency, cn } from '@/lib/utils'
-import { findSlotForAttendanceDate } from '@/lib/attendance-schedule'
+import { computeCoachStats, type CoachStats } from '@/lib/coach-stats'
 
 type Metric = 'rph' | 'retention' | 'hours'
 type Period = 'month' | 'quarter' | 'year'
-
-interface CoachStats {
-  coachId: string
-  coachName: string
-  rph: number
-  retentionPct: number | null
-  hours: number
-}
-
-function slotMinutes(startTime: string, endTime: string): number {
-  const [sh, sm] = startTime.split(':').map(Number)
-  const [eh, em] = endTime.split(':').map(Number)
-  return (eh * 60 + em) - (sh * 60 + sm)
-}
 
 export function CoachRankingTab() {
   const navigate = useNavigate()
@@ -39,83 +25,16 @@ export function CoachRankingTab() {
     return new Date(d.getFullYear(), 0, 1)
   }, [period])
 
-  const coachGroupIds = useMemo(() => {
-    const map: Record<string, string[]> = {}
-    groups.forEach(g => {
-      if (!map[g.coachId]) map[g.coachId] = []
-      map[g.coachId].push(g.id)
-    })
-    return map
-  }, [groups])
+  const weeksInPeriod = period === 'month' ? 4 : period === 'quarter' ? 13 : 52
 
   const stats = useMemo((): CoachStats[] => {
-    return coaches
-      .filter(c => c.isActive)
-      .map(coach => {
-        const groupIds = coachGroupIds[coach.id] ?? []
-
-        // ── €/h ──────────────────────────────────────────────────────
-        const revenue = payments
-          .filter(p =>
-            p.status === 'pagado' &&
-            p.groupId &&
-            groupIds.includes(p.groupId) &&
-            new Date(p.paidDate ?? p.dueDate) >= periodStart
-          )
-          .reduce((sum, p) => sum + p.amount, 0)
-
-        // Hours from attendance records (actual classes held)
-        const coachAttendance = attendance.filter(r => {
-          const d = r.date instanceof Date ? r.date : new Date(r.date)
-          return r.coachId === coach.id && d >= periodStart
-        })
-        const hoursFromAttendance = coachAttendance.reduce((sum, record) => {
-          const group = groups.find(g => g.id === record.groupId)
-          if (!group) return sum
-          const recordDate = record.date instanceof Date ? record.date : new Date(record.date)
-          const slot = findSlotForAttendanceDate(group, recordDate)
-          if (!slot) return sum
-          return sum + slotMinutes(slot.startTime, slot.endTime) / 60
-        }, 0)
-
-        // Fallback: estimate from schedule if no attendance records
-        const hoursFromSchedule = groups
-          .filter(g => g.coachId === coach.id && g.isActive)
-          .reduce((sum, g) => {
-            const weeksInPeriod = period === 'month' ? 4 : period === 'quarter' ? 13 : 52
-            return sum + g.schedule.reduce((s, slot) => s + slotMinutes(slot.startTime, slot.endTime) / 60, 0) * weeksInPeriod
-          }, 0)
-
-        const hours = hoursFromAttendance > 0 ? hoursFromAttendance : hoursFromSchedule
-        const rph = hours > 0 ? revenue / hours : 0
-
-        // ── Retention 3 months ────────────────────────────────────────
-        const threeMonthsAgo = new Date(now)
-        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-        const eligibleEnrollments = enrollments.filter(e => {
-          const d = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
-          return groupIds.includes(e.groupId) && d <= threeMonthsAgo
-        })
-        const retained = eligibleEnrollments.filter(e => e.isActive).length
-        const retentionPct = eligibleEnrollments.length > 0
-          ? Math.round((retained / eligibleEnrollments.length) * 100)
-          : null
-
-        return {
-          coachId: coach.id,
-          coachName: `${coach.firstName} ${coach.lastName}`,
-          rph,
-          retentionPct,
-          hours: Math.round(hours * 10) / 10,
-        }
-      })
-      .filter(s => s.rph > 0 || s.hours > 0 || s.retentionPct !== null)
-      .sort((a, b) => {
-        if (metric === 'rph') return b.rph - a.rph
-        if (metric === 'retention') return (b.retentionPct ?? 0) - (a.retentionPct ?? 0)
-        return b.hours - a.hours
-      })
-  }, [coaches, coachGroupIds, payments, attendance, enrollments, groups, periodStart, metric, period])
+    const raw = computeCoachStats(coaches, groups, payments, enrollments, attendance, periodStart, weeksInPeriod)
+    return [...raw].sort((a, b) => {
+      if (metric === 'rph') return b.rph - a.rph
+      if (metric === 'retention') return (b.retentionPct ?? 0) - (a.retentionPct ?? 0)
+      return b.hours - a.hours
+    })
+  }, [coaches, groups, payments, attendance, enrollments, periodStart, weeksInPeriod, metric])
 
   const maxValue = useMemo(() => {
     if (stats.length === 0) return 1

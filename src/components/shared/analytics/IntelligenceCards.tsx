@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
 import { computeCourtUtilization, getUnderutilizedSlots } from '@/lib/court-utilization'
+import { computeCoachStats } from '@/lib/coach-stats'
 import type { ClassReview } from '@/types'
 
 interface IntelligenceCardsProps {
@@ -55,66 +56,13 @@ export function IntelligenceCards({ classReviews }: IntelligenceCardsProps) {
 
   // ── Ranking: Coach top por €/h ────────────────────────────────────
   const topCoach = useMemo(() => {
-    if (coaches.length === 0) return null
-
-    const coachGroupIds: Record<string, string[]> = {}
-    groups.forEach(g => {
-      if (!coachGroupIds[g.coachId]) coachGroupIds[g.coachId] = []
-      coachGroupIds[g.coachId].push(g.id)
-    })
-
-    const monthPayments = payments.filter(
-      p => p.status === 'pagado' && p.billingMonth === currentMonth && p.billingYear === currentYear && p.groupId
-    )
-
-    const coachRevenue: Record<string, number> = {}
-    monthPayments.forEach(p => {
-      const coachId = Object.keys(coachGroupIds).find(cid => coachGroupIds[cid].includes(p.groupId!))
-      if (coachId) coachRevenue[coachId] = (coachRevenue[coachId] ?? 0) + p.amount
-    })
-
-    // Hours per coach from group schedules (approx 4 weeks)
-    const coachHours: Record<string, number> = {}
-    groups.forEach(g => {
-      let mins = 0
-      g.schedule.forEach(slot => {
-        const [sh, sm] = slot.startTime.split(':').map(Number)
-        const [eh, em] = slot.endTime.split(':').map(Number)
-        mins += (eh * 60 + em) - (sh * 60 + sm)
-      })
-      coachHours[g.coachId] = (coachHours[g.coachId] ?? 0) + (mins / 60) * 4
-    })
-
-    let bestCoachId: string | null = null
-    let bestRph = 0
-    Object.keys(coachRevenue).forEach(cid => {
-      const hours = coachHours[cid] ?? 0
-      const rph = hours > 0 ? coachRevenue[cid] / hours : 0
-      if (rph > bestRph) { bestRph = rph; bestCoachId = cid }
-    })
-
-    if (!bestCoachId) return null
-    const coach = coaches.find(c => c.id === bestCoachId)
-    if (!coach) return null
-
-    // Retention for display
-    const threeMonthsAgo = new Date(now)
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-    const coachEnrollments = enrollments.filter(e => {
-      const d = e.enrollmentDate instanceof Date ? e.enrollmentDate : new Date(e.enrollmentDate)
-      return (coachGroupIds[bestCoachId!] ?? []).includes(e.groupId) && d <= threeMonthsAgo
-    })
-    const retained = coachEnrollments.filter(e => e.isActive).length
-    const retentionPct = coachEnrollments.length > 0
-      ? Math.round((retained / coachEnrollments.length) * 100)
-      : null
-
-    return {
-      name: `${coach.firstName} ${coach.lastName}`,
-      rph: bestRph,
-      retentionPct,
-    }
-  }, [coaches, groups, payments, enrollments, currentMonth, currentYear])
+    const monthStart = new Date(currentYear, currentMonth - 1, 1)
+    const stats = computeCoachStats(coaches, groups, payments, enrollments, attendance, monthStart, 4)
+    if (stats.length === 0) return null
+    const best = [...stats].sort((a, b) => b.rph - a.rph)[0]
+    if (best.rph === 0) return null
+    return { name: best.coachName, rph: best.rph, retentionPct: best.retentionPct }
+  }, [coaches, groups, payments, enrollments, attendance, currentMonth, currentYear])
 
   const cards = [
     {
