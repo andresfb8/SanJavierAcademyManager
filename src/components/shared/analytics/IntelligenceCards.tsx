@@ -5,9 +5,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
+import { computeCourtUtilization, getUnderutilizedSlots } from '@/lib/court-utilization'
 import type { ClassReview } from '@/types'
-
-const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 interface IntelligenceCardsProps {
   classReviews: ClassReview[]
@@ -15,26 +14,17 @@ interface IntelligenceCardsProps {
 
 export function IntelligenceCards({ classReviews }: IntelligenceCardsProps) {
   const navigate = useNavigate()
-  const { groups, attendance, payments, coaches, enrollments } = useDataStore()
+  const { groups, attendance, payments, coaches, enrollments, courts, privateLessons } = useDataStore()
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
 
   // ── KPIs: Franjas infrautilizadas ────────────────────────────────
-  const underutilizedSlots = useMemo(() => {
-    const activeGroups = groups.filter(g => g.isActive)
-    return activeGroups.filter(g => g.maxCapacity > 0 && g.currentEnrollment / g.maxCapacity < 0.6)
-  }, [groups])
-
-  const underutilizedSummary = useMemo(() => {
-    if (underutilizedSlots.length === 0) return 'Todos los grupos bien ocupados'
-    const example = underutilizedSlots[0]
-    const slot = example.schedule[0]
-    if (!slot) return `${underutilizedSlots.length} grupos`
-    const pct = Math.round((example.currentEnrollment / example.maxCapacity) * 100)
-    return `${DAY_NAMES[slot.dayOfWeek]} ${slot.startTime} · ${pct}% ocupación`
-  }, [underutilizedSlots])
+  const underutilizedCount = useMemo(() => {
+    const utilization = computeCourtUtilization(courts, groups, privateLessons)
+    return getUnderutilizedSlots(utilization).length
+  }, [courts, groups, privateLessons])
 
   // ── Riesgo: Alumnos con 3+ faltas este mes ────────────────────────
   const atRiskPlayers = useMemo(() => {
@@ -134,10 +124,10 @@ export function IntelligenceCards({ classReviews }: IntelligenceCardsProps) {
       bg: 'bg-cyan-50',
       border: 'border-cyan-100',
       title: 'KPIs del Club',
-      value: underutilizedSlots.length > 0
-        ? `${underutilizedSlots.length} franja${underutilizedSlots.length > 1 ? 's' : ''} infrautilizada${underutilizedSlots.length > 1 ? 's' : ''}`
+      value: underutilizedCount > 0
+        ? `${underutilizedCount} franja${underutilizedCount > 1 ? 's' : ''} infrautilizada${underutilizedCount > 1 ? 's' : ''}`
         : 'Ocupación óptima',
-      sub: underutilizedSummary,
+      sub: underutilizedCount > 0 ? 'Revisa el mapa de ocupación de pistas' : 'Todas las franjas bien aprovechadas',
     },
     {
       tab: 'riesgo',
