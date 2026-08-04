@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro, Calendar as CalendarIcon } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 import type { PrivateLesson, EventType } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
@@ -212,7 +213,7 @@ export default function AgendaPage() {
 
     // 1. Grupos
     for (const group of groups) {
-      if (!group.isActive) continue
+      if (!isGroupCurrentlyActive(group, selectedDate)) continue
       for (const slot of group.schedule) {
         if (slot.dayOfWeek !== selectedDayOfWeek) continue
         if (!map[group.courtId]) continue
