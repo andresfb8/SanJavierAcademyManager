@@ -6,9 +6,10 @@ import { Select } from '@/components/ui/select'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency, cn } from '@/lib/utils'
 import { computeCoachStats, type CoachStats } from '@/lib/coach-stats'
+import { getPeriodStart, type AnalyticsPeriod } from '@/lib/period'
 
 type Metric = 'rph' | 'retention' | 'hours'
-type Period = 'month' | 'quarter' | 'year'
+type Period = AnalyticsPeriod
 
 export function CoachRankingTab() {
   const navigate = useNavigate()
@@ -18,12 +19,7 @@ export function CoachRankingTab() {
 
   const now = new Date()
 
-  const periodStart = useMemo(() => {
-    const d = new Date(now)
-    if (period === 'month') return new Date(d.getFullYear(), d.getMonth(), 1)
-    if (period === 'quarter') return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1)
-    return new Date(d.getFullYear(), 0, 1)
-  }, [period])
+  const periodStart = useMemo(() => getPeriodStart(period, now), [period])
 
   const weeksInPeriod = period === 'month' ? 4 : period === 'quarter' ? 13 : 52
 
