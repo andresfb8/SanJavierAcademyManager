@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { TrendingUp, AlertTriangle, Star, Trophy } from 'lucide-react'
+import { TrendingUp, AlertTriangle, Star, Trophy, History } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { KPIsTab } from '@/components/shared/analytics/KPIsTab'
 import { RiskTab } from '@/components/shared/analytics/RiskTab'
 import { ReviewsTab } from '@/components/shared/analytics/ReviewsTab'
 import { CoachRankingTab } from '@/components/shared/analytics/CoachRankingTab'
+import { HistoryTab } from '@/components/shared/analytics/HistoryTab'
 import { useClassReviewsQuery } from '@/hooks/useQueries'
 
-type Tab = 'kpis' | 'riesgo' | 'cuestionarios' | 'ranking'
+type Tab = 'kpis' | 'riesgo' | 'cuestionarios' | 'ranking' | 'historico'
 
-const VALID_TABS: Tab[] = ['kpis', 'riesgo', 'cuestionarios', 'ranking']
+const VALID_TABS: Tab[] = ['kpis', 'riesgo', 'cuestionarios', 'ranking', 'historico']
 
 export default function AnalyticsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -42,7 +43,7 @@ export default function AnalyticsPage() {
 
       <div className="p-5 lg:p-6">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1 mb-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto gap-1 mb-6">
             <TabsTrigger value="kpis" className="flex items-center gap-1.5 text-xs py-2">
               <TrendingUp className="h-3.5 w-3.5 hidden sm:block" />
               KPIs del Club
@@ -58,6 +59,10 @@ export default function AnalyticsPage() {
             <TabsTrigger value="ranking" className="flex items-center gap-1.5 text-xs py-2">
               <Trophy className="h-3.5 w-3.5 hidden sm:block" />
               Ranking coaches
+            </TabsTrigger>
+            <TabsTrigger value="historico" className="flex items-center gap-1.5 text-xs py-2">
+              <History className="h-3.5 w-3.5 hidden sm:block" />
+              Histórico
             </TabsTrigger>
           </TabsList>
 
@@ -75,6 +80,10 @@ export default function AnalyticsPage() {
 
           <TabsContent value="ranking">
             <CoachRankingTab />
+          </TabsContent>
+
+          <TabsContent value="historico">
+            <HistoryTab />
           </TabsContent>
         </Tabs>
       </div>
