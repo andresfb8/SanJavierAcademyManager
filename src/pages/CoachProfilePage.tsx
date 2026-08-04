@@ -41,6 +41,7 @@ import {
 } from '@/hooks/useQueries'
 import { calculateEventSalary } from '@/lib/salary-utils'
 import { CoachSelfEditDialog } from '@/components/coach/CoachSelfEditDialog'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 
 // ==========================================
 // CoachProfilePage - Perfil del entrenador
@@ -247,9 +248,10 @@ export default function CoachProfilePage() {
 
         {/* Clases de Hoy (Quick Actions Widget) */}
         {(() => {
-          const today = new Date().getDay()
-          const todayGroups = coachGroups.filter(g => 
-            g.isActive && g.schedule.some(s => s.dayOfWeek === today)
+          const now = new Date()
+          const today = now.getDay()
+          const todayGroups = coachGroups.filter(g =>
+            isGroupCurrentlyActive(g, now) && g.schedule.some(s => s.dayOfWeek === today)
           ).sort((a, b) => {
             const timeA = a.schedule.find(s => s.dayOfWeek === today)?.startTime || '23:59'
             const timeB = b.schedule.find(s => s.dayOfWeek === today)?.startTime || '23:59'
