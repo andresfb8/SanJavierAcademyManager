@@ -18,6 +18,7 @@ const COLLECTIONS = [
   { name: 'coaches', stateKey: 'coaches' },
   { name: 'groups', stateKey: 'groups' },
   { name: 'seasons', stateKey: 'seasons' },
+  { name: 'metricSnapshots', stateKey: 'metricSnapshots' },
   { name: 'enrollments', stateKey: 'enrollments' },
   { name: 'privateLessons', stateKey: 'privateLessons' },
   { name: 'invitations', stateKey: 'invitations' },

@@ -131,6 +131,11 @@ service cloud.firestore {
       allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
     }
 
+    match /metricSnapshots/{snapshotId} {
+      allow read: if isAuthenticated() && (isAdmin() || belongsToClub());
+      allow write: if false; // Solo Cloud Functions (Admin SDK) escriben aqui
+    }
+
     // ─── Enrollments Collection ─────────────────────────────────────────
 
     match /enrollments/{enrollmentId} {

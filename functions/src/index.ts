@@ -20,6 +20,14 @@ export {
 export { generateMonthlyInvoices } from "./invoicing/generateMonthlyInvoices";
 
 // ---------------------------------------------------------------------------
+// Analytics functions
+// ---------------------------------------------------------------------------
+export {
+  generateMetricSnapshotScheduled,
+  generateMetricSnapshotCallable,
+} from "./analytics/generateMetricSnapshot";
+
+// ---------------------------------------------------------------------------
 // Firestore triggers
 // ---------------------------------------------------------------------------
 export { onPlayerStatusChange } from "./triggers/onPlayerStatusChange";
