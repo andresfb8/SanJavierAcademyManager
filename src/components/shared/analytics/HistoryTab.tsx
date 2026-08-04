@@ -139,14 +139,23 @@ export function HistoryTab() {
       .filter((p): p is TrendPoint => p !== null)
   }, [selectedMetric, metricSnapshots])
 
+  const now = new Date()
+  const inProgressSnapshot = useMemo(
+    () => findSnapshot(metricSnapshots, now.getFullYear(), now.getMonth() + 1),
+    [metricSnapshots, now.getFullYear(), now.getMonth()]
+  )
+  const inProgressPreview = useMemo(
+    () => inProgressSnapshot ? aggregateSnapshots([inProgressSnapshot]) : null,
+    [inProgressSnapshot]
+  )
+
   const handleGenerate = async () => {
     if (!user?.clubId) return
     setGenerating(true)
     try {
       const fn = httpsCallable(functions, 'generateMetricSnapshotCallable')
-      const now = new Date()
       await fn({ clubId: user.clubId, year: now.getFullYear(), month: now.getMonth() + 1 })
-      toast.success('Snapshot generado')
+      toast.success('Snapshot generado — vista previa del mes en curso actualizada abajo')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error desconocido'
       toast.error(`Error al generar el snapshot: ${message}`)
@@ -177,6 +186,24 @@ export function HistoryTab() {
         </div>
       </div>
 
+      {inProgressPreview && (
+        <Card className="border-dashed">
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Vista previa del mes en curso (aún no cerrado, no incluido en la comparación de abajo)
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              {METRIC_ROWS.map(row => (
+                <div key={row.key}>
+                  <p className="text-muted-foreground">{row.label}</p>
+                  <p className="font-medium text-foreground">{row.format(inProgressPreview)}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!hasEnoughHistory ? (
         <Card>
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
@@ -206,8 +233,16 @@ export function HistoryTab() {
                   return (
                     <tr
                       key={row.key}
-                      className="border-b last:border-0 cursor-pointer hover:bg-accent/40"
+                      role="button"
+                      tabIndex={0}
+                      className="border-b last:border-0 cursor-pointer hover:bg-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                       onClick={() => setSelectedMetric(row.key)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setSelectedMetric(row.key)
+                        }
+                      }}
                     >
                       <td className="py-2 font-medium">{row.label}</td>
                       <td className="py-2">{row.format(current)}</td>
