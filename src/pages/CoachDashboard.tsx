@@ -147,7 +147,16 @@ export default function CoachDashboard() {
     if (!currentCoachId) return null
     const salaryConfig = coachSalaryConfigs.find(c => c.coachId === currentCoachId)
     if (!salaryConfig) return null
-    const coachGroups = groups.filter(g => g.coachId === currentCoachId && isGroupCurrentlyActive(g, now))
+    // Grupo con clase en ALGUN momento de este mes (no solo hoy), para no
+    // dejar de pagar un grupo que dio clase parte del mes antes de finalizar
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const coachGroups = groups.filter(g => {
+      if (g.coachId !== currentCoachId || !g.isActive) return false
+      const gStart = g.startDate instanceof Date ? g.startDate : new Date(g.startDate)
+      const gEnd = g.endDate instanceof Date ? g.endDate : new Date(g.endDate)
+      return gStart <= monthEnd && gEnd >= monthStart
+    })
     const adultGroups = coachGroups.filter(g => g.level !== 'menores').length
     const minorGroups = coachGroups.filter(g => g.level === 'menores').length
     const groupsSalary = adultGroups * (salaryConfig.ratePerGroupAdults || 0) + minorGroups * (salaryConfig.ratePerGroupMinors || 0)
