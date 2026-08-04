@@ -14,6 +14,7 @@ import type {
   Player,
   Coach,
   Group,
+  MetricSnapshot,
   Enrollment,
   Payment,
   AttendanceRecord,
@@ -104,6 +105,7 @@ export interface DataState {
   coaches: Coach[]
   groups: Group[]
   seasons: Season[]
+  metricSnapshots: MetricSnapshot[]
   enrollments: Enrollment[]
   privateLessons: PrivateLesson[]
   invitations: Invitation[]
@@ -426,6 +428,7 @@ export const useDataStore = create<DataState>()(
       coaches: [],
       groups: [],
       seasons: [],
+      metricSnapshots: [],
       enrollments: [],
       privateLessons: [],
       invitations: [],

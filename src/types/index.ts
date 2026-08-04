@@ -58,6 +58,37 @@ export interface Season {
   createdAt: Date
 }
 
+// --- Snapshot mensual de metricas de Inteligencia del Club ---
+export interface MetricSnapshot {
+  id: string              // `${clubId}_${YYYY-MM}`
+  clubId: string
+  year: number
+  month: number            // 1-12
+  generatedAt: Date
+  generatedBy: 'scheduled' | 'manual'
+
+  // Acumulables: desglose completo, no solo el "ganador"
+  revenueByGroup: Record<string, number>
+  groupNames: Record<string, string>
+  churnByGroup: Record<string, number>
+  newPlayersCount: number
+  attendanceByDayOfWeek: Record<number, number>
+  paymentsGenerated: number
+  paymentsPaid: number
+
+  // De estado: valor ya final del mes
+  underutilizedSlotsCount: number
+  atRiskPlayersCount: number
+  avgReviewQuality: number | null
+  coachStats: Array<{
+    coachId: string
+    coachName: string
+    rph: number
+    retentionPct: number | null
+    hours: number
+  }>
+}
+
 // --- Pista ---
 export type CourtType = 'indoor' | 'outdoor'
 export type CourtSurface = 'cristal' | 'muro' | 'cesped'
