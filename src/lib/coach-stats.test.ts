@@ -120,4 +120,28 @@ describe('computeCoachStats', () => {
     const stats = computeCoachStats(coaches, [], [], [], [], PERIOD_START, 4, NOW)
     expect(stats).toHaveLength(0)
   })
+
+  it('no estima horas por horario de un grupo cuya endDate ya paso (sin asistencia registrada)', () => {
+    const coaches = [makeCoach()]
+    const groups = [makeGroup({
+      startDate: new Date('2026-01-01'),
+      endDate: new Date('2026-07-01'), // ya paso respecto a NOW (2026-08-15)
+    })]
+    // Una matricula elegible para retencion, para que el coach no quede
+    // excluido del todo por el filtro final de computeCoachStats (que
+    // descarta entradas con rph=0, hours=0 y retentionPct=null a la vez) -
+    // asi se puede comprobar especificamente que `hours` es 0.
+    const enrollments: Enrollment[] = [
+      { id: 'e1', playerId: 'p1', playerName: 'A', groupId: 'group-1', groupName: 'Iniciación', tariffId: 't1', tariffName: 'Mensual', enrollmentDate: new Date('2026-01-01'), isActive: true },
+    ]
+    // Sin registros de attendance -> se usaria el fallback hoursFromSchedule
+    const stats = computeCoachStats(coaches, groups, [], enrollments, [], PERIOD_START, 4, NOW)
+    // El grupo finalizado no aporta horas estimadas (hours=0, por tanto
+    // rph=0 segun la formula existente), pero el coach sigue apareciendo
+    // porque tiene retencion calculable.
+    expect(stats).toHaveLength(1)
+    expect(stats[0].hours).toBe(0)
+    expect(stats[0].rph).toBe(0)
+    expect(stats[0].retentionPct).toBe(100)
+  })
 })
