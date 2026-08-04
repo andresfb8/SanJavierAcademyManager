@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { useDataStore } from '@/stores/dataStore'
+import { getPeriodStart } from '@/lib/period'
 
 interface AtRiskPlayer {
   playerId: string
@@ -24,13 +25,9 @@ export function RiskTab() {
   const [periodFilter, setPeriodFilter] = useState<'month' | 'quarter'>('month')
 
   const now = new Date()
-  const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
 
-  const periodStart = useMemo(() => {
-    if (periodFilter === 'month') return new Date(currentYear, currentMonth - 1, 1)
-    return new Date(currentYear, Math.floor((currentMonth - 1) / 3) * 3, 1)
-  }, [periodFilter, currentMonth, currentYear])
+  const periodStart = useMemo(() => getPeriodStart(periodFilter, now), [periodFilter])
 
   const [groupFilter, setGroupFilter] = useState<string>('all')
 
