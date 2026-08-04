@@ -5,6 +5,82 @@ import { logger } from "firebase-functions/v2";
 import { computeCourtUtilization, getUnderutilizedSlots } from "./court-utilization";
 import { computeCoachStats } from "./coach-stats";
 
+// ---------------------------------------------------------------------------
+// Interfaces (mirroring the Firestore data model; superset of the fields
+// needed by court-utilization.ts and coach-stats.ts, since the same `groups`
+// array is passed to both)
+// ---------------------------------------------------------------------------
+interface ScheduleSlot {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+interface Group {
+  id: string;
+  name: string;
+  coachId: string;
+  courtId: string;
+  schedule: ScheduleSlot[];
+  maxCapacity: number;
+  currentEnrollment: number;
+  isActive: boolean;
+}
+
+interface Court {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
+interface Coach {
+  id: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
+}
+
+interface Payment {
+  groupId?: string;
+  amount: number;
+  status: string;
+  billingMonth: number;
+  billingYear: number;
+  paidDate?: Date;
+  dueDate: Date;
+}
+
+interface Enrollment {
+  groupId: string;
+  enrollmentDate: Date;
+  unenrollmentDate?: Date;
+  isActive: boolean;
+}
+
+interface AttendanceEntry {
+  playerId: string;
+  status: string;
+}
+
+interface AttendanceRecord {
+  groupId: string;
+  coachId: string;
+  date: Date;
+  records: AttendanceEntry[];
+}
+
+interface PrivateLesson {
+  courtId: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+}
+
+interface ClassReview {
+  date: string;
+  quality: number;
+}
+
 function toDate(v: unknown): Date {
   if (v instanceof Timestamp) return v.toDate();
   if (v instanceof Date) return v;
@@ -41,26 +117,26 @@ async function generateSnapshotForClub(
     db.collection("classReviews").where("clubId", "==", clubId).get(),
   ]);
 
-  const groups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
-  const courts = courtsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
-  const coaches = coachesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  const groups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Group[];
+  const courts = courtsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Court[];
+  const coaches = coachesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Coach[];
   const payments = paymentsSnap.docs.map((d) => {
     const data = d.data();
     return { ...data, paidDate: data.paidDate ? toDate(data.paidDate) : undefined, dueDate: toDate(data.dueDate) };
-  }) as any[];
+  }) as Payment[];
   const enrollments = enrollmentsSnap.docs.map((d) => {
     const data = d.data();
     return { ...data, enrollmentDate: toDate(data.enrollmentDate), unenrollmentDate: data.unenrollmentDate ? toDate(data.unenrollmentDate) : undefined };
-  }) as any[];
+  }) as Enrollment[];
   const attendance = attendanceSnap.docs.map((d) => {
     const data = d.data();
     return { ...data, date: toDate(data.date) };
-  }) as any[];
+  }) as AttendanceRecord[];
   const privateLessons = privateLessonsSnap.docs.map((d) => {
     const data = d.data();
     return { ...data, date: toDate(data.date) };
-  }) as any[];
-  const reviews = reviewsSnap.docs.map((d) => d.data()) as any[];
+  }) as PrivateLesson[];
+  const reviews = reviewsSnap.docs.map((d) => d.data()) as ClassReview[];
 
   // ── Ingresos y bajas por grupo (acumulables) ──────────────────────
   const revenueByGroup: Record<string, number> = {};
@@ -68,7 +144,7 @@ async function generateSnapshotForClub(
   groups.forEach((g) => { groupNames[g.id] = g.name; });
   payments
     .filter((p) => p.status === "pagado" && p.groupId && p.paidDate && p.paidDate >= periodStart && p.paidDate < periodEnd)
-    .forEach((p) => { revenueByGroup[p.groupId] = (revenueByGroup[p.groupId] ?? 0) + p.amount; });
+    .forEach((p) => { revenueByGroup[p.groupId!] = (revenueByGroup[p.groupId!] ?? 0) + p.amount; });
 
   const churnByGroup: Record<string, number> = {};
   enrollments
@@ -137,7 +213,10 @@ async function generateSnapshotForClub(
   };
 
   const snapshotId = `${clubId}_${year}-${String(month).padStart(2, "0")}`;
-  await db.collection("metricSnapshots").doc(snapshotId).set(snapshot, { merge: true });
+  // Sin merge: el snapshot es una recomputacion completa desde cero cada vez,
+  // asi que se sobreescribe entero para no dejar campos obsoletos si el
+  // esquema cambia entre dos regeneraciones del mismo mes.
+  await db.collection("metricSnapshots").doc(snapshotId).set(snapshot);
   logger.info(`Snapshot generado: ${snapshotId}`);
 }
 
