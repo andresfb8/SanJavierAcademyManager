@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { calculateEventSalary } from '@/lib/salary-utils'
 import { formatCurrency } from '@/lib/utils'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 
 export default function CoachDashboard() {
   const navigate = useNavigate()
@@ -101,15 +102,15 @@ export default function CoachDashboard() {
   const coachClassesToday = useMemo(() => {
     if (!currentCoachId) return 0
     const today = now.getDay()
-    return groups.filter(g => g.isActive && g.coachId === currentCoachId && g.schedule.some(s => s.dayOfWeek === today)).length
-  }, [currentCoachId, groups])
+    return groups.filter(g => isGroupCurrentlyActive(g, now) && g.coachId === currentCoachId && g.schedule.some(s => s.dayOfWeek === today)).length
+  }, [currentCoachId, groups, now])
 
   // -- Active/Next Class Logic --
   const activeClass = useMemo(() => {
     if (!currentCoachId) return null
     const dayOfWeek = now.getDay()
-    const currentCoachGroups = groups.filter(g => g.coachId === currentCoachId && g.isActive)
-    
+    const currentCoachGroups = groups.filter(g => g.coachId === currentCoachId && isGroupCurrentlyActive(g, now))
+
     for (const group of currentCoachGroups) {
       for (const slot of group.schedule) {
         if (slot.dayOfWeek === dayOfWeek) {
@@ -146,7 +147,16 @@ export default function CoachDashboard() {
     if (!currentCoachId) return null
     const salaryConfig = coachSalaryConfigs.find(c => c.coachId === currentCoachId)
     if (!salaryConfig) return null
-    const coachGroups = groups.filter(g => g.coachId === currentCoachId && g.isActive)
+    // Grupo con clase en ALGUN momento de este mes (no solo hoy), para no
+    // dejar de pagar un grupo que dio clase parte del mes antes de finalizar
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const coachGroups = groups.filter(g => {
+      if (g.coachId !== currentCoachId || !g.isActive) return false
+      const gStart = g.startDate instanceof Date ? g.startDate : new Date(g.startDate)
+      const gEnd = g.endDate instanceof Date ? g.endDate : new Date(g.endDate)
+      return gStart <= monthEnd && gEnd >= monthStart
+    })
     const adultGroups = coachGroups.filter(g => g.level !== 'menores').length
     const minorGroups = coachGroups.filter(g => g.level === 'menores').length
     const groupsSalary = adultGroups * (salaryConfig.ratePerGroupAdults || 0) + minorGroups * (salaryConfig.ratePerGroupMinors || 0)
@@ -176,7 +186,7 @@ export default function CoachDashboard() {
     const dayOfWeek = now.getDay()
     const todayStr = now.toDateString()
     return groups
-      .filter(g => g.isActive && g.coachId === currentCoachId)
+      .filter(g => isGroupCurrentlyActive(g, now) && g.coachId === currentCoachId)
       .flatMap(group =>
         group.schedule
           .filter(s => s.dayOfWeek === dayOfWeek)
@@ -520,7 +530,7 @@ export default function CoachDashboard() {
               />
               <StatCard
                 title="Grupos"
-                value={groups.filter(g => g.coachId === currentCoachId && g.isActive).length}
+                value={groups.filter(g => g.coachId === currentCoachId && isGroupCurrentlyActive(g, now)).length}
                 icon={GraduationCap}
                 iconClassName="bg-indigo-50 text-indigo-600"
                 accentColor="#6366f1"

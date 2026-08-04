@@ -17,6 +17,7 @@ import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import { useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery, useClassReviewsQuery } from '@/hooks/useQueries'
 import { IntelligenceCards } from '@/components/shared/analytics/IntelligenceCards'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 import {
   Users,
   DollarSign,
@@ -235,8 +236,8 @@ export default function DashboardPage() {
     const jsDay = now.getDay()
     const dayOfWeek = jsDay === 0 ? 0 : jsDay // 0 is Sunday in constants too
 
-    const currentCoachGroups = groups.filter(g => g.coachId === currentCoachId && g.isActive)
-    
+    const currentCoachGroups = groups.filter(g => g.coachId === currentCoachId && isGroupCurrentlyActive(g, now))
+
     for (const group of currentCoachGroups) {
       for (const slot of group.schedule) {
         if (slot.dayOfWeek === dayOfWeek) {
@@ -270,7 +271,7 @@ export default function DashboardPage() {
 
   // ── KPI calculations ──────────────────────────────────────────────
   const activePlayers = players.filter((p) => p.status === 'activo').length
-  const activeGroups = groups.filter((g) => g.isActive).length
+  const activeGroups = groups.filter((g) => isGroupCurrentlyActive(g, now)).length
   const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1
   const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
@@ -375,7 +376,7 @@ export default function DashboardPage() {
 
   const today = now.getDay()
   const todayGroups = groups.filter(
-    (g) => g.isActive && g.schedule.some((s) => s.dayOfWeek === today) && (!isCoach || g.coachId === currentCoachId)
+    (g) => isGroupCurrentlyActive(g, now) && g.schedule.some((s) => s.dayOfWeek === today) && (!isCoach || g.coachId === currentCoachId)
   )
 
   const coachClassesToday = useMemo(() => {
@@ -385,15 +386,15 @@ export default function DashboardPage() {
 
   // ── Occupancy calculation ─────────────────────────────────────────
   const occupancyStats = useMemo(() => {
-    // Solo grupos de clases activos actualmente
-    const classGroups = groups.filter(g => g.isActive)
+    // Solo grupos de clases vigentes actualmente
+    const classGroups = groups.filter(g => isGroupCurrentlyActive(g, now))
     const totalCapacity = classGroups.reduce((sum, g) => sum + (g.maxCapacity || 0), 0)
     const totalOccupied = classGroups.reduce((sum, g) => sum + (g.currentEnrollment || 0), 0)
-    
+
     // Capamos al 100% para evitar valores extraños si hay sobre-inscripción puntual
     const rate = totalCapacity > 0 ? Math.min(100, Math.round((totalOccupied / totalCapacity) * 100)) : 0
     return { totalCapacity, totalOccupied, rate }
-  }, [groups])
+  }, [groups, now])
 
   // ── Chart data ────────────────────────────────────────────────────
   const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
