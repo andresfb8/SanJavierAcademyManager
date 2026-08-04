@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency, cn } from '@/lib/utils'
+import { findSlotForAttendanceDate } from '@/lib/attendance-schedule'
 
 type Metric = 'rph' | 'retention' | 'hours'
 type Period = 'month' | 'quarter' | 'year'
@@ -71,7 +72,8 @@ export function CoachRankingTab() {
         const hoursFromAttendance = coachAttendance.reduce((sum, record) => {
           const group = groups.find(g => g.id === record.groupId)
           if (!group) return sum
-          const slot = group.schedule.find(s => true) // use first slot as representative
+          const recordDate = record.date instanceof Date ? record.date : new Date(record.date)
+          const slot = findSlotForAttendanceDate(group, recordDate)
           if (!slot) return sum
           return sum + slotMinutes(slot.startTime, slot.endTime) / 60
         }, 0)
