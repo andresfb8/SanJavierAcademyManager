@@ -10,6 +10,7 @@ describe('getPeriodStart', () => {
   it('devuelve el inicio del trimestre para "quarter"', () => {
     expect(getPeriodStart('quarter', new Date('2026-08-15T12:00:00'))).toEqual(new Date(2026, 6, 1)) // Q3: jul-sep
     expect(getPeriodStart('quarter', new Date('2026-01-05T12:00:00'))).toEqual(new Date(2026, 0, 1)) // Q1: ene-mar
+    expect(getPeriodStart('quarter', new Date('2026-05-20T12:00:00'))).toEqual(new Date(2026, 3, 1)) // Q2: abr-jun
     expect(getPeriodStart('quarter', new Date('2026-12-31T12:00:00'))).toEqual(new Date(2026, 9, 1)) // Q4: oct-dic
   })
 
