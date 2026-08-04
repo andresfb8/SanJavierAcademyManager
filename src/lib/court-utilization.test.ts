@@ -127,6 +127,20 @@ describe('computeCourtUtilization', () => {
     const result = computeCourtUtilization(courts, groups, [], NOW)
     expect(result.every(r => r.courtId !== 'court-2')).toBe(true)
   })
+
+  it('no cuenta un grupo cuya endDate ya paso, aunque isActive siga en true', () => {
+    const courts = [makeCourt({ id: 'court-1' }), makeCourt({ id: 'court-2' })]
+    const groups = [makeGroup({
+      courtId: 'court-1',
+      isActive: true,
+      startDate: new Date('2026-01-01'),
+      endDate: new Date('2026-07-01'), // ya paso respecto a NOW (2026-08-01)
+    })]
+    const result = computeCourtUtilization(courts, groups, [], NOW)
+    // el grupo finalizado no genera ninguna franja: no hay buckets porque
+    // getWeekBuckets tambien debe ignorarlo al construir el universo de franjas
+    expect(result).toHaveLength(0)
+  })
 })
 
 describe('getUnderutilizedSlots', () => {
