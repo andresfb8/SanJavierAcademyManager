@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
+import { computeCourtUtilization, getUnderutilizedSlots, type CourtSlotStatus } from '@/lib/court-utilization'
 
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -12,34 +13,49 @@ interface KpiQuestionCard {
 }
 
 export function KPIsTab() {
-  const { groups, enrollments, payments, attendance } = useDataStore()
+  const { groups, enrollments, payments, attendance, courts, privateLessons } = useDataStore()
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
   const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
 
-  // ── Franjas infrautilizadas ────────────────────────────────────────
-  const underutilized = useMemo(() => {
-    return groups
-      .filter(g => g.isActive && g.maxCapacity > 0 && g.currentEnrollment / g.maxCapacity < 0.6)
-      .sort((a, b) => (a.currentEnrollment / a.maxCapacity) - (b.currentEnrollment / b.maxCapacity))
-  }, [groups])
+  // ── Ocupación real de pistas ────────────────────────────────────────
+  const utilization = useMemo(
+    () => computeCourtUtilization(courts, groups, privateLessons),
+    [courts, groups, privateLessons]
+  )
+  const underutilizedSlots = useMemo(() => getUnderutilizedSlots(utilization), [utilization])
+  const activeCourts = useMemo(() => courts.filter(c => c.isActive), [courts])
+  const heatmapRows = useMemo(() => {
+    const seen = new Map<string, { dayOfWeek: number; startTime: string; endTime: string }>()
+    utilization.forEach(s => {
+      const key = `${s.dayOfWeek}|${s.startTime}|${s.endTime}`
+      if (!seen.has(key)) seen.set(key, { dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime })
+    })
+    return Array.from(seen.values()).sort((a, b) =>
+      a.dayOfWeek !== b.dayOfWeek ? a.dayOfWeek - b.dayOfWeek : a.startTime.localeCompare(b.startTime)
+    )
+  }, [utilization])
 
-  const underutilizedAnswer = useMemo(() => {
-    if (underutilized.length === 0) return 'Todos los grupos bien ocupados'
-    const g = underutilized[0]
-    const slot = g.schedule[0]
-    if (!slot) return `${g.name}`
-    return `${DAY_NAMES[slot.dayOfWeek]} ${slot.startTime}`
-  }, [underutilized])
+  const STATUS_STYLES: Record<CourtSlotStatus['status'], string> = {
+    vacio: 'bg-red-500 text-white',
+    bajo: 'bg-red-500 text-white',
+    ocasional: 'bg-slate-300 text-slate-700',
+    medio: 'bg-amber-400 text-slate-900',
+    lleno: 'bg-emerald-500 text-white',
+  }
 
-  const underutilizedDetail = useMemo(() => {
-    if (underutilized.length === 0) return 'No hay franjas con menos del 60% de ocupación'
-    const g = underutilized[0]
-    const pct = Math.round((g.currentEnrollment / g.maxCapacity) * 100)
-    return `${pct}% ocupación · ${g.currentEnrollment}/${g.maxCapacity} plazas · ${underutilized.length} grupo${underutilized.length > 1 ? 's' : ''} total`
-  }, [underutilized])
+  const slotLabel = (slot: CourtSlotStatus): string => {
+    if (slot.status === 'vacio') return 'Vacío'
+    if (slot.status === 'ocasional') return 'Ocasional'
+    return `${slot.occupancyPct}%`
+  }
+
+  const slotCell = (courtId: string, row: { dayOfWeek: number; startTime: string; endTime: string }) =>
+    utilization.find(
+      s => s.courtId === courtId && s.dayOfWeek === row.dayOfWeek && s.startTime === row.startTime && s.endTime === row.endTime
+    )
 
   // ── Grupo más rentable ─────────────────────────────────────────────
   const mostProfitableGroup = useMemo(() => {
@@ -127,11 +143,6 @@ export function KPIsTab() {
 
   const cards: KpiQuestionCard[] = [
     {
-      label: '¿Qué franja está infrautilizada?',
-      answer: underutilizedAnswer,
-      detail: underutilizedDetail,
-    },
-    {
       label: '¿Cuál es el grupo más rentable?',
       answer: mostProfitableGroup.answer,
       detail: mostProfitableGroup.detail,
@@ -159,7 +170,69 @@ export function KPIsTab() {
   ]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <Card className="border-border/60">
+        <CardContent className="p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Ocupación de pistas por franja</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {underutilizedSlots.length > 0
+                ? `${underutilizedSlots.length} franja${underutilizedSlots.length > 1 ? 's' : ''} infrautilizada${underutilizedSlots.length > 1 ? 's' : ''}`
+                : 'Todas las franjas bien aprovechadas'}
+            </p>
+          </div>
+
+          {activeCourts.length > 0 && heatmapRows.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left p-1 text-muted-foreground font-medium">Franja</th>
+                    {activeCourts.map(court => (
+                      <th key={court.id} className="p-1 text-muted-foreground font-medium">{court.name}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {heatmapRows.map((row, i) => (
+                    <tr key={i}>
+                      <td className="p-1 text-left whitespace-nowrap">{DAY_NAMES[row.dayOfWeek]} {row.startTime}</td>
+                      {activeCourts.map(court => {
+                        const slot = slotCell(court.id, row)
+                        return (
+                          <td key={court.id} className="p-1">
+                            {slot && (
+                              <div className={`rounded px-1.5 py-1 text-center font-semibold ${STATUS_STYLES[slot.status]}`}>
+                                {slotLabel(slot)}
+                              </div>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {underutilizedSlots.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Peores franjas</p>
+              {underutilizedSlots.slice(0, 10).map((slot, i) => (
+                <p key={i} className="text-xs text-foreground">
+                  <span className="font-medium">{slot.courtName} · {DAY_NAMES[slot.dayOfWeek]} {slot.startTime}</span>
+                  {' — '}
+                  {slot.status === 'vacio'
+                    ? 'Vacío, sin nada agendado'
+                    : `Grupo "${slot.groupName}" al ${slot.occupancyPct}% de aforo`}
+                </p>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <p className="text-sm text-muted-foreground">
         Preguntas clave respondidas automáticamente con los datos del club.
       </p>
