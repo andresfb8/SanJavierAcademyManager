@@ -25,6 +25,8 @@ interface Group {
   maxCapacity: number;
   currentEnrollment: number;
   isActive: boolean;
+  startDate: Date;
+  endDate: Date;
 }
 
 interface Court {
@@ -117,7 +119,10 @@ async function generateSnapshotForClub(
     db.collection("classReviews").where("clubId", "==", clubId).get(),
   ]);
 
-  const groups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Group[];
+  const groups = groupsSnap.docs.map((d) => {
+    const data = d.data();
+    return { id: d.id, ...data, startDate: toDate(data.startDate), endDate: toDate(data.endDate) };
+  }) as Group[];
   const courts = courtsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Court[];
   const coaches = coachesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Coach[];
   const payments = paymentsSnap.docs.map((d) => {

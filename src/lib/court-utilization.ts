@@ -1,4 +1,5 @@
 import type { Court, Group, PrivateLesson } from '@/types'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 
 const OCCUPANCY_LOW_THRESHOLD = 0.4
 const OCCUPANCY_HIGH_THRESHOLD = 0.7
@@ -31,10 +32,10 @@ function timesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string
   return aStart < bEnd && bStart < aEnd
 }
 
-function getWeekBuckets(groups: Group[]): WeekBucket[] {
+function getWeekBuckets(groups: Group[], now: Date): WeekBucket[] {
   const seen = new Map<string, WeekBucket>()
   for (const group of groups) {
-    if (!group.isActive) continue
+    if (!isGroupCurrentlyActive(group, now)) continue
     for (const slot of group.schedule) {
       const key = `${slot.dayOfWeek}|${slot.startTime}|${slot.endTime}`
       if (!seen.has(key)) {
@@ -45,9 +46,9 @@ function getWeekBuckets(groups: Group[]): WeekBucket[] {
   return Array.from(seen.values())
 }
 
-function findGroupForSlot(groups: Group[], courtId: string, bucket: WeekBucket): Group | undefined {
+function findGroupForSlot(groups: Group[], courtId: string, bucket: WeekBucket, now: Date): Group | undefined {
   return groups.find(g =>
-    g.isActive &&
+    isGroupCurrentlyActive(g, now) &&
     g.courtId === courtId &&
     g.schedule.some(s => s.dayOfWeek === bucket.dayOfWeek && s.startTime === bucket.startTime && s.endTime === bucket.endTime)
   )
@@ -87,12 +88,12 @@ export function computeCourtUtilization(
   now: Date = new Date()
 ): CourtSlotStatus[] {
   const activeCourts = courts.filter(c => c.isActive)
-  const buckets = getWeekBuckets(groups)
+  const buckets = getWeekBuckets(groups, now)
   const results: CourtSlotStatus[] = []
 
   for (const court of activeCourts) {
     for (const bucket of buckets) {
-      const group = findGroupForSlot(groups, court.id, bucket)
+      const group = findGroupForSlot(groups, court.id, bucket, now)
       if (group) {
         const pct = group.maxCapacity > 0 ? group.currentEnrollment / group.maxCapacity : 0
         results.push({

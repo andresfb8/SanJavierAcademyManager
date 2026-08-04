@@ -1,5 +1,6 @@
 import type { Coach, Group, Payment, Enrollment, AttendanceRecord } from '@/types'
 import { findSlotForAttendanceDate } from '@/lib/attendance-schedule'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 
 export interface CoachStats {
   coachId: string
@@ -72,7 +73,7 @@ export function computeCoachStats(
 
       // Respaldo: estimar a partir del horario si no hay asistencia registrada
       const hoursFromSchedule = groups
-        .filter(g => g.coachId === coach.id && g.isActive)
+        .filter(g => g.coachId === coach.id && isGroupCurrentlyActive(g, now))
         .reduce((sum, g) => {
           return sum + g.schedule.reduce((s, slot) => s + slotMinutes(slot.startTime, slot.endTime) / 60, 0) * weeksInPeriod
         }, 0)

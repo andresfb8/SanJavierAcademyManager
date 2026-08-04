@@ -1,3 +1,5 @@
+import { isGroupCurrentlyActive } from "./group-utils";
+
 interface ScheduleSlot {
   dayOfWeek: number;
   startTime: string;
@@ -16,6 +18,8 @@ interface Group {
   coachId: string;
   schedule: ScheduleSlot[];
   isActive: boolean;
+  startDate: Date;
+  endDate: Date;
 }
 
 interface Payment {
@@ -95,7 +99,7 @@ export function computeCoachStats(
       }, 0);
 
       const hoursFromSchedule = groups
-        .filter((g) => g.coachId === coach.id && g.isActive)
+        .filter((g) => g.coachId === coach.id && isGroupCurrentlyActive(g, now))
         .reduce((sum, g) => sum + g.schedule.reduce((s, slot) => s + slotMinutes(slot.startTime, slot.endTime) / 60, 0) * weeksInPeriod, 0);
 
       const hours = hoursFromAttendance > 0 ? hoursFromAttendance : hoursFromSchedule;

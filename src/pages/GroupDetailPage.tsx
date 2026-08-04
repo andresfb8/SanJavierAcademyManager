@@ -23,6 +23,7 @@ import { generateGroupDetailReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
 import type { BillingFrequency } from '@/types'
 import { billingFrequencyLabel, cycleLength } from '@/lib/billing-utils'
+import { isGroupStale } from '@/lib/group-utils'
 
 export default function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -415,7 +416,12 @@ export default function GroupDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-lg font-semibold">{group.coachName}</p>
-                  <StatusBadge status={group.level} className="mt-1" />
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <StatusBadge status={group.level} />
+                    {isGroupStale(group, new Date()) && (
+                      <Badge variant="destructive" className="text-[10px]">Finalizado</Badge>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
