@@ -20,6 +20,7 @@ import type { Group, PlayerLevel, ScheduleSlot } from '@/types'
 import { generateGroupsListReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
 import { checkGroupScheduleConflicts, formatConflictMessage } from '@/lib/schedule-conflicts'
+import { isGroupStale } from '@/lib/group-utils'
 
 type ViewMode = 'grid' | 'list'
 
@@ -430,8 +431,11 @@ export default function GroupsPage() {
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <CardTitle className="text-base leading-tight">{group.name}</CardTitle>
-                        <div className="mt-1">
+                        <div className="mt-1 flex items-center gap-1.5">
                           <StatusBadge status={group.level} />
+                          {isGroupStale(group, new Date()) && (
+                            <Badge variant="destructive" className="text-[10px]">Finalizado</Badge>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -550,7 +554,12 @@ export default function GroupsPage() {
                             <span className="font-medium text-sm">{group.name}</span>
                           </td>
                           <td className="p-3 align-top">
-                            <StatusBadge status={group.level} />
+                            <div className="flex items-center gap-1.5">
+                              <StatusBadge status={group.level} />
+                              {isGroupStale(group, new Date()) && (
+                                <Badge variant="destructive" className="text-[10px]">Finalizado</Badge>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3 hidden md:table-cell align-top">
                             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
