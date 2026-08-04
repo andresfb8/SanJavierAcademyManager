@@ -8,6 +8,7 @@ import { useDataStore } from '@/stores/dataStore'
 import { useAttendanceQuery } from '@/hooks/useQueries'
 import { AttendanceEntry, AttendanceRecord } from '@/types'
 import { BookRecoveryDialog } from '@/components/shared/BookRecoveryDialog'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 
 interface RecoverySlot {
   groupId: string
@@ -29,7 +30,7 @@ export default function FreeSlotsPage() {
     const dayOfWeek = today.getDay()
 
     // Find groups that have a schedule for the selected date
-    const dayGroups = groups.filter(g => g.isActive && g.schedule.some(s => s.dayOfWeek === dayOfWeek))
+    const dayGroups = groups.filter(g => isGroupCurrentlyActive(g, today) && g.schedule.some(s => s.dayOfWeek === dayOfWeek))
 
     dayGroups.forEach(group => {
       const schedule = group.schedule.find(s => s.dayOfWeek === dayOfWeek)
