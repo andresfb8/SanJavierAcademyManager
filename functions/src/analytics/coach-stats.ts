@@ -13,7 +13,6 @@ interface Coach {
 
 interface Group {
   id: string;
-  name: string;
   coachId: string;
   schedule: ScheduleSlot[];
   isActive: boolean;
