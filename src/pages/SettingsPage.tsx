@@ -519,7 +519,7 @@ export default function SettingsPage() {
                             <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
                           )}
                           {(tariff.billingFrequency === 'quarterly' || tariff.billingFrequency === 'annual') && (
-                            <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
+                            <p className="text-2xl font-bold">{formatCurrency(tariff.price)}</p>
                           )}
                           {tariff.billingFrequency === 'installments' && (
                             <>
