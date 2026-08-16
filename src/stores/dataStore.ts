@@ -192,7 +192,13 @@ export interface DataState {
       endDate: Date
     }
     includeStudents: boolean
-    includedPlayerIds: string[]
+    includedStudents: Array<{
+      playerId: string
+      tariffId: string
+      customPrice?: number
+      billingFrequency: BillingFrequency
+      billingAnchorMonth?: number
+    }>
   }) => Promise<{ newGroupId: string }>
   renewGroups: (
     items: Array<Parameters<DataState['renewGroup']>[0]>
@@ -1155,15 +1161,16 @@ export const useDataStore = create<DataState>()(
         }
       },
 
-      renewGroup: async ({ oldGroupId, seasonId, groupData, includeStudents, includedPlayerIds }) => {
+      renewGroup: async ({ oldGroupId, seasonId, groupData, includeStudents, includedStudents }) => {
         const clubId = getClubId()
         if (!clubId) throw new Error('No clubId found')
 
         const oldGroup = get().groups.find((g) => g.id === oldGroupId)
         if (!oldGroup) throw new Error('Grupo no encontrado')
 
-        const tariff = get().tariffs.find((t) => t.id === groupData.defaultTariffId)
-        if (!tariff) throw new Error('Tarifa no encontrada')
+        if (!get().tariffs.some((t) => t.id === groupData.defaultTariffId)) {
+          throw new Error('Tarifa no encontrada')
+        }
 
         const now = new Date()
         const newGroupId = generateId()
@@ -1171,33 +1178,42 @@ export const useDataStore = create<DataState>()(
         const activeEnrollments = get().enrollments.filter(
           (e) => e.groupId === oldGroupId && e.isActive
         )
-        const includedEnrollments = includeStudents
-          ? activeEnrollments.filter((e) => includedPlayerIds.includes(e.playerId))
-          : []
+        const studentsToInclude = includeStudents ? includedStudents : []
 
         const newGroup: Group = {
           ...groupData,
           id: newGroupId,
           seasonId,
           renewedFromGroupId: oldGroupId,
-          currentEnrollment: includedEnrollments.length,
+          currentEnrollment: studentsToInclude.length,
           isActive: true,
           createdAt: now,
         }
 
-        const newEnrollments: Enrollment[] = includedEnrollments.map((e) => ({
-          id: generateId(),
-          playerId: e.playerId,
-          playerName: e.playerName,
-          groupId: newGroupId,
-          groupName: newGroup.name,
-          tariffId: tariff.id,
-          tariffName: tariff.name,
-          billingFrequency: groupData.billingFrequency,
-          billingAnchorMonth: groupData.billingAnchorMonth,
-          enrollmentDate: now,
-          isActive: true,
-        }))
+        const newEnrollments: Enrollment[] = studentsToInclude.map((student) => {
+          const oldEnrollment = activeEnrollments.find((e) => e.playerId === student.playerId)
+          if (!oldEnrollment) {
+            throw new Error(`Matricula no encontrada para el alumno ${student.playerId}`)
+          }
+          const studentTariff = get().tariffs.find((t) => t.id === student.tariffId)
+          if (!studentTariff) {
+            throw new Error(`Tarifa no encontrada para ${oldEnrollment.playerName}`)
+          }
+          return {
+            id: generateId(),
+            playerId: student.playerId,
+            playerName: oldEnrollment.playerName,
+            groupId: newGroupId,
+            groupName: newGroup.name,
+            tariffId: studentTariff.id,
+            tariffName: studentTariff.name,
+            customPrice: student.customPrice,
+            billingFrequency: student.billingFrequency,
+            billingAnchorMonth: student.billingAnchorMonth,
+            enrollmentDate: now,
+            isActive: true,
+          }
+        })
 
         const closedEnrollments = activeEnrollments.map((enrollment) => ({
           ...enrollment,
@@ -1249,7 +1265,7 @@ export const useDataStore = create<DataState>()(
           console.info('[renewGroup] Success:', newGroupId)
 
           // 5. Jugadores excluidos sin otras matriculas activas: pasan a lista_espera
-          const includedPlayerIdSet = new Set(includedEnrollments.map((e) => e.playerId))
+          const includedPlayerIdSet = new Set(studentsToInclude.map((s) => s.playerId))
           const excludedPlayerIds = activeEnrollments
             .map((e) => e.playerId)
             .filter((playerId) => !includedPlayerIdSet.has(playerId))
