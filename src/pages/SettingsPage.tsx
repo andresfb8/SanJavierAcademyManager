@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
+import { cycleLength, billingFrequencyLabel } from '@/lib/billing-utils'
 import { COURT_TYPES, COURT_SURFACES, BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import type { CourtType, CourtSurface, BillingFrequency, VatRate } from '@/types'
 import {
@@ -514,17 +515,28 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         <div className="space-y-1">
-                          {tariff.billingFrequency === 'monthly' ? (
+                          {tariff.billingFrequency === 'monthly' && (
                             <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
-                          ) : (
+                          )}
+                          {(tariff.billingFrequency === 'quarterly' || tariff.billingFrequency === 'annual') && (
+                            <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
+                          )}
+                          {tariff.billingFrequency === 'installments' && (
                             <>
                               <p className="text-2xl font-bold">{formatCurrency(tariff.price)}<span className="text-sm font-normal text-muted-foreground"> total plan</span></p>
                               <p className="text-sm text-muted-foreground">Dividido en {installmentCount} plazos</p>
                             </>
                           )}
-                          {tariff.billingFrequency === 'monthly'
-                            ? <p className="text-sm text-muted-foreground">Facturación mensual</p>
-                            : tariff.installmentPrices && (
+                          {tariff.billingFrequency === 'monthly' && (
+                            <p className="text-sm text-muted-foreground">Facturación mensual</p>
+                          )}
+                          {(tariff.billingFrequency === 'quarterly' || tariff.billingFrequency === 'annual') && (
+                            <p className="text-sm text-muted-foreground">
+                              Facturación {billingFrequencyLabel(tariff.billingFrequency).toLowerCase()}
+                              {' '}({formatCurrency(tariff.price * cycleLength(tariff.billingFrequency))} cada {tariff.billingFrequency === 'annual' ? 'año' : 'trimestre'})
+                            </p>
+                          )}
+                          {tariff.billingFrequency === 'installments' && tariff.installmentPrices && (
                               <p className="text-xs text-muted-foreground">
                                 {Object.entries(tariff.installmentPrices)
                                   .sort(([a], [b]) => a.localeCompare(b))
@@ -535,8 +547,7 @@ export default function SettingsPage() {
                                   })
                                   .join(' · ')}
                               </p>
-                            )
-                          }
+                          )}
                           {tariff.description && <p className="text-xs text-muted-foreground">{tariff.description}</p>}
                         </div>
                       </CardContent>
@@ -605,14 +616,20 @@ export default function SettingsPage() {
               />
             </div>
 
-            {tariffForm.billingFrequency === 'monthly' && (
+            {(tariffForm.billingFrequency === 'monthly' || tariffForm.billingFrequency === 'quarterly' || tariffForm.billingFrequency === 'annual') && (
               <div className="space-y-2">
-                <Label>Precio mensual *</Label>
+                <Label>{tariffForm.billingFrequency === 'monthly' ? 'Precio mensual *' : 'Precio mensual base *'}</Label>
                 <Input
                   type="number" min={0} step={0.01}
                   value={tariffForm.price}
                   onChange={(e) => setTariffForm({ ...tariffForm, price: Number(e.target.value) })}
                 />
+                {tariffForm.billingFrequency !== 'monthly' && (
+                  <p className="text-xs text-muted-foreground">
+                    Se facturará {formatCurrency(tariffForm.price * cycleLength(tariffForm.billingFrequency))} cada {billingFrequencyLabel(tariffForm.billingFrequency).toLowerCase()}
+                    {' '}({cycleLength(tariffForm.billingFrequency)} × {formatCurrency(tariffForm.price)})
+                  </p>
+                )}
               </div>
             )}
 
@@ -738,7 +755,7 @@ export default function SettingsPage() {
               onClick={handleSaveTariff}
               disabled={
                 !tariffForm.name ||
-                (tariffForm.billingFrequency === 'monthly' && tariffForm.price <= 0)
+                (tariffForm.billingFrequency !== 'installments' && tariffForm.price <= 0)
               }
             >
               {editingTariffId ? 'Guardar' : 'Crear'}
