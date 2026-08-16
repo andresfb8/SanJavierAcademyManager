@@ -33,6 +33,7 @@ import {
   Receipt,
   RotateCcw,
   Trash2,
+  Pencil,
   MessageCircle,
   UploadCloud,
 } from 'lucide-react'
@@ -107,8 +108,9 @@ export default function PaymentsPage() {
     markPaymentPaid, 
     markEventPaymentPaid, 
     markPrivateLessonPaymentPaid, 
-    revertPaymentPaidStatus, 
-    deletePayment, 
+    revertPaymentPaidStatus,
+    updatePayment,
+    deletePayment,
     deleteEventPayment, 
     deletePrivateLessonPayment, 
     generateMonthlyReceipts, 
@@ -148,6 +150,11 @@ export default function PaymentsPage() {
   // Mark as paid dialog
   const [paymentToMark, setPaymentToMark] = useState<NormalizedPayment | null>(null)
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('transferencia')
+
+  // Edit payment dialog
+  const [paymentToEdit, setPaymentToEdit] = useState<NormalizedPayment | null>(null)
+  const [editAmount, setEditAmount] = useState('')
+  const [editConcept, setEditConcept] = useState('')
 
   const [categoryFilter, setCategoryFilter] = useState<string>('')
 
@@ -577,6 +584,15 @@ export default function PaymentsPage() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-8 w-8"
+                  onClick={() => openEditPaymentDialog(payment)}
+                  title="Editar importe/concepto"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => handleDeletePayment(payment)}
                   title="Eliminar recibo"
@@ -587,15 +603,26 @@ export default function PaymentsPage() {
             )
           } else if (payment.status === 'pagado') {
             return (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRevertPaidStatus(payment)}
-                title="Deshacer pago y marcar como pendiente"
-              >
-                <RotateCcw className="h-4 w-4 md:mr-1" />
-                <span className="hidden md:inline">Deshacer</span>
-              </Button>
+              <div className="flex items-center gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => openEditPaymentDialog(payment)}
+                  title="Editar importe/concepto"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRevertPaidStatus(payment)}
+                  title="Deshacer pago y marcar como pendiente"
+                >
+                  <RotateCcw className="h-4 w-4 md:mr-1" />
+                  <span className="hidden md:inline">Deshacer</span>
+                </Button>
+              </div>
             )
           }
           return null
@@ -652,6 +679,20 @@ export default function PaymentsPage() {
         deletePayment(payment.id)
       }
     }
+  }
+
+  const openEditPaymentDialog = (payment: NormalizedPayment) => {
+    setPaymentToEdit(payment)
+    setEditAmount(String(payment.amount))
+    setEditConcept(payment.concept)
+  }
+
+  const handleSaveEditPayment = () => {
+    if (!paymentToEdit) return
+    const amount = parseFloat(editAmount)
+    if (isNaN(amount) || amount <= 0 || !editConcept.trim()) return
+    updatePayment(paymentToEdit.id, { amount, concept: editConcept.trim() })
+    setPaymentToEdit(null)
   }
 
   const handleGenerateReceipts = async () => {
@@ -1397,6 +1438,49 @@ export default function PaymentsPage() {
             <Button onClick={handleMarkPaid}>
               <CreditCard className="h-4 w-4 mr-1" />
               Confirmar pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={!!paymentToEdit} onOpenChange={(open) => { if (!open) setPaymentToEdit(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar recibo</DialogTitle>
+          </DialogHeader>
+
+          {paymentToEdit && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Jugador</span>
+                  <span className="font-medium">{paymentToEdit.playerName}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Concepto</Label>
+                <Input value={editConcept} onChange={(e) => setEditConcept(e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Importe (€)</Label>
+                <Input
+                  type="number" min={0} step={0.01}
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentToEdit(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEditPayment} disabled={!editConcept.trim() || isNaN(parseFloat(editAmount)) || parseFloat(editAmount) <= 0}>
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
