@@ -8,7 +8,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
 import { toast } from '@/hooks/use-toast'
-import { cycleLength } from '@/lib/billing-utils'
 import type { Group, BillingFrequency } from '@/types'
 
 interface RenewGroupsDialogProps {
@@ -66,7 +65,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
         const students: StudentDraft[] = activeEnrollmentsForGroup.map((e) => {
           const freq = e.billingFrequency ?? g.billingFrequency
           const tariff = tariffs.find((t) => t.id === e.tariffId)
-          const computedPrice = (tariff?.price ?? g.defaultTariffPrice) * cycleLength(freq)
+          const computedPrice = tariff?.price ?? g.defaultTariffPrice
           return {
             playerId: e.playerId,
             playerName: e.playerName,
