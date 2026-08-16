@@ -46,3 +46,19 @@ export function cycleLength(frequency: BillingFrequency): number {
     case 'installments': return 1   // plazos usa su propio precio por mes, no se multiplica
   }
 }
+
+/**
+ * Nº de meses restantes de un grupo, contando desde el mes de facturación
+ * (inclusive) hasta el mes en que termina el grupo (inclusive).
+ * Ej: grupo termina en septiembre, se factura en septiembre -> 1.
+ * Ej: grupo termina en noviembre, se factura en septiembre -> 3 (sep, oct, nov).
+ */
+export function remainingMonthsInGroup(
+  groupEnd: Date,
+  billingMonth: number, // 1-12
+  billingYear: number,
+): number {
+  const endMonthsTotal = groupEnd.getFullYear() * 12 + (groupEnd.getMonth() + 1)
+  const billingMonthsTotal = billingYear * 12 + billingMonth
+  return endMonthsTotal - billingMonthsTotal + 1
+}
