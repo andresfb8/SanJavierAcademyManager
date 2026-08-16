@@ -581,7 +581,7 @@ export default function PaymentsPage() {
                   <CheckCircle className="h-4 w-4 mr-1" />
                   Marcar pagado
                 </Button>
-                {payment.source !== 'evento' && payment.source !== 'clase_particular' && (
+                {payment.source !== 'evento' && payment.source !== 'clase_particular' && !payment.invoiceId && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -606,7 +606,7 @@ export default function PaymentsPage() {
           } else if (payment.status === 'pagado') {
             return (
               <div className="flex items-center gap-2 justify-end">
-                {payment.source !== 'evento' && payment.source !== 'clase_particular' && (
+                {payment.source !== 'evento' && payment.source !== 'clase_particular' && !payment.invoiceId && (
                   <Button
                     variant="ghost"
                     size="icon"
