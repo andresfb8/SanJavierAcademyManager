@@ -581,15 +581,17 @@ export default function PaymentsPage() {
                   <CheckCircle className="h-4 w-4 mr-1" />
                   Marcar pagado
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => openEditPaymentDialog(payment)}
-                  title="Editar importe/concepto"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                {payment.source !== 'evento' && payment.source !== 'clase_particular' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => openEditPaymentDialog(payment)}
+                    title="Editar importe/concepto"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -604,15 +606,17 @@ export default function PaymentsPage() {
           } else if (payment.status === 'pagado') {
             return (
               <div className="flex items-center gap-2 justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => openEditPaymentDialog(payment)}
-                  title="Editar importe/concepto"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                {payment.source !== 'evento' && payment.source !== 'clase_particular' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => openEditPaymentDialog(payment)}
+                    title="Editar importe/concepto"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
