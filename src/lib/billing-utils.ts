@@ -46,3 +46,29 @@ export function cycleLength(frequency: BillingFrequency): number {
     case 'installments': return 1   // plazos usa su propio precio por mes, no se multiplica
   }
 }
+
+/**
+ * Nº de meses restantes de un grupo, contando desde el mes de facturación
+ * (inclusive) hasta el mes en que termina el grupo (inclusive).
+ * Ej: grupo termina en septiembre, se factura en septiembre -> 1.
+ * Ej: grupo termina en noviembre, se factura en septiembre -> 3 (sep, oct, nov).
+ */
+export function remainingMonthsInGroup(
+  groupEnd: Date,
+  billingMonth: number, // 1-12
+  billingYear: number,
+): number {
+  const endMonthsTotal = groupEnd.getFullYear() * 12 + (groupEnd.getMonth() + 1)
+  const billingMonthsTotal = billingYear * 12 + billingMonth
+  return endMonthsTotal - billingMonthsTotal + 1
+}
+
+/**
+ * Quita el aviso de ciclo incompleto (⚠ ...) del concepto de un pago, para
+ * usos de cara al cliente (factura, remesa SEPA) donde esa nota interna no
+ * debe aparecer. El concepto guardado en el pago no se toca — esto solo
+ * afecta a la copia usada en esos documentos.
+ */
+export function stripCycleWarning(concept: string): string {
+  return concept.replace(/\s*⚠.*$/, '')
+}

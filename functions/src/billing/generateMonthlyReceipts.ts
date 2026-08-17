@@ -2,7 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import { isBillingMonth, cycleLength } from "./billing-utils";
+import { isBillingMonth, cycleLength, remainingMonthsInGroup, billingFrequencyLabel } from "./billing-utils";
 
 // ---------------------------------------------------------------------------
 // Spanish month names (1-indexed: index 0 unused)
@@ -244,11 +244,27 @@ async function processClub(
     // -----------------------------------------------------------------------
     // Calculate amount and concept
     // -----------------------------------------------------------------------
-    // Trimestral/anual generan menos recibos pero por el total del periodo
-    // (cuota base x meses del ciclo); customPrice, si está definido, es
-    // siempre el importe exacto del recibo y no se multiplica.
-    const amount = enrollment.customPrice ?? (group.defaultTariffPrice * cycleLength(freq));
-    const concept = `Cuota ${monthName} ${billingYear} - ${group.name}`;
+    // El importe de un ciclo trimestral/anual es el que se ha configurado
+    // directamente en la tarifa/matrícula (no se multiplica por meses del
+    // ciclo); customPrice, si está definido, manda sobre el precio del grupo.
+    const amount = enrollment.customPrice ?? group.defaultTariffPrice;
+    let concept = `Cuota ${monthName} ${billingYear} - ${group.name}`;
+
+    // Aviso de ciclo incompleto: si el ciclo (trimestral/anual) no cabe
+    // completo antes de que el grupo termine, se cobra igualmente el importe
+    // configurado pero se marca para que el admin decida si ajustarlo.
+    if ((freq === "quarterly" || freq === "annual") && group.endDate) {
+      const groupEnd = group.endDate.toDate();
+      const remaining = remainingMonthsInGroup(groupEnd, billingMonth, billingYear);
+      if (remaining < cycleLength(freq)) {
+        concept += ` ⚠ el grupo finaliza antes de cubrir el ciclo ${billingFrequencyLabel(freq).toLowerCase()} completo, revisa el importe`;
+        logger.warn(
+          `Club ${clubId}: ciclo ${freq} incompleto para matrícula ${enrollment.id} ` +
+          `(alumno ${enrollment.playerName}, grupo ${group.name}): quedan ${remaining} ` +
+          `mes(es) pero el ciclo cubre ${cycleLength(freq)}. Importe cobrado: ${amount}.`,
+        );
+      }
+    }
 
     // Create the payment document
     const paymentRef = db.collection("payments").doc();

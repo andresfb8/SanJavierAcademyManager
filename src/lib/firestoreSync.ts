@@ -24,7 +24,7 @@ import { db } from './firebase'
 import { toast } from '@/hooks/use-toast'
 import type { Invoice, Payment, Enrollment } from '@/types'
 import { MONTHS } from '@/constants'
-import { isBillingMonth, cycleLength } from './billing-utils'
+import { isBillingMonth, remainingMonthsInGroup, cycleLength, billingFrequencyLabel } from './billing-utils'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -365,13 +365,14 @@ export async function generateMonthlyReceiptsAtomic(
     const groupsSnap = await getDocs(
       query(collection(db, 'groups'), where('clubId', '==', clubId))
     )
-    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; startDate: any; installmentPrices?: Record<string, number> }>()
+    const groupsMap = new Map<string, { defaultTariffPrice: number; billingFrequency: string; startDate: any; endDate: any; installmentPrices?: Record<string, number> }>()
     for (const groupDoc of groupsSnap.docs) {
       const g = groupDoc.data()
       groupsMap.set(groupDoc.id, {
         defaultTariffPrice: g.defaultTariffPrice ?? 0,
         billingFrequency: g.billingFrequency ?? 'monthly',
         startDate: g.startDate,
+        endDate: g.endDate,
         installmentPrices: g.installmentPrices,
       })
     }
@@ -433,20 +434,35 @@ export async function generateMonthlyReceiptsAtomic(
 
       // Calcular importe: customPrice tiene prioridad
       // Para plazos: usar el precio específico del mes (YYYY-MM) sin multiplicar.
-      // Para mensual/trimestral/anual: precio base del grupo x meses del ciclo
-      // (trimestral/anual generan menos recibos pero por el total del periodo).
+      // Para mensual/trimestral/anual: el importe configurado directamente en
+      // el grupo/tarifa (no se multiplica por meses del ciclo).
       let baseAmount: number
       if (freq === 'installments' && group.installmentPrices) {
         const billingKey = `${year}-${String(month).padStart(2, '0')}`
         baseAmount = group.installmentPrices[billingKey] ?? group.defaultTariffPrice
       } else {
-        baseAmount = group.defaultTariffPrice * cycleLength(freq)
+        baseAmount = group.defaultTariffPrice
       }
       const amount = enrollment.customPrice ?? baseAmount
 
       // Crear pago
       const paymentId = generateId()
       const dueDate = new Date(year, month - 1, 5) // Día 5 del mes
+
+      let concept = `${MONTHS[month - 1].label} ${year} - ${enrollment.groupName} · Cuota Socio`
+
+      // Aviso de ciclo incompleto: mismo criterio que generateMonthlyReceipts.ts
+      if ((freq === 'quarterly' || freq === 'annual') && group.endDate) {
+        const groupEndDate = group.endDate instanceof Date ? group.endDate : new Date((group.endDate as any).toDate?.() ?? group.endDate)
+        const remaining = remainingMonthsInGroup(groupEndDate, month, year)
+        if (remaining < cycleLength(freq)) {
+          concept += ` ⚠ el grupo finaliza antes de cubrir el ciclo ${billingFrequencyLabel(freq).toLowerCase()} completo, revisa el importe`
+          console.warn(
+            `[generateReceipts] Ciclo ${freq} incompleto para matrícula ${enrollDoc.id} ` +
+            `(grupo ${enrollment.groupName}): quedan ${remaining} mes(es) pero el ciclo cubre ${cycleLength(freq)}. Importe cobrado: ${amount}.`
+          )
+        }
+      }
 
       batch.set(doc(db, 'payments', paymentId), {
         id: paymentId,
@@ -456,7 +472,7 @@ export async function generateMonthlyReceiptsAtomic(
         enrollmentId: enrollDoc.id,
         groupId: enrollment.groupId,
         groupName: enrollment.groupName,
-        concept: `${MONTHS[month - 1].label} ${year} - ${enrollment.groupName} · Cuota Socio`,
+        concept,
         amount,
         status: 'pendiente',
         category: 'cuota',

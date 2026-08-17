@@ -8,6 +8,7 @@
 // ==========================================
 
 import type { Payment, Player, Club } from '@/types'
+import { stripCycleWarning } from './billing-utils'
 
 // --- Interfaces SEPA ---
 
@@ -358,7 +359,7 @@ export function prepareSepaPayments(
       const endToEndId = `${payment.enrollmentId ?? payment.id}-${String(payment.billingMonth).padStart(2, '0')}${payment.billingYear}`
 
       // Construir concepto del pago
-      const remittanceInfo = payment.concept || `${payment.groupName ?? 'Pago manual'} - ${String(payment.billingMonth).padStart(2, '0')}/${payment.billingYear}`
+      const remittanceInfo = (payment.concept ? stripCycleWarning(payment.concept) : '') || `${payment.groupName ?? 'Pago manual'} - ${String(payment.billingMonth).padStart(2, '0')}/${payment.billingYear}`
 
       return {
         endToEndId,

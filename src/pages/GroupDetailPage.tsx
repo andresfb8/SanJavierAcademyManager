@@ -22,7 +22,7 @@ import { DAYS_OF_WEEK, PLAYER_LEVELS, BILLING_FREQUENCIES, MONTHS } from '@/cons
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
 import type { BillingFrequency } from '@/types'
-import { billingFrequencyLabel, cycleLength } from '@/lib/billing-utils'
+import { billingFrequencyLabel } from '@/lib/billing-utils'
 import { isGroupStale } from '@/lib/group-utils'
 
 export default function GroupDetailPage() {
@@ -130,9 +130,9 @@ export default function GroupDetailPage() {
   // Handle adding a player to the group
   // Compute final price based on discount mode
   const selectedTariffPrice = tariffs.find((t) => t.id === selectedTariffId)?.price ?? 0
-  // Precio de referencia del periodo completo: cuota mensual x meses del ciclo
-  // seleccionado. Los descuentos operan sobre este total, no sobre el mes.
-  const periodBasePrice = selectedTariffPrice * cycleLength(selectedBillingFrequency)
+  // Precio de referencia del periodo completo: el precio de la tarifa ya es
+  // el importe del ciclo (no se multiplica). Los descuentos operan sobre él.
+  const periodBasePrice = selectedTariffPrice
   const computedFinalPrice = useMemo(() => {
     if (discountMode === 'percentage') {
       const pct = parseFloat(discountPercentage)
@@ -155,7 +155,7 @@ export default function GroupDetailPage() {
     const tariff = tariffs.find((t) => t.id === selectedTariffId)
     if (!player || !tariff) return
 
-    const tariffPeriodPrice = tariff.price * cycleLength(selectedBillingFrequency)
+    const tariffPeriodPrice = tariff.price
     let finalCustomPrice: number | undefined
     if (discountMode === 'percentage') {
       const pct = parseFloat(discountPercentage)
@@ -814,12 +814,6 @@ export default function GroupDetailPage() {
                     </span>
                   )}
                 </div>
-                {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
-                  <p className="text-xs text-muted-foreground">
-                    Base del periodo: {formatCurrency(periodBasePrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
-                    {' '}({cycleLength(selectedBillingFrequency)} × {formatCurrency(selectedTariffPrice)})
-                  </p>
-                )}
               </div>
             )}
 

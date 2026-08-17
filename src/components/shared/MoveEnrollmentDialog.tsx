@@ -9,7 +9,6 @@ import { useDataStore } from '@/stores/dataStore'
 import { BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
 import type { BillingFrequency } from '@/types'
-import { cycleLength, billingFrequencyLabel } from '@/lib/billing-utils'
 
 interface Props {
   enrollmentId: string
@@ -43,9 +42,9 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
   const activeTariffs = tariffs.filter(t => t.isActive)
   const selectedTariff = tariffs.find(t => t.id === selectedTariffId)
   const selectedTariffPrice = selectedTariff?.price ?? 0
-  // Precio de referencia del periodo completo: cuota mensual x meses del ciclo
-  // seleccionado. Los descuentos operan sobre este total, no sobre el mes.
-  const periodBasePrice = selectedTariffPrice * cycleLength(selectedBillingFrequency)
+  // Precio de referencia del periodo completo: el precio de la tarifa ya es
+  // el importe del ciclo (no se multiplica). Los descuentos operan sobre él.
+  const periodBasePrice = selectedTariffPrice
 
   const computedFinalPrice = useMemo(() => {
     if (discountMode === 'percentage') {
@@ -88,7 +87,7 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
       } else {
         const tariff = tariffs.find(t => t.id === selectedTariffId)
         if (!tariff) return
-        const tariffPeriodPrice = tariff.price * cycleLength(selectedBillingFrequency)
+        const tariffPeriodPrice = tariff.price
         let finalCustomPrice: number | undefined
         if (discountMode === 'percentage') {
           const pct = parseFloat(discountPercentage)
@@ -221,12 +220,6 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                       {discountMode !== 'none' && (
                         <p className="text-xs text-muted-foreground">
                           Precio final: <span className="font-medium">{formatCurrency(computedFinalPrice)}</span>
-                        </p>
-                      )}
-                      {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
-                        <p className="text-xs text-muted-foreground">
-                          Base del periodo: {formatCurrency(periodBasePrice)} por {billingFrequencyLabel(selectedBillingFrequency).toLowerCase()}
-                          {' '}({cycleLength(selectedBillingFrequency)} × {formatCurrency(selectedTariffPrice)})
                         </p>
                       )}
                     </div>

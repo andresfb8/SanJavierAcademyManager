@@ -15,6 +15,7 @@ import type {
   Player,
   Club,
 } from '@/types'
+import { stripCycleWarning } from './billing-utils'
 
 // ==========================================
 // Tipos helper
@@ -67,7 +68,7 @@ export function createInvoiceLineItem(
   // Descripción según tipo de pago
   let description = ''
   if ('concept' in payment && payment.concept) {
-    description = payment.concept
+    description = stripCycleWarning(payment.concept)
   } else if (paymentType === 'eventPayment' && 'eventName' in payment) {
     description = `Evento: ${payment.eventName}`
   } else if (paymentType === 'privateLessonPayment' && 'lessonDate' in payment) {
