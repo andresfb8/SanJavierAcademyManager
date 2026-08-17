@@ -62,3 +62,13 @@ export function remainingMonthsInGroup(
   const billingMonthsTotal = billingYear * 12 + billingMonth
   return endMonthsTotal - billingMonthsTotal + 1
 }
+
+/**
+ * Quita el aviso de ciclo incompleto (⚠ ...) del concepto de un pago, para
+ * usos de cara al cliente (factura, remesa SEPA) donde esa nota interna no
+ * debe aparecer. El concepto guardado en el pago no se toca — esto solo
+ * afecta a la copia usada en esos documentos.
+ */
+export function stripCycleWarning(concept: string): string {
+  return concept.replace(/\s*⚠.*$/, '')
+}

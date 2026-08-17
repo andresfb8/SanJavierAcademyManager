@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cycleLength, remainingMonthsInGroup } from '@/lib/billing-utils'
+import { cycleLength, remainingMonthsInGroup, stripCycleWarning } from '@/lib/billing-utils'
 
 describe('cycleLength', () => {
   it('mensual cubre 1 mes', () => {
@@ -47,5 +47,17 @@ describe('remainingMonthsInGroup', () => {
     const remaining = remainingMonthsInGroup(groupEnd, 9, 2026) // sep 2026 .. ago 2027 = 12
     expect(remaining).toBe(12)
     expect(remaining < cycleLength('annual')).toBe(false)
+  })
+})
+
+describe('stripCycleWarning', () => {
+  it('quita el aviso de ciclo incompleto cuando está presente', () => {
+    const concept = 'Cuota Septiembre 2026 - Grupo X ⚠ el grupo finaliza antes de cubrir el ciclo trimestral completo, revisa el importe'
+    expect(stripCycleWarning(concept)).toBe('Cuota Septiembre 2026 - Grupo X')
+  })
+
+  it('deja el concepto igual cuando no hay aviso', () => {
+    const concept = 'Cuota Septiembre 2026 - Grupo X'
+    expect(stripCycleWarning(concept)).toBe(concept)
   })
 })
