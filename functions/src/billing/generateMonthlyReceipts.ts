@@ -257,7 +257,7 @@ async function processClub(
       const groupEnd = group.endDate.toDate();
       const remaining = remainingMonthsInGroup(groupEnd, billingMonth, billingYear);
       if (remaining < cycleLength(freq)) {
-        concept += ` ⚠ el grupo finaliza antes de cubrir el ${billingFrequencyLabel(freq).toLowerCase()} completo, revisa el importe`;
+        concept += ` ⚠ el grupo finaliza antes de cubrir el ciclo ${billingFrequencyLabel(freq).toLowerCase()} completo, revisa el importe`;
         logger.warn(
           `Club ${clubId}: ciclo ${freq} incompleto para matrícula ${enrollment.id} ` +
           `(alumno ${enrollment.playerName}, grupo ${group.name}): quedan ${remaining} ` +

@@ -456,7 +456,7 @@ export async function generateMonthlyReceiptsAtomic(
         const groupEndDate = group.endDate instanceof Date ? group.endDate : new Date((group.endDate as any).toDate?.() ?? group.endDate)
         const remaining = remainingMonthsInGroup(groupEndDate, month, year)
         if (remaining < cycleLength(freq)) {
-          concept += ` ⚠ el grupo finaliza antes de cubrir el ${billingFrequencyLabel(freq).toLowerCase()} completo, revisa el importe`
+          concept += ` ⚠ el grupo finaliza antes de cubrir el ciclo ${billingFrequencyLabel(freq).toLowerCase()} completo, revisa el importe`
           console.warn(
             `[generateReceipts] Ciclo ${freq} incompleto para matrícula ${enrollDoc.id} ` +
             `(grupo ${enrollment.groupName}): quedan ${remaining} mes(es) pero el ciclo cubre ${cycleLength(freq)}. Importe cobrado: ${amount}.`
