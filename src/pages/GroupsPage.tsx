@@ -36,6 +36,8 @@ interface GroupFormState {
   endDate: string
 }
 
+const ALL_SEASONS = '__all__'
+
 const emptyForm: GroupFormState = {
   name: '',
   level: 'iniciacion',
@@ -75,7 +77,6 @@ export default function GroupsPage() {
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [coachFilter, setCoachFilter] = useState<string>('')
-  const ALL_SEASONS = '__all__'
   const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [sortBy, setSortBy] = useState<'schedule' | 'name'>('schedule')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -144,6 +145,7 @@ export default function GroupsPage() {
   }, [groups, search, levelFilter, coachFilter, seasonFilter, sortBy, isEntrenador, currentCoach, club?.activeSeasonId])
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
+  const activeSeason = club ? seasons.find((s) => s.id === club.activeSeasonId) : undefined
 
   const handleExportPDF = async () => {
     const clubName = user?.clubId || 'San Javier Academy'
@@ -321,9 +323,11 @@ export default function GroupsPage() {
       <Header
         title="Grupos"
         subtitle={
-          (search || levelFilter || coachFilter)
+          (search || levelFilter || coachFilter || (seasonFilter !== '' && seasonFilter !== ALL_SEASONS))
             ? `${filteredGroups.length} grupos encontrados`
-            : `${activeGroupsCount} activos · ${groups.length} total`
+            : (seasonFilter === ALL_SEASONS)
+              ? `${activeGroupsCount} activos · ${groups.length} total`
+              : `${filteredGroups.length} de la temporada actual`
         }
         actions={
           <div className="flex items-center gap-2">
@@ -387,7 +391,7 @@ export default function GroupsPage() {
           />
           <Select
             options={[
-              { value: '', label: club && seasons.find(s => s.id === club.activeSeasonId) ? `Temporada actual: ${seasons.find(s => s.id === club.activeSeasonId)!.name}` : 'Temporada actual' },
+              { value: '', label: activeSeason ? `Temporada actual: ${activeSeason.name}` : 'Temporada actual' },
               { value: ALL_SEASONS, label: 'Todas las temporadas' },
               ...seasons.map((s) => ({ value: s.id, label: s.name })),
             ]}
@@ -420,7 +424,13 @@ export default function GroupsPage() {
           <EmptyState
             icon={Users}
             title={isEntrenador ? "No tienes grupos asignados" : "No hay grupos"}
-            description={isEntrenador ? "Actualmente no tienes ningún grupo asignado a tu perfil." : "Crea tu primer grupo para empezar a organizar las clases de la escuela"}
+            description={
+              isEntrenador
+                ? "Actualmente no tienes ningún grupo asignado a tu perfil."
+                : seasonFilter !== ALL_SEASONS
+                  ? "No hay grupos en esta temporada. Prueba a seleccionar 'Todas las temporadas' en el filtro, o crea un grupo nuevo."
+                  : "Crea tu primer grupo para empezar a organizar las clases de la escuela"
+            }
             action={isEntrenador ? undefined : { label: 'Crear grupo', onClick: openCreateDialog }}
           />
         ) : viewMode === 'grid' ? (
