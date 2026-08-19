@@ -166,6 +166,13 @@ async function loadUserProfile(
         // deja suscripciones con un alcance obsoleto.
         _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
           setDataLoading(false)
+          // Solo tras la primera carga completa (incluida `seasons`), y solo
+          // para roles que pueden escribir en clubs/groups/seasons — evita
+          // que ensureActiveSeason vea `seasons` vacío y cree una temporada
+          // duplicada, y evita permission-denied para roles no admin.
+          if (appUser.role === 'director' || appUser.role === 'coordinador') {
+            useDataStore.getState().ensureActiveSeason()
+          }
         })
       })
       .catch((err) => {
