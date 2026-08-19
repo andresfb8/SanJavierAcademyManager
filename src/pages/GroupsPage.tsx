@@ -36,6 +36,8 @@ interface GroupFormState {
   endDate: string
 }
 
+const ALL_SEASONS = '__all__'
+
 const emptyForm: GroupFormState = {
   name: '',
   level: 'iniciacion',
@@ -69,12 +71,13 @@ function formatSchedule(schedule: ScheduleSlot[]): string {
 
 export default function GroupsPage() {
   const navigate = useNavigate()
-  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments } = useDataStore()
+  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments, club, seasons } = useDataStore()
   const { user } = useAuthStore()
 
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [coachFilter, setCoachFilter] = useState<string>('')
+  const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [sortBy, setSortBy] = useState<'schedule' | 'name'>('schedule')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showDialog, setShowDialog] = useState(false)
@@ -107,21 +110,27 @@ export default function GroupsPage() {
   )
 
   const filteredGroups = useMemo(() => {
+    const effectiveSeasonFilter = seasonFilter === '' ? (club?.activeSeasonId ?? '') : seasonFilter
+
     const filtered = groups.filter((g) => {
       const q = normalizeText(search)
       const matchesSearch = search === '' || normalizeText(g.name).includes(q)
       const matchesLevel = levelFilter === '' || g.level === levelFilter
-      const matchesCoach = isEntrenador 
-        ? g.coachId === currentCoach?.id 
+      const matchesCoach = isEntrenador
+        ? g.coachId === currentCoach?.id
         : coachFilter === '' || g.coachId === coachFilter
-      return matchesSearch && matchesLevel && matchesCoach
+      const matchesSeason =
+        effectiveSeasonFilter === ALL_SEASONS ||
+        effectiveSeasonFilter === '' ||
+        g.seasonId === effectiveSeasonFilter
+      return matchesSearch && matchesLevel && matchesCoach && matchesSeason
     })
 
     return filtered.sort((a, b) => {
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name)
       }
-      
+
       const aSlot = a.schedule[0]
       const bSlot = b.schedule[0]
       if (!aSlot && !bSlot) return 0
@@ -133,9 +142,10 @@ export default function GroupsPage() {
       }
       return aSlot.startTime.localeCompare(bSlot.startTime)
     })
-  }, [groups, search, levelFilter, coachFilter, sortBy, isEntrenador, currentCoach])
+  }, [groups, search, levelFilter, coachFilter, seasonFilter, sortBy, isEntrenador, currentCoach, club?.activeSeasonId])
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
+  const activeSeason = club ? seasons.find((s) => s.id === club.activeSeasonId) : undefined
 
   const handleExportPDF = async () => {
     const clubName = user?.clubId || 'San Javier Academy'
@@ -298,6 +308,7 @@ export default function GroupsPage() {
         startDate: new Date(form.startDate),
         endDate: new Date(form.endDate),
         isActive: true,
+        seasonId: club?.activeSeasonId,
       })
     }
 
@@ -313,9 +324,11 @@ export default function GroupsPage() {
       <Header
         title="Grupos"
         subtitle={
-          (search || levelFilter || coachFilter)
+          (search || levelFilter || coachFilter || (seasonFilter !== '' && seasonFilter !== ALL_SEASONS))
             ? `${filteredGroups.length} grupos encontrados`
-            : `${activeGroupsCount} activos · ${groups.length} total`
+            : (seasonFilter === ALL_SEASONS || (seasonFilter === '' && !club?.activeSeasonId))
+              ? `${activeGroupsCount} activos · ${groups.length} total`
+              : `${filteredGroups.length} de la temporada actual`
         }
         actions={
           <div className="flex items-center gap-2">
@@ -377,6 +390,16 @@ export default function GroupsPage() {
             onChange={(e) => setLevelFilter(e.target.value)}
             className="w-full sm:w-48"
           />
+          <Select
+            options={[
+              { value: '', label: activeSeason ? `Temporada actual: ${activeSeason.name}` : 'Temporada actual' },
+              { value: ALL_SEASONS, label: 'Todas las temporadas' },
+              ...seasons.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+            value={seasonFilter}
+            onChange={(e) => setSeasonFilter(e.target.value)}
+            className="w-full sm:w-56"
+          />
           <div className="flex items-center border rounded-md shrink-0">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
@@ -402,7 +425,13 @@ export default function GroupsPage() {
           <EmptyState
             icon={Users}
             title={isEntrenador ? "No tienes grupos asignados" : "No hay grupos"}
-            description={isEntrenador ? "Actualmente no tienes ningún grupo asignado a tu perfil." : "Crea tu primer grupo para empezar a organizar las clases de la escuela"}
+            description={
+              isEntrenador
+                ? "Actualmente no tienes ningún grupo asignado a tu perfil."
+                : (!search && !levelFilter && !coachFilter && seasonFilter !== ALL_SEASONS && (seasonFilter !== '' || club?.activeSeasonId))
+                  ? "No hay grupos en esta temporada. Prueba a seleccionar 'Todas las temporadas' en el filtro, o crea un grupo nuevo."
+                  : "Crea tu primer grupo para empezar a organizar las clases de la escuela"
+            }
             action={isEntrenador ? undefined : { label: 'Crear grupo', onClick: openCreateDialog }}
           />
         ) : viewMode === 'grid' ? (

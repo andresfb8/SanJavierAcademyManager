@@ -60,6 +60,7 @@ import {
   demoCoachSalaryConfigs,
 } from '@/lib/demo-data'
 import { generateId } from '@/lib/utils'
+import { findOrBuildMigrationSeason } from '@/lib/season-utils'
 import { CANCELLATION_DEADLINE_DAY } from '@/constants'
 import { useAuthStore } from '@/stores/authStore'
 import {
@@ -74,7 +75,7 @@ import {
   moveEnrollmentAtomic,
   toFirestore,
 } from '@/lib/firestoreSync'
-import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc, writeBatch, runTransaction } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
@@ -160,6 +161,7 @@ export interface DataState {
 
   // --- Seasons CRUD ---
   addSeason: (season: Omit<Season, 'id' | 'createdAt'>) => Season
+  ensureActiveSeason: () => Promise<void>
 
   // --- Enrollments CRUD ---
   addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<{ needsPartialReceipt: boolean; enrollmentId: string }>
@@ -902,6 +904,71 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         if (clubId) syncDoc('seasons', newSeason.id, newSeason as any, clubId)
         return newSeason
+      },
+
+      ensureActiveSeason: async () => {
+        const club = get().club
+        if (!club || club.activeSeasonId) return
+
+        const clubId = getClubId()
+        if (!clubId) return
+
+        const result = findOrBuildMigrationSeason(get().seasons, club.seasonStart, club.seasonEnd)
+
+        const seasonId = result.reuse ? result.season.id : generateId()
+        const newSeasonDoc: Season | null = result.reuse
+          ? null
+          : { id: seasonId, name: result.name, startDate: result.startDate, endDate: result.endDate, createdAt: new Date() }
+
+        // Reclamar activeSeasonId de forma atómica: si otro proceso (p.ej. otro
+        // admin logueándose a la vez en otro dispositivo) ya lo puso, esta
+        // transacción se aborta sin escribir nada, evitando temporadas duplicadas.
+        let claimed: boolean
+        try {
+          claimed = await runTransaction(db, async (transaction) => {
+            const clubRef = doc(db, 'clubs', clubId)
+            const clubSnap = await transaction.get(clubRef)
+            if (clubSnap.data()?.activeSeasonId) {
+              return false
+            }
+            if (newSeasonDoc) {
+              transaction.set(doc(db, 'seasons', newSeasonDoc.id), toFirestore({ ...newSeasonDoc, clubId }))
+            }
+            transaction.update(clubRef, { activeSeasonId: seasonId })
+            return true
+          })
+        } catch (err) {
+          console.error('[ensureActiveSeason] Transacción fallida:', err)
+          return
+        }
+
+        if (!claimed) return
+
+        if (newSeasonDoc) {
+          set((state) => ({ seasons: [...state.seasons, newSeasonDoc] }))
+        }
+
+        const groupsToMigrate = get().groups.filter((g) => g.isActive && !g.seasonId)
+        if (groupsToMigrate.length > 0) {
+          try {
+            const batch = writeBatch(db)
+            for (const g of groupsToMigrate) {
+              batch.update(doc(db, 'groups', g.id), { seasonId })
+            }
+            await batch.commit()
+            set((state) => ({
+              groups: state.groups.map((g) =>
+                groupsToMigrate.some((m) => m.id === g.id) ? { ...g, seasonId } : g
+              ),
+            }))
+          } catch (err) {
+            console.error('[ensureActiveSeason] Error migrando grupos:', err)
+          }
+        }
+
+        set((state) => ({
+          club: state.club ? { ...state.club, activeSeasonId: seasonId } : null,
+        }))
       },
 
       updateGroup: (id, data) => {

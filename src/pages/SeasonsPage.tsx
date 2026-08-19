@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,18 @@ import type { Group } from '@/types'
 const NO_SEASON = '__none__'
 
 export default function SeasonsPage() {
-  const { seasons, groups, enrollments } = useDataStore()
+  const { seasons, groups, enrollments, club } = useDataStore()
 
-  const [originSeasonId, setOriginSeasonId] = useState<string>(NO_SEASON)
+  const [originSeasonId, setOriginSeasonId] = useState<string>(club?.activeSeasonId ?? NO_SEASON)
+  const hasAutoSelectedOrigin = useRef(!!club?.activeSeasonId)
+
+  useEffect(() => {
+    if (!hasAutoSelectedOrigin.current && club?.activeSeasonId) {
+      setOriginSeasonId(club.activeSeasonId)
+      hasAutoSelectedOrigin.current = true
+    }
+  }, [club?.activeSeasonId])
+
   const [destinationSeasonId, setDestinationSeasonId] = useState<string>('')
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set())
   const [showNewSeason, setShowNewSeason] = useState<'origin' | 'destination' | null>(null)
@@ -61,6 +70,7 @@ export default function SeasonsPage() {
                   onChange={(e) => {
                     setOriginSeasonId(e.target.value)
                     setSelectedGroupIds(new Set())
+                    hasAutoSelectedOrigin.current = true
                   }}
                   className="w-auto"
                 />
