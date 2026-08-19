@@ -427,7 +427,7 @@ export default function GroupsPage() {
             description={
               isEntrenador
                 ? "Actualmente no tienes ningún grupo asignado a tu perfil."
-                : seasonFilter !== ALL_SEASONS
+                : (!search && !levelFilter && !coachFilter && seasonFilter !== ALL_SEASONS)
                   ? "No hay grupos en esta temporada. Prueba a seleccionar 'Todas las temporadas' en el filtro, o crea un grupo nuevo."
                   : "Crea tu primer grupo para empezar a organizar las clases de la escuela"
             }
