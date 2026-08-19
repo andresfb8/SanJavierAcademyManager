@@ -923,19 +923,19 @@ export const useDataStore = create<DataState>()(
         // Reclamar activeSeasonId de forma atómica: si otro proceso (p.ej. otro
         // admin logueándose a la vez en otro dispositivo) ya lo puso, esta
         // transacción se aborta sin escribir nada, evitando temporadas duplicadas.
-        let claimed = false
+        let claimed: boolean
         try {
-          await runTransaction(db, async (transaction) => {
+          claimed = await runTransaction(db, async (transaction) => {
             const clubRef = doc(db, 'clubs', clubId)
             const clubSnap = await transaction.get(clubRef)
             if (clubSnap.data()?.activeSeasonId) {
-              return
+              return false
             }
             if (newSeasonDoc) {
               transaction.set(doc(db, 'seasons', newSeasonDoc.id), toFirestore({ ...newSeasonDoc, clubId }))
             }
             transaction.update(clubRef, { activeSeasonId: seasonId })
-            claimed = true
+            return true
           })
         } catch (err) {
           console.error('[ensureActiveSeason] Transacción fallida:', err)
