@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,15 @@ export default function SeasonsPage() {
   const { seasons, groups, enrollments, club } = useDataStore()
 
   const [originSeasonId, setOriginSeasonId] = useState<string>(club?.activeSeasonId ?? NO_SEASON)
+  const hasAutoSelectedOrigin = useRef(!!club?.activeSeasonId)
+
+  useEffect(() => {
+    if (!hasAutoSelectedOrigin.current && club?.activeSeasonId) {
+      setOriginSeasonId(club.activeSeasonId)
+      hasAutoSelectedOrigin.current = true
+    }
+  }, [club?.activeSeasonId])
+
   const [destinationSeasonId, setDestinationSeasonId] = useState<string>('')
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set())
   const [showNewSeason, setShowNewSeason] = useState<'origin' | 'destination' | null>(null)
