@@ -17,6 +17,7 @@ export interface Club {
   closingTime: string
   seasonStart: Date
   seasonEnd: Date
+  activeSeasonId?: string  // temporada en la que el club está trabajando ahora mismo
   // SEPA Direct Debit configuration
   iban?: string        // IBAN del club para domiciliación SEPA
   bic?: string         // BIC/SWIFT del banco del club

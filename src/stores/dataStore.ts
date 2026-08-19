@@ -60,6 +60,7 @@ import {
   demoCoachSalaryConfigs,
 } from '@/lib/demo-data'
 import { generateId } from '@/lib/utils'
+import { findOrBuildMigrationSeason } from '@/lib/season-utils'
 import { CANCELLATION_DEADLINE_DAY } from '@/constants'
 import { useAuthStore } from '@/stores/authStore'
 import {
@@ -160,6 +161,7 @@ export interface DataState {
 
   // --- Seasons CRUD ---
   addSeason: (season: Omit<Season, 'id' | 'createdAt'>) => Season
+  ensureActiveSeason: () => Promise<void>
 
   // --- Enrollments CRUD ---
   addEnrollment: (enrollment: Omit<Enrollment, 'id'>) => Promise<{ needsPartialReceipt: boolean; enrollmentId: string }>
@@ -902,6 +904,52 @@ export const useDataStore = create<DataState>()(
         const clubId = getClubId()
         if (clubId) syncDoc('seasons', newSeason.id, newSeason as any, clubId)
         return newSeason
+      },
+
+      ensureActiveSeason: async () => {
+        const club = get().club
+        if (!club || club.activeSeasonId) return
+
+        const clubId = getClubId()
+        if (!clubId) return
+
+        const result = findOrBuildMigrationSeason(get().seasons, club.seasonStart, club.seasonEnd)
+
+        let seasonId: string
+        if (result.reuse) {
+          seasonId = result.season.id
+        } else {
+          const newSeason: Season = {
+            id: generateId(),
+            name: result.name,
+            startDate: result.startDate,
+            endDate: result.endDate,
+            createdAt: new Date(),
+          }
+          set((state) => ({ seasons: [...state.seasons, newSeason] }))
+          syncDoc('seasons', newSeason.id, newSeason as any, clubId)
+          seasonId = newSeason.id
+        }
+
+        const groupsToMigrate = get().groups.filter((g) => g.isActive && !g.seasonId)
+
+        if (groupsToMigrate.length > 0) {
+          const batch = writeBatch(db)
+          for (const g of groupsToMigrate) {
+            batch.update(doc(db, 'groups', g.id), { seasonId })
+          }
+          await batch.commit()
+          set((state) => ({
+            groups: state.groups.map((g) =>
+              groupsToMigrate.some((m) => m.id === g.id) ? { ...g, seasonId } : g
+            ),
+          }))
+        }
+
+        set((state) => ({
+          club: state.club ? { ...state.club, activeSeasonId: seasonId } : null,
+        }))
+        syncDoc('clubs', clubId, { activeSeasonId: seasonId }, clubId)
       },
 
       updateGroup: (id, data) => {
