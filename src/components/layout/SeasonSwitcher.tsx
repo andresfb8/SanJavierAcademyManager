@@ -16,7 +16,9 @@ import {
  */
 export function SeasonSwitcher() {
   const { user } = useAuthStore()
-  const { club, seasons, updateClub } = useDataStore()
+  const club = useDataStore((s) => s.club)
+  const seasons = useDataStore((s) => s.seasons)
+  const updateClub = useDataStore((s) => s.updateClub)
 
   const activeRole = user?.activeRole ?? user?.role
   if (activeRole !== 'director' && activeRole !== 'coordinador') return null
