@@ -101,9 +101,10 @@ function SortableHeader({
 }
 
 export default function PaymentsPage() {
-  const { 
-    groups, 
-    players, 
+  const {
+    groups,
+    seasons,
+    players,
     club, 
     markPaymentPaid, 
     markEventPaymentPaid, 
@@ -143,6 +144,7 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [groupFilter, setGroupFilter] = useState<string>('')
+  const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear())
   const [viewMode, setViewMode] = useState<ViewMode>('mensual')
@@ -218,9 +220,12 @@ export default function PaymentsPage() {
       const matchesCategory = categoryFilter === '' || p.source === categoryFilter
       const matchesMonth = p.billingMonth === selectedMonth
       const matchesYear = p.billingYear === selectedYear
-      return matchesSearch && matchesStatus && matchesGroup && matchesCategory && matchesMonth && matchesYear
+      const matchesSeason =
+        seasonFilter === '' ||
+        groups.find((g) => g.id === p.groupId)?.seasonId === seasonFilter
+      return matchesSearch && matchesStatus && matchesGroup && matchesCategory && matchesMonth && matchesYear && matchesSeason
     })
-  }, [allPayments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear])
+  }, [allPayments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear, seasonFilter, groups])
 
   // KPI calculations for current selected month (usando TODOS los origenes)
   const currentMonthAllPayments = useMemo(() => {
@@ -1142,6 +1147,15 @@ export default function PaymentsPage() {
                 ]}
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
+                className="w-full sm:w-48"
+              />
+              <Select
+                options={[
+                  { value: '', label: 'Todas las temporadas' },
+                  ...seasons.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+                value={seasonFilter}
+                onChange={(e) => setSeasonFilter(e.target.value)}
                 className="w-full sm:w-48"
               />
               <Select
