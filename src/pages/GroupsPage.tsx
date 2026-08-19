@@ -308,6 +308,7 @@ export default function GroupsPage() {
         startDate: new Date(form.startDate),
         endDate: new Date(form.endDate),
         isActive: true,
+        seasonId: club?.activeSeasonId,
       })
     }
 
