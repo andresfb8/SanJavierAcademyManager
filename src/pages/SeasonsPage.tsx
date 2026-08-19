@@ -13,9 +13,9 @@ import type { Group } from '@/types'
 const NO_SEASON = '__none__'
 
 export default function SeasonsPage() {
-  const { seasons, groups, enrollments } = useDataStore()
+  const { seasons, groups, enrollments, club } = useDataStore()
 
-  const [originSeasonId, setOriginSeasonId] = useState<string>(NO_SEASON)
+  const [originSeasonId, setOriginSeasonId] = useState<string>(club?.activeSeasonId ?? NO_SEASON)
   const [destinationSeasonId, setDestinationSeasonId] = useState<string>('')
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set())
   const [showNewSeason, setShowNewSeason] = useState<'origin' | 'destination' | null>(null)

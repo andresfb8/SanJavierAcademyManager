@@ -326,7 +326,7 @@ export default function GroupsPage() {
         subtitle={
           (search || levelFilter || coachFilter || (seasonFilter !== '' && seasonFilter !== ALL_SEASONS))
             ? `${filteredGroups.length} grupos encontrados`
-            : (seasonFilter === ALL_SEASONS)
+            : (seasonFilter === ALL_SEASONS || (seasonFilter === '' && !club?.activeSeasonId))
               ? `${activeGroupsCount} activos · ${groups.length} total`
               : `${filteredGroups.length} de la temporada actual`
         }
@@ -428,7 +428,7 @@ export default function GroupsPage() {
             description={
               isEntrenador
                 ? "Actualmente no tienes ningún grupo asignado a tu perfil."
-                : (!search && !levelFilter && !coachFilter && seasonFilter !== ALL_SEASONS)
+                : (!search && !levelFilter && !coachFilter && seasonFilter !== ALL_SEASONS && (seasonFilter !== '' || club?.activeSeasonId))
                   ? "No hay grupos en esta temporada. Prueba a seleccionar 'Todas las temporadas' en el filtro, o crea un grupo nuevo."
                   : "Crea tu primer grupo para empezar a organizar las clases de la escuela"
             }
