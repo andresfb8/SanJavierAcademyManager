@@ -70,6 +70,7 @@ export default function SeasonsPage() {
                   onChange={(e) => {
                     setOriginSeasonId(e.target.value)
                     setSelectedGroupIds(new Set())
+                    hasAutoSelectedOrigin.current = true
                   }}
                   className="w-auto"
                 />
