@@ -75,7 +75,7 @@ import {
   moveEnrollmentAtomic,
   toFirestore,
 } from '@/lib/firestoreSync'
-import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, getDocs, query, collection, where, limit, deleteDoc, writeBatch, runTransaction } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toast } from '@/hooks/use-toast'
 import { queryClient } from '@/lib/queryClient'
@@ -915,41 +915,60 @@ export const useDataStore = create<DataState>()(
 
         const result = findOrBuildMigrationSeason(get().seasons, club.seasonStart, club.seasonEnd)
 
-        let seasonId: string
-        if (result.reuse) {
-          seasonId = result.season.id
-        } else {
-          const newSeason: Season = {
-            id: generateId(),
-            name: result.name,
-            startDate: result.startDate,
-            endDate: result.endDate,
-            createdAt: new Date(),
-          }
-          set((state) => ({ seasons: [...state.seasons, newSeason] }))
-          syncDoc('seasons', newSeason.id, newSeason as any, clubId)
-          seasonId = newSeason.id
+        const seasonId = result.reuse ? result.season.id : generateId()
+        const newSeasonDoc: Season | null = result.reuse
+          ? null
+          : { id: seasonId, name: result.name, startDate: result.startDate, endDate: result.endDate, createdAt: new Date() }
+
+        // Reclamar activeSeasonId de forma atómica: si otro proceso (p.ej. otro
+        // admin logueándose a la vez en otro dispositivo) ya lo puso, esta
+        // transacción se aborta sin escribir nada, evitando temporadas duplicadas.
+        let claimed = false
+        try {
+          await runTransaction(db, async (transaction) => {
+            const clubRef = doc(db, 'clubs', clubId)
+            const clubSnap = await transaction.get(clubRef)
+            if (clubSnap.data()?.activeSeasonId) {
+              return
+            }
+            if (newSeasonDoc) {
+              transaction.set(doc(db, 'seasons', newSeasonDoc.id), toFirestore({ ...newSeasonDoc, clubId }))
+            }
+            transaction.update(clubRef, { activeSeasonId: seasonId })
+            claimed = true
+          })
+        } catch (err) {
+          console.error('[ensureActiveSeason] Transacción fallida:', err)
+          return
+        }
+
+        if (!claimed) return
+
+        if (newSeasonDoc) {
+          set((state) => ({ seasons: [...state.seasons, newSeasonDoc] }))
         }
 
         const groupsToMigrate = get().groups.filter((g) => g.isActive && !g.seasonId)
-
         if (groupsToMigrate.length > 0) {
-          const batch = writeBatch(db)
-          for (const g of groupsToMigrate) {
-            batch.update(doc(db, 'groups', g.id), { seasonId })
+          try {
+            const batch = writeBatch(db)
+            for (const g of groupsToMigrate) {
+              batch.update(doc(db, 'groups', g.id), { seasonId })
+            }
+            await batch.commit()
+            set((state) => ({
+              groups: state.groups.map((g) =>
+                groupsToMigrate.some((m) => m.id === g.id) ? { ...g, seasonId } : g
+              ),
+            }))
+          } catch (err) {
+            console.error('[ensureActiveSeason] Error migrando grupos:', err)
           }
-          await batch.commit()
-          set((state) => ({
-            groups: state.groups.map((g) =>
-              groupsToMigrate.some((m) => m.id === g.id) ? { ...g, seasonId } : g
-            ),
-          }))
         }
 
         set((state) => ({
           club: state.club ? { ...state.club, activeSeasonId: seasonId } : null,
         }))
-        syncDoc('clubs', clubId, { activeSeasonId: seasonId }, clubId)
       },
 
       updateGroup: (id, data) => {
