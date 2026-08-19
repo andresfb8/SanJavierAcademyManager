@@ -69,12 +69,14 @@ function formatSchedule(schedule: ScheduleSlot[]): string {
 
 export default function GroupsPage() {
   const navigate = useNavigate()
-  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments } = useDataStore()
+  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments, club, seasons } = useDataStore()
   const { user } = useAuthStore()
 
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [coachFilter, setCoachFilter] = useState<string>('')
+  const ALL_SEASONS = '__all__'
+  const [seasonFilter, setSeasonFilter] = useState<string>('')
   const [sortBy, setSortBy] = useState<'schedule' | 'name'>('schedule')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showDialog, setShowDialog] = useState(false)
@@ -107,21 +109,27 @@ export default function GroupsPage() {
   )
 
   const filteredGroups = useMemo(() => {
+    const effectiveSeasonFilter = seasonFilter === '' ? (club?.activeSeasonId ?? '') : seasonFilter
+
     const filtered = groups.filter((g) => {
       const q = normalizeText(search)
       const matchesSearch = search === '' || normalizeText(g.name).includes(q)
       const matchesLevel = levelFilter === '' || g.level === levelFilter
-      const matchesCoach = isEntrenador 
-        ? g.coachId === currentCoach?.id 
+      const matchesCoach = isEntrenador
+        ? g.coachId === currentCoach?.id
         : coachFilter === '' || g.coachId === coachFilter
-      return matchesSearch && matchesLevel && matchesCoach
+      const matchesSeason =
+        effectiveSeasonFilter === ALL_SEASONS ||
+        effectiveSeasonFilter === '' ||
+        g.seasonId === effectiveSeasonFilter
+      return matchesSearch && matchesLevel && matchesCoach && matchesSeason
     })
 
     return filtered.sort((a, b) => {
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name)
       }
-      
+
       const aSlot = a.schedule[0]
       const bSlot = b.schedule[0]
       if (!aSlot && !bSlot) return 0
@@ -133,7 +141,7 @@ export default function GroupsPage() {
       }
       return aSlot.startTime.localeCompare(bSlot.startTime)
     })
-  }, [groups, search, levelFilter, coachFilter, sortBy, isEntrenador, currentCoach])
+  }, [groups, search, levelFilter, coachFilter, seasonFilter, sortBy, isEntrenador, currentCoach, club?.activeSeasonId])
 
   const activeGroupsCount = groups.filter((g) => g.isActive).length
 
@@ -376,6 +384,16 @@ export default function GroupsPage() {
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
             className="w-full sm:w-48"
+          />
+          <Select
+            options={[
+              { value: '', label: club && seasons.find(s => s.id === club.activeSeasonId) ? `Temporada actual: ${seasons.find(s => s.id === club.activeSeasonId)!.name}` : 'Temporada actual' },
+              { value: ALL_SEASONS, label: 'Todas las temporadas' },
+              ...seasons.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+            value={seasonFilter}
+            onChange={(e) => setSeasonFilter(e.target.value)}
+            className="w-full sm:w-56"
           />
           <div className="flex items-center border rounded-md shrink-0">
             <Button
