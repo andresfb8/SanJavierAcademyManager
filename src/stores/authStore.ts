@@ -327,12 +327,15 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user: appUser, isAuthenticated: true, isLoading: false })
       } else {
         // Sesión expirada o logout externo (otra pestaña, token caducado...)
+        // No se espera a clearDataStore() antes de desbloquear la UI: la
+        // pantalla de login no lee de dataStore, así que no hace falta
+        // retrasar su aparición por una descarga de red en segundo plano.
         if (_dataUnsubscribe) {
           _dataUnsubscribe()
           _dataUnsubscribe = null
         }
-        await clearDataStore()
         set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
+        void clearDataStore().catch((err) => console.warn('[Auth] Error limpiando datos tras cierre de sesión externo:', err))
       }
     })
     return unsubscribe
