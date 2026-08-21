@@ -17,10 +17,6 @@ import {
   updateDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
-import { migrateLocalToFirestore } from '@/lib/dataLoader'
-import { subscribeToAllData } from '@/lib/realtimeSync'
-import { retryFailedSyncs } from '@/lib/firestoreSync'
-import { useDataStore } from '@/stores/dataStore'
 import type { AppUser, UserRole, Invitation } from '@/types'
 
 interface AuthState {
@@ -46,7 +42,8 @@ let _dataUnsubscribe: (() => void) | null = null
 
 // Limpia todas las colecciones del store al hacer logout o cuando expira la sesión.
 // Evita que el próximo usuario vea datos del usuario anterior en el mismo dispositivo.
-function clearDataStore(): void {
+async function clearDataStore(): Promise<void> {
+  const { useDataStore } = await import('@/stores/dataStore')
   useDataStore.setState({
     courts: [],
     tariffs: [],
@@ -151,29 +148,40 @@ async function loadUserProfile(
       _dataUnsubscribe()
       _dataUnsubscribe = null
     }
-    migrateLocalToFirestore(appUser.clubId)
-      .then(() => {
-        // Reintentar syncs fallidos de sesiones anteriores
-        return retryFailedSyncs()
-      })
-      .then((retriedCount) => {
-        if (retriedCount > 0) {
-          console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
-        }
-        // Iniciar listeners en tiempo real.
-        // Se pasa `role` (el de BD), NO `activeRole`: es el rol que aplican las
-        // security rules, y al no cambiar en toda la sesión, el RoleSwitcher no
-        // deja suscripciones con un alcance obsoleto.
-        _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
-          setDataLoading(false)
-          // Solo tras la primera carga completa (incluida `seasons`), y solo
-          // para roles que pueden escribir en clubs/groups/seasons — evita
-          // que ensureActiveSeason vea `seasons` vacío y cree una temporada
-          // duplicada, y evita permission-denied para roles no admin.
-          if (appUser.role === 'director' || appUser.role === 'coordinador') {
-            useDataStore.getState().ensureActiveSeason()
-          }
-        })
+    Promise.all([
+      import('@/lib/dataLoader'),
+      import('@/lib/realtimeSync'),
+      import('@/lib/firestoreSync'),
+    ])
+      .then(([{ migrateLocalToFirestore }, { subscribeToAllData }, { retryFailedSyncs }]) => {
+        return migrateLocalToFirestore(appUser.clubId)
+          .then(() => {
+            // Reintentar syncs fallidos de sesiones anteriores
+            return retryFailedSyncs()
+          })
+          .then((retriedCount) => {
+            if (retriedCount > 0) {
+              console.info(`[Auth] Retried ${retriedCount} failed syncs on login`)
+            }
+            // Iniciar listeners en tiempo real.
+            // Se pasa `role` (el de BD), NO `activeRole`: es el rol que aplican las
+            // security rules, y al no cambiar en toda la sesión, el RoleSwitcher no
+            // deja suscripciones con un alcance obsoleto.
+            _dataUnsubscribe = subscribeToAllData(appUser.clubId, appUser.role, () => {
+              setDataLoading(false)
+              // Solo tras la primera carga completa (incluida `seasons`), y solo
+              // para roles que pueden escribir en clubs/groups/seasons — evita
+              // que ensureActiveSeason vea `seasons` vacío y cree una temporada
+              // duplicada, y evita permission-denied para roles no admin.
+              if (appUser.role === 'director' || appUser.role === 'coordinador') {
+                import('@/stores/dataStore')
+                  .then(({ useDataStore }) => {
+                    useDataStore.getState().ensureActiveSeason()
+                  })
+                  .catch((err) => console.warn('[Auth] Error cargando dataStore para ensureActiveSeason:', err))
+              }
+            })
+          })
       })
       .catch((err) => {
         console.warn('[Firestore] Error en carga inicial:', err)
@@ -205,7 +213,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           _dataUnsubscribe()
           _dataUnsubscribe = null
         }
-        clearDataStore()
+        await clearDataStore()
         await signOut(auth)
         set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
         throw { code: 'auth/user-disabled' }
@@ -225,7 +233,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       _dataUnsubscribe = null
     }
     // 2. Limpiar datos del store para el siguiente usuario
-    clearDataStore()
+    void clearDataStore().catch((err) => console.warn('[Auth] Error limpiando datos al cerrar sesión:', err))
     // 3. Cerrar sesión en Firebase Auth
     signOut(auth).catch(err => console.error('[Auth] Logout error:', err))
     set({ user: null, isAuthenticated: false, isDataLoading: false })
@@ -310,7 +318,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             _dataUnsubscribe()
             _dataUnsubscribe = null
           }
-          clearDataStore()
+          await clearDataStore()
           await signOut(auth)
           set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
           return
@@ -319,12 +327,15 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user: appUser, isAuthenticated: true, isLoading: false })
       } else {
         // Sesión expirada o logout externo (otra pestaña, token caducado...)
+        // No se espera a clearDataStore() antes de desbloquear la UI: la
+        // pantalla de login no lee de dataStore, así que no hace falta
+        // retrasar su aparición por una descarga de red en segundo plano.
         if (_dataUnsubscribe) {
           _dataUnsubscribe()
           _dataUnsubscribe = null
         }
-        clearDataStore()
         set({ user: null, isAuthenticated: false, isLoading: false, isDataLoading: false })
+        void clearDataStore().catch((err) => console.warn('[Auth] Error limpiando datos tras cierre de sesión externo:', err))
       }
     })
     return unsubscribe
