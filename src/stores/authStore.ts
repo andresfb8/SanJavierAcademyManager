@@ -174,9 +174,11 @@ async function loadUserProfile(
               // que ensureActiveSeason vea `seasons` vacío y cree una temporada
               // duplicada, y evita permission-denied para roles no admin.
               if (appUser.role === 'director' || appUser.role === 'coordinador') {
-                import('@/stores/dataStore').then(({ useDataStore }) => {
-                  useDataStore.getState().ensureActiveSeason()
-                })
+                import('@/stores/dataStore')
+                  .then(({ useDataStore }) => {
+                    useDataStore.getState().ensureActiveSeason()
+                  })
+                  .catch((err) => console.warn('[Auth] Error cargando dataStore para ensureActiveSeason:', err))
               }
             })
           })
@@ -231,7 +233,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       _dataUnsubscribe = null
     }
     // 2. Limpiar datos del store para el siguiente usuario
-    void clearDataStore()
+    void clearDataStore().catch((err) => console.warn('[Auth] Error limpiando datos al cerrar sesión:', err))
     // 3. Cerrar sesión en Firebase Auth
     signOut(auth).catch(err => console.error('[Auth] Logout error:', err))
     set({ user: null, isAuthenticated: false, isDataLoading: false })
