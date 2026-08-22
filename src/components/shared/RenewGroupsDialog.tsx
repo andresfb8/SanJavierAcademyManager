@@ -171,7 +171,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Traspasar a {season?.name ?? 'temporada'}</DialogTitle>
         </DialogHeader>
@@ -250,15 +250,15 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                         {draft.students.length === 0 ? (
                           <p className="text-xs text-slate-400 p-2">Sin alumnos matriculados actualmente.</p>
                         ) : (
-                          <table className="w-full min-w-[640px] text-xs">
+                          <table className="w-full min-w-[660px] text-xs">
                             <thead className="bg-slate-50 sticky top-0">
                               <tr className="text-left text-slate-500">
                                 <th className="p-1.5 w-6"></th>
-                                <th className="p-1.5 min-w-[110px]">Alumno</th>
-                                <th className="p-1.5 min-w-[160px]">Tarifa</th>
-                                <th className="p-1.5 min-w-[80px]">Precio</th>
-                                <th className="p-1.5 min-w-[100px]">Frecuencia</th>
-                                <th className="p-1.5 min-w-[110px]">Anclaje</th>
+                                <th className="p-1.5 min-w-[100px]">Alumno</th>
+                                <th className="p-1.5 min-w-[180px]">Tarifa</th>
+                                <th className="p-1.5 min-w-[70px]">Precio</th>
+                                <th className="p-1.5 min-w-[90px]">Frecuencia</th>
+                                <th className="p-1.5 min-w-[120px]">Anclaje</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -272,10 +272,10 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                       }
                                     />
                                   </td>
-                                  <td className="p-1.5 whitespace-nowrap">{student.playerName}</td>
+                                  <td className="p-1.5">{student.playerName}</td>
                                   <td className="p-1.5">
                                     <Select
-                                      className="h-7 min-w-[140px] text-xs"
+                                      className="h-7 min-w-[170px] text-xs"
                                       value={student.tariffId}
                                       onChange={(e) => {
                                         const tariffId = e.target.value

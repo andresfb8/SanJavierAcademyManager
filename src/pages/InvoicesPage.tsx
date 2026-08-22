@@ -205,9 +205,9 @@ export default function InvoicesPage() {
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col md:flex-row md:flex-wrap gap-4">
               {/* Búsqueda */}
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
@@ -222,6 +222,7 @@ export default function InvoicesPage() {
               <Select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full md:w-44"
                 options={[
                   { value: '', label: 'Todos los estados' },
                   ...INVOICE_STATUSES.map((status) => ({ value: status.value, label: status.label })),
@@ -232,6 +233,7 @@ export default function InvoicesPage() {
               <Select
                 value={seriesFilter}
                 onChange={(e) => setSeriesFilter(e.target.value)}
+                className="w-full md:w-44"
                 options={[
                   { value: '', label: 'Todas las series' },
                   ...INVOICE_SERIES.map((series) => ({ value: series.value, label: series.label })),
@@ -242,6 +244,7 @@ export default function InvoicesPage() {
               <Select
                 value={playerFilter}
                 onChange={(e) => setPlayerFilter(e.target.value)}
+                className="w-full md:w-48"
                 options={[
                   { value: '', label: 'Todos los clientes' },
                   ...players.map((player) => ({

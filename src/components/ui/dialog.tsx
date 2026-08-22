@@ -37,6 +37,14 @@ function DialogContent({ children, className }: { children: React.ReactNode; cla
     (child) => !React.isValidElement(child) || (child.type as any).displayName !== 'DialogFooter'
   )
 
+  // Un className de un `max-w-*` sin prefijo de breakpoint (p.ej. "max-w-2xl")
+  // nunca gana en cascada CSS a nuestro "sm:max-w-lg" por defecto — twMerge no
+  // los considera el mismo slot al tener variantes distintas, así que ambas
+  // clases sobreviven y la regla con media query (que aparece después en la
+  // hoja de estilos compilada) siempre se aplica. Por eso el ancho por defecto
+  // solo se incluye si el que llama no ha pedido ya un ancho propio.
+  const hasCustomMaxWidth = className ? /\bmax-w-/.test(className) : false
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center">
       {/* Backdrop — deeper blur + darker */}
@@ -54,7 +62,8 @@ function DialogContent({ children, className }: { children: React.ReactNode; cla
           // Mobile: full width, slide up from bottom, rounded top
           "w-full rounded-t-2xl max-h-[90svh]",
           // Desktop: centered, rounded all corners, max width
-          "sm:w-full sm:max-w-lg sm:rounded-2xl sm:max-h-[85svh] sm:mx-4",
+          "sm:w-full sm:rounded-2xl sm:max-h-[85svh] sm:mx-4",
+          !hasCustomMaxWidth && "sm:max-w-lg",
           // Animate in
           "animate-fade-in",
           className
