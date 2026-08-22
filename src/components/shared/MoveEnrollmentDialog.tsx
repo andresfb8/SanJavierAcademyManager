@@ -6,8 +6,9 @@ import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
-import { BILLING_FREQUENCIES, MONTHS } from '@/constants'
+import { MONTHS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
+import { billingFrequencyLabel } from '@/lib/billing-utils'
 import type { BillingFrequency } from '@/types'
 
 interface Props {
@@ -197,6 +198,9 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                   {selectedTariffId && (
                     <div className="space-y-2">
                       <Label>Precio</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Frecuencia: <span className="font-medium text-foreground">{billingFrequencyLabel(selectedBillingFrequency)}</span>
+                      </p>
                       <div className="space-y-2">
                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                           <input type="radio" name="dm" checked={discountMode === 'none'} onChange={() => setDiscountMode('none')} className="accent-primary" />
@@ -224,15 +228,6 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                       )}
                     </div>
                   )}
-
-                  <div className="space-y-2">
-                    <Label>Frecuencia de facturación</Label>
-                    <Select
-                      options={BILLING_FREQUENCIES.map(f => ({ value: f.value, label: f.label }))}
-                      value={selectedBillingFrequency}
-                      onChange={e => setSelectedBillingFrequency(e.target.value as BillingFrequency)}
-                    />
-                  </div>
 
                   {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (
                     <div className="space-y-2">
