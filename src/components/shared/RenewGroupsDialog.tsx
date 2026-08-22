@@ -26,7 +26,7 @@ interface StudentDraft {
   playerName: string
   included: boolean
   tariffId: string
-  customPrice: number
+  customPrice?: number
   billingFrequency: BillingFrequency
   billingAnchorMonth: number
 }
@@ -36,6 +36,7 @@ interface GroupDraft {
   defaultTariffId: string
   defaultTariffPrice: number
   billingFrequency: BillingFrequency
+  installmentPrices?: Record<string, number>
   startDate: string
   endDate: string
   includeStudents: boolean
@@ -50,6 +51,10 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
   const { seasons, enrollments, tariffs, renewGroups } = useDataStore()
   const season = seasons.find((s) => s.id === seasonId)
   const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
+  const activeIndividualTariffs = useMemo(
+    () => activeTariffs.filter((t) => t.billingFrequency !== 'installments'),
+    [activeTariffs]
+  )
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(groups.map((g) => [g.id, true]))
@@ -62,12 +67,19 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
           const freq = e.billingFrequency ?? g.billingFrequency
           const tariff = tariffs.find((t) => t.id === e.tariffId)
           const computedPrice = tariff?.price ?? g.defaultTariffPrice
+          // Para cuotas, tariff.price es el total de la temporada, no un
+          // importe recurrente — nunca se materializa como customPrice a
+          // partir de la tarifa. Solo se conserva un customPrice que el
+          // alumno ya tuviera explícitamente; si no tenía ninguno, se deja
+          // sin definir para que la facturación use el calendario de
+          // cuotas del grupo (group.installmentPrices) mes a mes.
+          const customPrice = freq === 'installments' ? e.customPrice : (e.customPrice ?? computedPrice)
           return {
             playerId: e.playerId,
             playerName: e.playerName,
             included: true,
             tariffId: e.tariffId,
-            customPrice: e.customPrice ?? computedPrice,
+            customPrice,
             billingFrequency: freq,
             billingAnchorMonth: e.billingAnchorMonth ?? 1,
           }
@@ -79,6 +91,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             defaultTariffId: g.defaultTariffId,
             defaultTariffPrice: g.defaultTariffPrice,
             billingFrequency: g.billingFrequency,
+            installmentPrices: g.installmentPrices,
             startDate: season ? toDateInput(season.startDate) : '',
             endDate: season ? toDateInput(season.endDate) : '',
             includeStudents: true,
@@ -127,6 +140,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             defaultTariffId: draft.defaultTariffId,
             defaultTariffPrice: draft.defaultTariffPrice,
             billingFrequency: draft.billingFrequency,
+            installmentPrices: draft.installmentPrices,
             startDate: new Date(draft.startDate),
             endDate: new Date(draft.endDate),
           },
@@ -196,6 +210,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                               defaultTariffId: tariffId,
                               defaultTariffPrice: tariff?.price ?? 0,
                               billingFrequency: tariff?.billingFrequency ?? 'monthly',
+                              installmentPrices: tariff?.installmentPrices,
                             })
                           }}
                         />
@@ -271,7 +286,13 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                           billingFrequency: tariff?.billingFrequency ?? 'monthly',
                                         })
                                       }}
-                                      options={activeTariffs.map((t) => ({ value: t.id, label: t.name }))}
+                                      options={(() => {
+                                        const currentTariff = tariffs.find((t) => t.id === student.tariffId)
+                                        const rowTariffs = currentTariff?.billingFrequency === 'installments'
+                                          ? [...activeIndividualTariffs, currentTariff]
+                                          : activeIndividualTariffs
+                                        return rowTariffs.map((t) => ({ value: t.id, label: t.name }))
+                                      })()}
                                       disabled={!student.included}
                                     />
                                   </td>
@@ -279,10 +300,13 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                     <Input
                                       type="number"
                                       className="h-7 text-xs"
-                                      value={student.customPrice}
-                                      onChange={(e) =>
-                                        updateStudent(group.id, student.playerId, { customPrice: parseFloat(e.target.value) || 0 })
-                                      }
+                                      value={student.customPrice ?? ''}
+                                      onChange={(e) => {
+                                        const raw = e.target.value
+                                        updateStudent(group.id, student.playerId, {
+                                          customPrice: raw === '' ? undefined : (parseFloat(raw) || 0),
+                                        })
+                                      }}
                                       disabled={!student.included}
                                     />
                                   </td>

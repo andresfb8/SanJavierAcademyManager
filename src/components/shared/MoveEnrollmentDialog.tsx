@@ -40,9 +40,12 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
   )
 
   const destinationGroup = groups.find(g => g.id === destinationGroupId)
-  const activeTariffs = tariffs.filter(t => t.isActive)
+  const activeTariffs = tariffs.filter(t => t.isActive && t.billingFrequency !== 'installments')
   const selectedTariff = tariffs.find(t => t.id === selectedTariffId)
   const selectedTariffPrice = selectedTariff?.price ?? 0
+  const tariffSelectOptions = selectedTariff && selectedTariff.billingFrequency === 'installments'
+    ? [...activeTariffs, selectedTariff]
+    : activeTariffs
   // Precio de referencia del periodo completo: el precio de la tarifa ya es
   // el importe del ciclo (no se multiplica). Los descuentos operan sobre él.
   const periodBasePrice = selectedTariffPrice
@@ -182,7 +185,7 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                   <div className="space-y-2">
                     <Label>Tarifa *</Label>
                     <Select
-                      options={activeTariffs.map(t => ({
+                      options={tariffSelectOptions.map(t => ({
                         value: t.id,
                         label: `${t.name} (${formatCurrency(t.price)})`,
                       }))}

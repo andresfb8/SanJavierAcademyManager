@@ -190,6 +190,7 @@ export interface DataState {
       defaultTariffPrice: number
       billingFrequency: BillingFrequency
       billingAnchorMonth?: number
+      installmentPrices?: Record<string, number>
       startDate: Date
       endDate: Date
     }

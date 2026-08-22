@@ -247,7 +247,14 @@ async function processClub(
     // El importe de un ciclo trimestral/anual es el que se ha configurado
     // directamente en la tarifa/matrícula (no se multiplica por meses del
     // ciclo); customPrice, si está definido, manda sobre el precio del grupo.
-    const amount = enrollment.customPrice ?? group.defaultTariffPrice;
+    // Para plazos: usar el precio específico del mes (YYYY-MM) del grupo,
+    // igual que ya hace src/lib/firestoreSync.ts — antes esta función
+    // ignoraba installmentPrices y cobraba el precio total de la tarifa.
+    const billingKey = `${billingYear}-${String(billingMonth).padStart(2, "0")}`;
+    const baseAmount = freq === "installments" && group.installmentPrices
+      ? (group.installmentPrices[billingKey] ?? group.defaultTariffPrice)
+      : group.defaultTariffPrice;
+    const amount = enrollment.customPrice ?? baseAmount;
     let concept = `Cuota ${monthName} ${billingYear} - ${group.name}`;
 
     // Aviso de ciclo incompleto: si el ciclo (trimestral/anual) no cabe
