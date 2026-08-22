@@ -26,7 +26,7 @@ interface StudentDraft {
   playerName: string
   included: boolean
   tariffId: string
-  customPrice: number
+  customPrice?: number
   billingFrequency: BillingFrequency
   billingAnchorMonth: number
 }
@@ -67,12 +67,19 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
           const freq = e.billingFrequency ?? g.billingFrequency
           const tariff = tariffs.find((t) => t.id === e.tariffId)
           const computedPrice = tariff?.price ?? g.defaultTariffPrice
+          // Para cuotas, tariff.price es el total de la temporada, no un
+          // importe recurrente — nunca se materializa como customPrice a
+          // partir de la tarifa. Solo se conserva un customPrice que el
+          // alumno ya tuviera explícitamente; si no tenía ninguno, se deja
+          // sin definir para que la facturación use el calendario de
+          // cuotas del grupo (group.installmentPrices) mes a mes.
+          const customPrice = freq === 'installments' ? e.customPrice : (e.customPrice ?? computedPrice)
           return {
             playerId: e.playerId,
             playerName: e.playerName,
             included: true,
             tariffId: e.tariffId,
-            customPrice: e.customPrice ?? computedPrice,
+            customPrice,
             billingFrequency: freq,
             billingAnchorMonth: e.billingAnchorMonth ?? 1,
           }
@@ -293,7 +300,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                     <Input
                                       type="number"
                                       className="h-7 text-xs"
-                                      value={student.customPrice}
+                                      value={student.customPrice ?? ''}
                                       onChange={(e) =>
                                         updateStudent(group.id, student.playerId, { customPrice: parseFloat(e.target.value) || 0 })
                                       }
