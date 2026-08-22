@@ -72,3 +72,28 @@ export function remainingMonthsInGroup(
 export function stripCycleWarning(concept: string): string {
   return concept.replace(/\s*⚠.*$/, '')
 }
+
+/**
+ * Genera las claves 'YYYY-MM' de todos los meses entre inicio y fin (ambos
+ * incluidos), para un plan de tarifa por plazos. Única fuente de verdad para
+ * "qué meses caen en el rango del plan" — la usan tanto la pantalla de
+ * edición de tarifas (qué inputs mostrar) como el guardado (qué plazos
+ * persistir), para que nunca puedan desincronizarse.
+ * Si el rango está invertido (fin antes que inicio), devuelve un array vacío.
+ */
+export function buildInstallmentMonthKeys(
+  startYear: number,
+  startMonth: number, // 1-12
+  endYear: number,
+  endMonth: number, // 1-12
+): string[] {
+  const months: string[] = []
+  let y = startYear, m = startMonth
+  while (y < endYear || (y === endYear && m <= endMonth)) {
+    months.push(`${y}-${String(m).padStart(2, '0')}`)
+    m++
+    if (m > 12) { m = 1; y++ }
+    if (months.length >= 60) break // safety cap: 5 años, cubre el selector de año existente
+  }
+  return months
+}

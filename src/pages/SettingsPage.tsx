@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
-import { billingFrequencyLabel } from '@/lib/billing-utils'
+import { billingFrequencyLabel, buildInstallmentMonthKeys } from '@/lib/billing-utils'
 import { COURT_TYPES, COURT_SURFACES, BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import type { CourtType, CourtSurface, BillingFrequency, VatRate } from '@/types'
 import {
@@ -144,7 +144,20 @@ export default function SettingsPage() {
     if (tariffForm.billingFrequency === 'installments') {
       installmentStartDate = new Date(tariffForm.installmentStartYear, tariffForm.installmentStartMonth - 1, 1)
       installmentEndDate = new Date(tariffForm.installmentEndYear, tariffForm.installmentEndMonth - 1, 1)
-      installmentPrices = { ...tariffForm.installmentPrices }
+      // Solo se guardan los plazos que caen dentro del rango actual del plan
+      // — evita que un plazo de un rango anterior (ya editado/movido) se
+      // quede colgado en el objeto y se cuele al guardar.
+      const validKeys = new Set(
+        buildInstallmentMonthKeys(
+          tariffForm.installmentStartYear,
+          tariffForm.installmentStartMonth,
+          tariffForm.installmentEndYear,
+          tariffForm.installmentEndMonth
+        )
+      )
+      installmentPrices = Object.fromEntries(
+        Object.entries(tariffForm.installmentPrices).filter(([key]) => validKeys.has(key))
+      )
       // Auto-calculate total price as the sum of all installment amounts
       finalPrice = Object.values(installmentPrices).reduce((sum, v) => sum + (v || 0), 0)
     }
@@ -632,19 +645,14 @@ export default function SettingsPage() {
             )}
 
             {tariffForm.billingFrequency === 'installments' && (() => {
-              // Build list of YYYY-MM keys for all months in the selected range
-              const months: string[] = []
-              const startY = tariffForm.installmentStartYear
-              const startM = tariffForm.installmentStartMonth
-              const endY = tariffForm.installmentEndYear
-              const endM = tariffForm.installmentEndMonth
-              let y = startY, m = startM
-              while (y < endY || (y === endY && m <= endM)) {
-                months.push(`${y}-${String(m).padStart(2, '0')}`)
-                m++
-                if (m > 12) { m = 1; y++ }
-                if (months.length > 36) break // safety cap
-              }
+              // Meses del rango seleccionado — misma función que usa el guardado,
+              // para que la pantalla y lo que realmente se persiste nunca diverjan.
+              const months = buildInstallmentMonthKeys(
+                tariffForm.installmentStartYear,
+                tariffForm.installmentStartMonth,
+                tariffForm.installmentEndYear,
+                tariffForm.installmentEndMonth
+              )
               const total = months.reduce((s, key) => s + (tariffForm.installmentPrices[key] || 0), 0)
               const monthOptions = MONTHS.map(mo => ({ value: String(mo.value), label: mo.label }))
               const yearOptions = [2024, 2025, 2026, 2027, 2028].map(y => ({ value: String(y), label: String(y) }))
@@ -753,7 +761,13 @@ export default function SettingsPage() {
               onClick={handleSaveTariff}
               disabled={
                 !tariffForm.name ||
-                (tariffForm.billingFrequency !== 'installments' && tariffForm.price <= 0)
+                (tariffForm.billingFrequency !== 'installments' && tariffForm.price <= 0) ||
+                (tariffForm.billingFrequency === 'installments' && buildInstallmentMonthKeys(
+                  tariffForm.installmentStartYear,
+                  tariffForm.installmentStartMonth,
+                  tariffForm.installmentEndYear,
+                  tariffForm.installmentEndMonth
+                ).every(key => !(tariffForm.installmentPrices[key] > 0)))
               }
             >
               {editingTariffId ? 'Guardar' : 'Crear'}

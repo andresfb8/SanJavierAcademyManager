@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cycleLength, remainingMonthsInGroup, stripCycleWarning } from '@/lib/billing-utils'
+import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys } from '@/lib/billing-utils'
 
 describe('cycleLength', () => {
   it('mensual cubre 1 mes', () => {
@@ -59,5 +59,37 @@ describe('stripCycleWarning', () => {
   it('deja el concepto igual cuando no hay aviso', () => {
     const concept = 'Cuota Septiembre 2026 - Grupo X'
     expect(stripCycleWarning(concept)).toBe(concept)
+  })
+})
+
+describe('buildInstallmentMonthKeys', () => {
+  it('plan de un solo mes', () => {
+    expect(buildInstallmentMonthKeys(2026, 8, 2026, 8)).toEqual(['2026-08'])
+  })
+
+  it('plan típico de temporada (agosto a junio)', () => {
+    expect(buildInstallmentMonthKeys(2026, 8, 2027, 6)).toEqual([
+      '2026-08', '2026-09', '2026-10', '2026-11', '2026-12',
+      '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06',
+    ])
+  })
+
+  it('cruza el cambio de año', () => {
+    expect(buildInstallmentMonthKeys(2026, 11, 2027, 2)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02'])
+  })
+
+  it('rango invertido (fin antes que inicio) devuelve un array vacío', () => {
+    expect(buildInstallmentMonthKeys(2027, 1, 2026, 1)).toEqual([])
+  })
+
+  it('un año natural completo', () => {
+    expect(buildInstallmentMonthKeys(2026, 1, 2026, 12)).toHaveLength(12)
+  })
+
+  it('el rango más amplio del selector de años (2024-2028) no se trunca', () => {
+    const months = buildInstallmentMonthKeys(2024, 1, 2028, 12)
+    expect(months).toHaveLength(60)
+    expect(months[0]).toBe('2024-01')
+    expect(months[59]).toBe('2028-12')
   })
 })
