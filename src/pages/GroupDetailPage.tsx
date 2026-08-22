@@ -18,7 +18,7 @@ import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { useDataStore } from '@/stores/dataStore'
 import { ArrowLeft, Users, Clock, MapPin, User, CreditCard, UserPlus, UserMinus, Calendar, FileDown, BookOpen, Pencil, ArrowRightLeft } from 'lucide-react'
 import { formatDate, formatCurrency, generateId } from '@/lib/utils'
-import { DAYS_OF_WEEK, PLAYER_LEVELS, BILLING_FREQUENCIES, MONTHS } from '@/constants'
+import { DAYS_OF_WEEK, PLAYER_LEVELS, MONTHS } from '@/constants'
 import { generateGroupDetailReport } from '@/lib/pdf-reports'
 import { useAuthStore } from '@/stores/authStore'
 import type { BillingFrequency } from '@/types'
@@ -745,6 +745,9 @@ export default function GroupDetailPage() {
             {selectedTariffId && (
               <div className="space-y-3">
                 <Label>Precio</Label>
+                <p className="text-xs text-muted-foreground">
+                  Frecuencia: <span className="font-medium text-foreground">{billingFrequencyLabel(selectedBillingFrequency)}</span>
+                </p>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
@@ -816,16 +819,6 @@ export default function GroupDetailPage() {
                 </div>
               </div>
             )}
-
-            {/* Billing frequency */}
-            <div className="space-y-2">
-              <Label>Frecuencia de facturación</Label>
-              <Select
-                options={BILLING_FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))}
-                value={selectedBillingFrequency}
-                onChange={(e) => setSelectedBillingFrequency(e.target.value as BillingFrequency)}
-              />
-            </div>
 
             {/* Anchor month — only for quarterly or annual */}
             {(selectedBillingFrequency === 'quarterly' || selectedBillingFrequency === 'annual') && (

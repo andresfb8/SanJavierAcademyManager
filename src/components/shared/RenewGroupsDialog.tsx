@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,9 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
 import { toast } from '@/hooks/use-toast'
 import type { Group, BillingFrequency } from '@/types'
+import { formatCurrency } from '@/lib/utils'
+import { billingFrequencyLabel } from '@/lib/billing-utils'
+import { MONTHS } from '@/constants'
 
 interface RenewGroupsDialogProps {
   open: boolean
@@ -33,19 +36,11 @@ interface GroupDraft {
   defaultTariffId: string
   defaultTariffPrice: number
   billingFrequency: BillingFrequency
-  billingAnchorMonth: number
   startDate: string
   endDate: string
   includeStudents: boolean
   students: StudentDraft[]
 }
-
-const BILLING_OPTIONS = [
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'quarterly', label: 'Trimestral' },
-  { value: 'annual', label: 'Anual' },
-  { value: 'installments', label: 'Cuotas' },
-]
 
 function toDateInput(d: Date): string {
   return d.toISOString().split('T')[0]
@@ -54,6 +49,7 @@ function toDateInput(d: Date): string {
 export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone }: RenewGroupsDialogProps) {
   const { seasons, enrollments, tariffs, renewGroups } = useDataStore()
   const season = seasons.find((s) => s.id === seasonId)
+  const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(groups.map((g) => [g.id, true]))
@@ -83,7 +79,6 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             defaultTariffId: g.defaultTariffId,
             defaultTariffPrice: g.defaultTariffPrice,
             billingFrequency: g.billingFrequency,
-            billingAnchorMonth: 1,
             startDate: season ? toDateInput(season.startDate) : '',
             endDate: season ? toDateInput(season.endDate) : '',
             includeStudents: true,
@@ -132,10 +127,6 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             defaultTariffId: draft.defaultTariffId,
             defaultTariffPrice: draft.defaultTariffPrice,
             billingFrequency: draft.billingFrequency,
-            billingAnchorMonth:
-              draft.billingFrequency === 'quarterly' || draft.billingFrequency === 'annual'
-                ? draft.billingAnchorMonth
-                : undefined,
             startDate: new Date(draft.startDate),
             endDate: new Date(draft.endDate),
           },
@@ -189,42 +180,43 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
 
                 {isOpen && (
                   <div className="p-3 pt-0 space-y-3 border-t">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3">
                       <div>
-                        <Label>Precio</Label>
-                        <Input
-                          type="number"
-                          value={draft.defaultTariffPrice}
-                          onChange={(e) =>
-                            updateDraft(group.id, { defaultTariffPrice: parseFloat(e.target.value) || 0 })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label>Frecuencia de facturación</Label>
+                        <Label>Tarifa por defecto</Label>
                         <Select
-                          options={BILLING_OPTIONS}
-                          value={draft.billingFrequency}
-                          onChange={(e) =>
-                            updateDraft(group.id, { billingFrequency: e.target.value as BillingFrequency })
-                          }
+                          options={activeTariffs.map((t) => ({
+                            value: t.id,
+                            label: `${t.name} (${formatCurrency(t.price)})`,
+                          }))}
+                          value={draft.defaultTariffId}
+                          onChange={(e) => {
+                            const tariffId = e.target.value
+                            const tariff = tariffs.find((t) => t.id === tariffId)
+                            updateDraft(group.id, {
+                              defaultTariffId: tariffId,
+                              defaultTariffPrice: tariff?.price ?? 0,
+                              billingFrequency: tariff?.billingFrequency ?? 'monthly',
+                            })
+                          }}
                         />
                       </div>
-                      <div>
-                        <Label>Fecha de inicio</Label>
-                        <Input
-                          type="date"
-                          value={draft.startDate}
-                          onChange={(e) => updateDraft(group.id, { startDate: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Fecha de fin</Label>
-                        <Input
-                          type="date"
-                          value={draft.endDate}
-                          onChange={(e) => updateDraft(group.id, { endDate: e.target.value })}
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Fecha de inicio</Label>
+                          <Input
+                            type="date"
+                            value={draft.startDate}
+                            onChange={(e) => updateDraft(group.id, { startDate: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label>Fecha de fin</Label>
+                          <Input
+                            type="date"
+                            value={draft.endDate}
+                            onChange={(e) => updateDraft(group.id, { endDate: e.target.value })}
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -270,10 +262,16 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                     <Select
                                       className="h-7 text-xs"
                                       value={student.tariffId}
-                                      onChange={(e) =>
-                                        updateStudent(group.id, student.playerId, { tariffId: e.target.value })
-                                      }
-                                      options={tariffs.filter((t) => t.isActive).map((t) => ({ value: t.id, label: t.name }))}
+                                      onChange={(e) => {
+                                        const tariffId = e.target.value
+                                        const tariff = tariffs.find((t) => t.id === tariffId)
+                                        updateStudent(group.id, student.playerId, {
+                                          tariffId,
+                                          customPrice: tariff?.price ?? 0,
+                                          billingFrequency: tariff?.billingFrequency ?? 'monthly',
+                                        })
+                                      }}
+                                      options={activeTariffs.map((t) => ({ value: t.id, label: t.name }))}
                                       disabled={!student.included}
                                     />
                                   </td>
@@ -288,16 +286,8 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                       disabled={!student.included}
                                     />
                                   </td>
-                                  <td className="p-1.5">
-                                    <Select
-                                      className="h-7 text-xs"
-                                      value={student.billingFrequency}
-                                      onChange={(e) =>
-                                        updateStudent(group.id, student.playerId, { billingFrequency: e.target.value as BillingFrequency })
-                                      }
-                                      options={BILLING_OPTIONS}
-                                      disabled={!student.included}
-                                    />
+                                  <td className="p-1.5 text-slate-600">
+                                    {billingFrequencyLabel(student.billingFrequency)}
                                   </td>
                                   <td className="p-1.5">
                                     {(student.billingFrequency === 'quarterly' || student.billingFrequency === 'annual') ? (
@@ -307,7 +297,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                         onChange={(e) =>
                                           updateStudent(group.id, student.playerId, { billingAnchorMonth: parseInt(e.target.value, 10) })
                                         }
-                                        options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+                                        options={MONTHS.map((m) => ({ value: String(m.value), label: m.label }))}
                                         disabled={!student.included}
                                       />
                                     ) : (
