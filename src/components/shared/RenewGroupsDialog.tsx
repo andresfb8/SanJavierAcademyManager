@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +49,7 @@ function toDateInput(d: Date): string {
 export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone }: RenewGroupsDialogProps) {
   const { seasons, enrollments, tariffs, renewGroups } = useDataStore()
   const season = seasons.find((s) => s.id === seasonId)
+  const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(groups.map((g) => [g.id, true]))
@@ -183,7 +184,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                       <div>
                         <Label>Tarifa por defecto</Label>
                         <Select
-                          options={tariffs.filter((t) => t.isActive).map((t) => ({
+                          options={activeTariffs.map((t) => ({
                             value: t.id,
                             label: `${t.name} (${formatCurrency(t.price)})`,
                           }))}
@@ -270,7 +271,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                           billingFrequency: tariff?.billingFrequency ?? 'monthly',
                                         })
                                       }}
-                                      options={tariffs.filter((t) => t.isActive).map((t) => ({ value: t.id, label: t.name }))}
+                                      options={activeTariffs.map((t) => ({ value: t.id, label: t.name }))}
                                       disabled={!student.included}
                                     />
                                   </td>
