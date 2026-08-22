@@ -205,7 +205,10 @@ export interface DataState {
   }) => Promise<{ newGroupId: string }>
   renewGroups: (
     items: Array<Parameters<DataState['renewGroup']>[0]>
-  ) => Promise<{ newGroupId: string }[]>
+  ) => Promise<{
+    succeeded: { oldGroupId: string; newGroupId: string }[]
+    failed: { oldGroupId: string; message: string }[]
+  }>
 
   // --- Lista de espera (cola por grupo, modelada como enrollments isActive:false + isWaitlist) ---
   addToWaitlist: (data: Pick<Enrollment, 'playerId' | 'playerName' | 'groupId' | 'groupName' | 'tariffId' | 'tariffName' | 'customPrice'>) => void
@@ -1235,6 +1238,7 @@ export const useDataStore = create<DataState>()(
 
         const oldGroup = get().groups.find((g) => g.id === oldGroupId)
         if (!oldGroup) throw new Error('Grupo no encontrado')
+        if (oldGroup.renewedToGroupId) throw new Error('Este grupo ya fue traspasado anteriormente')
 
         if (!get().tariffs.some((t) => t.id === groupData.defaultTariffId)) {
           throw new Error('Tarifa no encontrada')
@@ -1368,11 +1372,24 @@ export const useDataStore = create<DataState>()(
       },
 
       renewGroups: async (items) => {
-        const results: { newGroupId: string }[] = []
+        // Cada grupo se traspasa de forma independiente: si uno falla (p.ej. un
+        // alumno con una tarifa ya no válida), no debe abortar el resto de la
+        // tanda — antes un solo fallo detenía el bucle y dejaba todos los
+        // grupos siguientes sin ni siquiera intentarse.
+        const succeeded: { oldGroupId: string; newGroupId: string }[] = []
+        const failed: { oldGroupId: string; message: string }[] = []
         for (const item of items) {
-          results.push(await get().renewGroup(item))
+          try {
+            const { newGroupId } = await get().renewGroup(item)
+            succeeded.push({ oldGroupId: item.oldGroupId, newGroupId })
+          } catch (error) {
+            failed.push({
+              oldGroupId: item.oldGroupId,
+              message: error instanceof Error ? error.message : 'Error desconocido',
+            })
+          }
         }
-        return results
+        return { succeeded, failed }
       },
 
       updateEnrollment: (id, data) => {

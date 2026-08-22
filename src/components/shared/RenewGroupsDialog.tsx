@@ -159,11 +159,30 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             })),
         }
       })
-      await renewGroups(items)
-      toast.success(`${groups.length} grupo(s) traspasado(s) a ${season?.name ?? 'la nueva temporada'}`)
-      onDone()
+      const { succeeded, failed } = await renewGroups(items)
+
+      if (failed.length === 0) {
+        toast.success(`${succeeded.length} grupo(s) traspasado(s) a ${season?.name ?? 'la nueva temporada'}`)
+        onDone()
+      } else {
+        // No cerramos el diálogo: los grupos con error siguen pendientes aquí
+        // (los que sí se traspasaron desaparecen solos de la lista) para que
+        // se puedan corregir y reintentar sin tener que rehacer todo desde
+        // cero (aunque si el motivo requiere crear una tarifa nueva, sí habrá
+        // que cerrar el asistente para hacerlo y volver a empezar ese grupo).
+        const names = failed
+          .slice(0, 5)
+          .map((f) => groups.find((g) => g.id === f.oldGroupId)?.name ?? f.oldGroupId)
+        const namesLabel = names.join(', ') + (failed.length > 5 ? ` y ${failed.length - 5} más` : '')
+        const reasons = [...new Set(failed.map((f) => f.message))].slice(0, 3).join(' / ')
+        toast.warning(
+          `${succeeded.length} grupo(s) traspasado(s). ${failed.length} no se pudieron traspasar (${namesLabel}): ${reasons}`,
+          9000
+        )
+      }
     } catch {
-      // renewGroup ya muestra su propio toast de error
+      // renewGroups ya no debería lanzar (captura cada fallo por grupo), esto
+      // es solo un cortafuegos por si acaso.
     } finally {
       setSubmitting(false)
     }

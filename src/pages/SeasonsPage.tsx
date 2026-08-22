@@ -36,8 +36,12 @@ export default function SeasonsPage() {
   ]
 
   const originGroups = useMemo(() => {
+    // Un grupo ya traspasado se archiva (isActive: false) pero debe seguir
+    // apareciendo aquí para mostrar el check "✓ Traspasado a..." — si no, la
+    // única señal de que un traspaso ha ido bien es que la fila desaparece.
     return groups.filter((g) =>
-      g.isActive && (originSeasonId === NO_SEASON ? !g.seasonId : g.seasonId === originSeasonId)
+      (g.isActive || g.renewedToGroupId) &&
+      (originSeasonId === NO_SEASON ? !g.seasonId : g.seasonId === originSeasonId)
     )
   }, [groups, originSeasonId])
 
