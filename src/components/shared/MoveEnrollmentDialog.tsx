@@ -40,7 +40,7 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
   )
 
   const destinationGroup = groups.find(g => g.id === destinationGroupId)
-  const activeTariffs = tariffs.filter(t => t.isActive)
+  const activeTariffs = tariffs.filter(t => t.isActive && t.billingFrequency !== 'installments')
   const selectedTariff = tariffs.find(t => t.id === selectedTariffId)
   const selectedTariffPrice = selectedTariff?.price ?? 0
   // Precio de referencia del periodo completo: el precio de la tarifa ya es
