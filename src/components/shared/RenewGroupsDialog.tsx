@@ -301,9 +301,12 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                       type="number"
                                       className="h-7 text-xs"
                                       value={student.customPrice ?? ''}
-                                      onChange={(e) =>
-                                        updateStudent(group.id, student.playerId, { customPrice: parseFloat(e.target.value) || 0 })
-                                      }
+                                      onChange={(e) => {
+                                        const raw = e.target.value
+                                        updateStudent(group.id, student.playerId, {
+                                          customPrice: raw === '' ? undefined : (parseFloat(raw) || 0),
+                                        })
+                                      }}
                                       disabled={!student.included}
                                     />
                                   </td>
