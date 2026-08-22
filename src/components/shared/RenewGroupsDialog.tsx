@@ -36,6 +36,7 @@ interface GroupDraft {
   defaultTariffId: string
   defaultTariffPrice: number
   billingFrequency: BillingFrequency
+  installmentPrices?: Record<string, number>
   startDate: string
   endDate: string
   includeStudents: boolean
@@ -79,6 +80,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             defaultTariffId: g.defaultTariffId,
             defaultTariffPrice: g.defaultTariffPrice,
             billingFrequency: g.billingFrequency,
+            installmentPrices: g.installmentPrices,
             startDate: season ? toDateInput(season.startDate) : '',
             endDate: season ? toDateInput(season.endDate) : '',
             includeStudents: true,
@@ -127,6 +129,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
             defaultTariffId: draft.defaultTariffId,
             defaultTariffPrice: draft.defaultTariffPrice,
             billingFrequency: draft.billingFrequency,
+            installmentPrices: draft.installmentPrices,
             startDate: new Date(draft.startDate),
             endDate: new Date(draft.endDate),
           },
@@ -196,6 +199,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                               defaultTariffId: tariffId,
                               defaultTariffPrice: tariff?.price ?? 0,
                               billingFrequency: tariff?.billingFrequency ?? 'monthly',
+                              installmentPrices: tariff?.installmentPrices,
                             })
                           }}
                         />
