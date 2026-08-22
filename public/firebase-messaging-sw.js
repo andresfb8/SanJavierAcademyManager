@@ -1,14 +1,18 @@
 // Firebase Messaging Service Worker
 // Gestiona notificaciones push cuando la app está en background o cerrada.
 //
-// IMPORTANTE: Completa el campo apiKey con el valor de tu archivo .env
-// (VITE_FIREBASE_API_KEY). Los demás valores ya están configurados.
+// Este archivo se sirve tal cual desde /public — Vite no lo procesa ni
+// sustituye variables de entorno en él, así que la apiKey va literal.
+// No es un secreto: es la misma clave pública ya embebida en el bundle
+// principal de la app (identifica el proyecto Firebase; el control de
+// acceso lo dan las Reglas de Seguridad y las restricciones de la key
+// en Google Cloud Console, no su confidencialidad).
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js')
 
 firebase.initializeApp({
-  apiKey: self.__FIREBASE_API_KEY__ || 'REPLACE_WITH_YOUR_API_KEY',
+  apiKey: 'AIzaSyCHK_Al4Sh6bqjiTXLuY84QO3A-rUR-oW8',
   authDomain: 'san-javieracademy-manager.firebaseapp.com',
   projectId: 'san-javieracademy-manager',
   storageBucket: 'san-javieracademy-manager.firebasestorage.app',
