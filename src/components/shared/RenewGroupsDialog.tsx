@@ -279,7 +279,13 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                           billingFrequency: tariff?.billingFrequency ?? 'monthly',
                                         })
                                       }}
-                                      options={activeIndividualTariffs.map((t) => ({ value: t.id, label: t.name }))}
+                                      options={(() => {
+                                        const currentTariff = tariffs.find((t) => t.id === student.tariffId)
+                                        const rowTariffs = currentTariff?.billingFrequency === 'installments'
+                                          ? [...activeIndividualTariffs, currentTariff]
+                                          : activeIndividualTariffs
+                                        return rowTariffs.map((t) => ({ value: t.id, label: t.name }))
+                                      })()}
                                       disabled={!student.included}
                                     />
                                   </td>
