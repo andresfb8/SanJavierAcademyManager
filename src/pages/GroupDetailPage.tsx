@@ -724,7 +724,7 @@ export default function GroupDetailPage() {
             <div className="space-y-2">
               <Label>Tarifa *</Label>
               <Select
-                options={tariffs.filter((t) => t.isActive).map((t) => ({
+                options={tariffs.filter((t) => t.isActive && t.billingFrequency !== 'installments').map((t) => ({
                   value: t.id,
                   label: `${t.name} (${formatCurrency(t.price)})`,
                 }))}
