@@ -51,6 +51,10 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
   const { seasons, enrollments, tariffs, renewGroups } = useDataStore()
   const season = seasons.find((s) => s.id === seasonId)
   const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
+  const activeIndividualTariffs = useMemo(
+    () => activeTariffs.filter((t) => t.billingFrequency !== 'installments'),
+    [activeTariffs]
+  )
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(groups.map((g) => [g.id, true]))
@@ -275,7 +279,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                           billingFrequency: tariff?.billingFrequency ?? 'monthly',
                                         })
                                       }}
-                                      options={activeTariffs.map((t) => ({ value: t.id, label: t.name }))}
+                                      options={activeIndividualTariffs.map((t) => ({ value: t.id, label: t.name }))}
                                       disabled={!student.included}
                                     />
                                   </td>
