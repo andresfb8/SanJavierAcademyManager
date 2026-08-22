@@ -185,11 +185,11 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
               <div key={group.id} className="border rounded-lg">
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between p-3 text-left font-medium"
+                  className="w-full flex items-center justify-between gap-2 p-3 text-left font-medium"
                   onClick={() => setExpanded((prev) => ({ ...prev, [group.id]: !prev[group.id] }))}
                 >
-                  <span>{group.name}</span>
-                  {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <span className="min-w-0 truncate">{group.name}</span>
+                  {isOpen ? <ChevronDown className="h-4 w-4 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 flex-shrink-0" />}
                 </button>
 
                 {isOpen && (
@@ -215,7 +215,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                           }}
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <Label>Fecha de inicio</Label>
                           <Input
@@ -246,19 +246,19 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                     </label>
 
                     {draft.includeStudents && (
-                      <div className="max-h-64 overflow-y-auto border rounded">
+                      <div className="max-h-64 overflow-auto border rounded">
                         {draft.students.length === 0 ? (
                           <p className="text-xs text-slate-400 p-2">Sin alumnos matriculados actualmente.</p>
                         ) : (
-                          <table className="w-full text-xs">
+                          <table className="w-full min-w-[640px] text-xs">
                             <thead className="bg-slate-50 sticky top-0">
                               <tr className="text-left text-slate-500">
                                 <th className="p-1.5 w-6"></th>
-                                <th className="p-1.5">Alumno</th>
-                                <th className="p-1.5">Tarifa</th>
-                                <th className="p-1.5 w-20">Precio</th>
-                                <th className="p-1.5 w-28">Frecuencia</th>
-                                <th className="p-1.5 w-16">Anclaje</th>
+                                <th className="p-1.5 min-w-[110px]">Alumno</th>
+                                <th className="p-1.5 min-w-[160px]">Tarifa</th>
+                                <th className="p-1.5 min-w-[80px]">Precio</th>
+                                <th className="p-1.5 min-w-[100px]">Frecuencia</th>
+                                <th className="p-1.5 min-w-[110px]">Anclaje</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -272,10 +272,10 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                       }
                                     />
                                   </td>
-                                  <td className="p-1.5">{student.playerName}</td>
+                                  <td className="p-1.5 whitespace-nowrap">{student.playerName}</td>
                                   <td className="p-1.5">
                                     <Select
-                                      className="h-7 text-xs"
+                                      className="h-7 min-w-[140px] text-xs"
                                       value={student.tariffId}
                                       onChange={(e) => {
                                         const tariffId = e.target.value
@@ -299,7 +299,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                   <td className="p-1.5">
                                     <Input
                                       type="number"
-                                      className="h-7 text-xs"
+                                      className="h-7 min-w-[70px] text-xs"
                                       value={student.customPrice ?? ''}
                                       onChange={(e) => {
                                         const raw = e.target.value
@@ -310,13 +310,13 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                       disabled={!student.included}
                                     />
                                   </td>
-                                  <td className="p-1.5 text-slate-600">
+                                  <td className="p-1.5 whitespace-nowrap text-slate-600">
                                     {billingFrequencyLabel(student.billingFrequency)}
                                   </td>
                                   <td className="p-1.5">
                                     {(student.billingFrequency === 'quarterly' || student.billingFrequency === 'annual') ? (
                                       <Select
-                                        className="h-7 text-xs"
+                                        className="h-7 min-w-[110px] text-xs"
                                         value={String(student.billingAnchorMonth)}
                                         onChange={(e) =>
                                           updateStudent(group.id, student.playerId, { billingAnchorMonth: parseInt(e.target.value, 10) })

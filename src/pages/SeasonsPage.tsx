@@ -90,51 +90,53 @@ export default function SeasonsPage() {
               </div>
             </div>
 
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b">
-                  <th className="py-2 pr-2 w-8"></th>
-                  <th className="py-2 pr-2">Grupo</th>
-                  <th className="py-2 pr-2">Nivel</th>
-                  <th className="py-2 pr-2">Alumnos</th>
-                  <th className="py-2 pr-2">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {originGroups.map((group) => (
-                  <tr key={group.id} className="border-b last:border-0">
-                    <td className="py-2 pr-2">
-                      {!group.renewedToGroupId && (
-                        <Checkbox
-                          checked={selectedGroupIds.has(group.id)}
-                          onCheckedChange={() => toggleGroup(group.id)}
-                        />
-                      )}
-                    </td>
-                    <td className="py-2 pr-2 font-medium">{group.name}</td>
-                    <td className="py-2 pr-2">{group.level}</td>
-                    <td className="py-2 pr-2">{studentCount(group)}</td>
-                    <td className="py-2 pr-2">
-                      {group.renewedToGroupId ? (
-                        <Badge variant="secondary" className="text-emerald-700">
-                          ✓ Traspasado a{' '}
-                          {seasons.find((s) => s.id === groups.find((g) => g.id === group.renewedToGroupId)?.seasonId)?.name ?? '—'}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-amber-700">Pendiente</Badge>
-                      )}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[500px] text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b">
+                    <th className="py-2 pr-2 w-8"></th>
+                    <th className="py-2 pr-2">Grupo</th>
+                    <th className="py-2 pr-2">Nivel</th>
+                    <th className="py-2 pr-2">Alumnos</th>
+                    <th className="py-2 pr-2">Estado</th>
                   </tr>
-                ))}
-                {originGroups.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400">
-                      No hay grupos en esta temporada de origen.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {originGroups.map((group) => (
+                    <tr key={group.id} className="border-b last:border-0">
+                      <td className="py-2 pr-2">
+                        {!group.renewedToGroupId && (
+                          <Checkbox
+                            checked={selectedGroupIds.has(group.id)}
+                            onCheckedChange={() => toggleGroup(group.id)}
+                          />
+                        )}
+                      </td>
+                      <td className="py-2 pr-2 font-medium">{group.name}</td>
+                      <td className="py-2 pr-2">{group.level}</td>
+                      <td className="py-2 pr-2">{studentCount(group)}</td>
+                      <td className="py-2 pr-2">
+                        {group.renewedToGroupId ? (
+                          <Badge variant="secondary" className="text-emerald-700">
+                            ✓ Traspasado a{' '}
+                            {seasons.find((s) => s.id === groups.find((g) => g.id === group.renewedToGroupId)?.seasonId)?.name ?? '—'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-700">Pendiente</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {originGroups.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-400">
+                        No hay grupos en esta temporada de origen.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             <div className="flex justify-end">
               <Button
