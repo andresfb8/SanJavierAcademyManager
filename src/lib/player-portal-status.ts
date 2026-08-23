@@ -65,7 +65,7 @@ export function getInvitablePlayers(
     (p) =>
       p.status === 'activo' &&
       !p.isMinor &&
-      p.email !== '' &&
+      !!p.email?.trim() &&
       getPlayerPortalStatus(p, users, invitations, now) === 'sin_acceso'
   )
 }

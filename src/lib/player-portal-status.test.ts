@@ -118,6 +118,11 @@ describe('getInvitablePlayers', () => {
     expect(getInvitablePlayers([player], [], [], NOW)).toEqual([])
   })
 
+  it('excluye a un jugador con email en blanco (solo espacios)', () => {
+    const player = makePlayer({ status: 'activo', isMinor: false, email: '   ' })
+    expect(getInvitablePlayers([player], [], [], NOW)).toEqual([])
+  })
+
   it('excluye a un jugador que ya tiene cuenta de portal', () => {
     const player = makePlayer({ status: 'activo', isMinor: false })
     const users = [makeUser({ linkedPlayerId: 'p1' })]
