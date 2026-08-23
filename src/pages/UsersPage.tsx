@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { BulkTutorInviteDialog } from '@/components/shared/BulkTutorInviteDialog'
+import { InvitePlayersDialog } from '@/components/shared/InvitePlayersDialog'
 import { USER_ROLES, INVITATION_STATUSES } from '@/constants'
 import { formatDate, normalizeText } from '@/lib/utils'
 import { createInvitation } from '@/lib/invitations'
@@ -53,6 +54,7 @@ export default function UsersPage() {
   // --- Dialog state ---
   const [showInviteDialog, setShowInviteDialog] = useState(false)
   const [showBulkTutorDialog, setShowBulkTutorDialog] = useState(false)
+  const [showInvitePlayersDialog, setShowInvitePlayersDialog] = useState(false)
 
   // --- Users state ---
   const [deactivateUserId, setDeactivateUserId] = useState<string | null>(null)
@@ -422,6 +424,10 @@ export default function UsersPage() {
             <Users className="h-4 w-4 mr-2" />
             Invitar tutores
           </Button>
+          <Button variant="outline" onClick={() => setShowInvitePlayersDialog(true)}>
+            <Gamepad2 className="h-4 w-4 mr-2" />
+            Invitar jugadores
+          </Button>
           <Button onClick={handleOpenDialog}>
             <UserPlus className="h-4 w-4 mr-2" />
             Invitar usuario
@@ -754,6 +760,11 @@ export default function UsersPage() {
       <BulkTutorInviteDialog
         open={showBulkTutorDialog}
         onOpenChange={setShowBulkTutorDialog}
+      />
+
+      <InvitePlayersDialog
+        open={showInvitePlayersDialog}
+        onOpenChange={setShowInvitePlayersDialog}
       />
 
       <ConfirmDialog
