@@ -48,3 +48,24 @@ export function getPlayerPortalStatus(
 
   return hasPendingInvitation ? 'invitado' : 'sin_acceso'
 }
+
+/**
+ * Jugadores candidatos a una invitación en bloque al portal: activos, no
+ * menores de edad (los menores se invitan por la vía del tutor, con su
+ * propio email, no por aquí), con email propio, y sin cuenta ni invitación
+ * pendiente todavía.
+ */
+export function getInvitablePlayers(
+  players: Player[],
+  users: AppUser[],
+  invitations: Invitation[],
+  now: Date = new Date()
+): Player[] {
+  return players.filter(
+    (p) =>
+      p.status === 'activo' &&
+      !p.isMinor &&
+      p.email !== '' &&
+      getPlayerPortalStatus(p, users, invitations, now) === 'sin_acceso'
+  )
+}

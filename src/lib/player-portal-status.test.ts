@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getPlayerPortalStatus } from '@/lib/player-portal-status'
+import { getPlayerPortalStatus, getInvitablePlayers } from '@/lib/player-portal-status'
 import type { AppUser, Invitation, Player } from '@/types'
 
 const NOW = new Date('2026-07-16T12:00:00Z')
@@ -94,5 +94,46 @@ describe('getPlayerPortalStatus', () => {
   it('acepta expiresAt como string ISO (rehidratado de localStorage)', () => {
     const invitations = [makeInvitation({ expiresAt: '2026-07-20T12:00:00Z' as unknown as Date })]
     expect(getPlayerPortalStatus(makePlayer(), [], invitations, NOW)).toBe('invitado')
+  })
+})
+
+describe('getInvitablePlayers', () => {
+  it('incluye a un jugador activo, no menor, con email, sin acceso al portal', () => {
+    const player = makePlayer({ status: 'activo', isMinor: false })
+    expect(getInvitablePlayers([player], [], [], NOW)).toEqual([player])
+  })
+
+  it('excluye a un jugador que no está activo (baja o lista de espera)', () => {
+    const player = makePlayer({ status: 'baja', isMinor: false })
+    expect(getInvitablePlayers([player], [], [], NOW)).toEqual([])
+  })
+
+  it('excluye a un menor de edad', () => {
+    const player = makePlayer({ status: 'activo', isMinor: true })
+    expect(getInvitablePlayers([player], [], [], NOW)).toEqual([])
+  })
+
+  it('excluye a un jugador sin email', () => {
+    const player = makePlayer({ status: 'activo', isMinor: false, email: '' })
+    expect(getInvitablePlayers([player], [], [], NOW)).toEqual([])
+  })
+
+  it('excluye a un jugador que ya tiene cuenta de portal', () => {
+    const player = makePlayer({ status: 'activo', isMinor: false })
+    const users = [makeUser({ linkedPlayerId: 'p1' })]
+    expect(getInvitablePlayers([player], users, [], NOW)).toEqual([])
+  })
+
+  it('excluye a un jugador con invitación pendiente y vigente', () => {
+    const player = makePlayer({ status: 'activo', isMinor: false })
+    const invitations = [makeInvitation()]
+    expect(getInvitablePlayers([player], [], invitations, NOW)).toEqual([])
+  })
+
+  it('filtra dentro de una lista con varios jugadores', () => {
+    const eligible = makePlayer({ id: 'p1', status: 'activo', isMinor: false })
+    const minor = makePlayer({ id: 'p2', status: 'activo', isMinor: true })
+    const inactive = makePlayer({ id: 'p3', status: 'baja', isMinor: false })
+    expect(getInvitablePlayers([eligible, minor, inactive], [], [], NOW)).toEqual([eligible])
   })
 })
