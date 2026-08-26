@@ -1,5 +1,5 @@
 import type { NormalizedPayment } from '@/lib/payment-utils'
-import type { Group, Player } from '@/types'
+import type { Group, Player, PlayerLevel } from '@/types'
 
 /** Variacion porcentual de `current` respecto a `previous`. `null` si no es comparable (previo 0, actual > 0). */
 export function pctChange(current: number, previous: number): number | null {
@@ -67,6 +67,30 @@ export function revenueByAgeGroup(
     const player = players.find(pl => pl.id === p.playerId)
     if (player?.isMinor) result.menores += p.amount
     else result.adultos += p.amount
+  }
+  return result
+}
+
+const ALL_LEVELS: PlayerLevel[] = ['iniciacion', 'intermedio', 'avanzado', 'competicion', 'menores']
+
+/** Ingresos de cuotas (cuota+manual) pagados dentro de `monthKeys`, agrupados por nivel del grupo. Los 5 niveles siempre estan presentes en el resultado. */
+export function revenueByLevel(
+  payments: NormalizedPayment[],
+  groups: Group[],
+  monthKeys: Set<string>
+): Record<PlayerLevel, number> {
+  const result = ALL_LEVELS.reduce((acc, level) => {
+    acc[level] = 0
+    return acc
+  }, {} as Record<PlayerLevel, number>)
+
+  for (const p of payments) {
+    if (!isPaidInPeriod(p, monthKeys)) continue
+    if (p.source !== 'cuota' && p.source !== 'manual') continue
+    if (!p.groupId) continue
+    const group = groups.find(g => g.id === p.groupId)
+    if (!group) continue
+    result[group.level] += p.amount
   }
   return result
 }

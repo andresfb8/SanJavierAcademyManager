@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import type { Group, Player } from '@/types'
 
@@ -135,5 +135,27 @@ describe('revenueByAgeGroup', () => {
     ]
     const result = revenueByAgeGroup(payments, groups, players, new Set(['2026-8']))
     expect(result).toEqual({ adultos: 0, menores: 0 })
+  })
+})
+
+describe('revenueByLevel', () => {
+  it('agrupa ingresos de cuotas por nivel de grupo, con los 5 niveles siempre presentes', () => {
+    const groups = [
+      makeGroup({ id: 'g1', level: 'iniciacion' }),
+      makeGroup({ id: 'g2', level: 'competicion' }),
+    ]
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', groupId: 'g1', amount: 100 }),
+      makePayment({ source: 'manual', groupId: 'g2', amount: 50 }),
+      makePayment({ source: 'evento', groupId: undefined, amount: 999 }),
+    ]
+    const result = revenueByLevel(payments, groups, new Set(['2026-8']))
+    expect(result).toEqual({
+      iniciacion: 100,
+      intermedio: 0,
+      avanzado: 0,
+      competicion: 50,
+      menores: 0,
+    })
   })
 })
