@@ -55,6 +55,7 @@ export function revenueByAgeGroup(
   const result: RevenueByAgeGroup = { adultos: 0, menores: 0 }
   for (const p of payments) {
     if (!isPaidInPeriod(p, monthKeys)) continue
+    if (p.source !== 'cuota' && p.source !== 'manual' && p.source !== 'evento' && p.source !== 'clase_particular') continue
 
     const group = p.groupId ? groups.find(g => g.id === p.groupId) : undefined
     if (group) {

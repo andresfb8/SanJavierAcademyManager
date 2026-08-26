@@ -125,4 +125,15 @@ describe('revenueByAgeGroup', () => {
     const result = revenueByAgeGroup(payments, [], players, new Set(['2026-8']))
     expect(result).toEqual({ adultos: 30, menores: 40 })
   })
+
+  it('excluye pagos con source "otro" para reconciliar con revenueByOrigin', () => {
+    const groups = [makeGroup({ id: 'g-menores', level: 'menores' })]
+    const players = [makePlayer({ id: 'p-menor', isMinor: true })]
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'otro', groupId: 'g-menores', amount: 500 }),
+      makePayment({ source: 'otro', playerId: 'p-menor', amount: 700 }),
+    ]
+    const result = revenueByAgeGroup(payments, groups, players, new Set(['2026-8']))
+    expect(result).toEqual({ adultos: 0, menores: 0 })
+  })
 })
