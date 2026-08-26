@@ -268,38 +268,97 @@ function makeLessonPayment(overrides: Partial<PrivateLessonPayment> = {}): Priva
 describe('contributionMarginByCategory', () => {
   it('calcula margen de cuotas restando la tarifa del coach por grupo y mes con ingreso', () => {
     const groups = [makeGroup({ id: 'g1', level: 'avanzado', coachId: 'c1' })]
-    const configs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
+    const coachSalaryConfigs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
     const payments: NormalizedPayment[] = [
       makePayment({ source: 'cuota', groupId: 'g1', amount: 300, billingMonth: 8, billingYear: 2026 }),
     ]
-    const result = contributionMarginByCategory(payments, groups, configs, [], [], [], [], new Set(['2026-8']))
+    const result = contributionMarginByCategory({
+      payments, groups, coachSalaryConfigs,
+      events: [], eventPayments: [], privateLessons: [], privateLessonPayments: [],
+      monthKeys: new Set(['2026-8']),
+    })
     expect(result.cuotas).toEqual({ revenue: 300, cost: 100, margin: 200, marginPct: (200 * 100) / 300 })
   })
 
   it('cobra la tarifa del coach una vez por cada mes distinto con ingreso del mismo grupo', () => {
     const groups = [makeGroup({ id: 'g1', level: 'avanzado', coachId: 'c1' })]
-    const configs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
+    const coachSalaryConfigs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
     const payments: NormalizedPayment[] = [
       makePayment({ source: 'cuota', groupId: 'g1', amount: 300, billingMonth: 7, billingYear: 2026 }),
       makePayment({ source: 'cuota', groupId: 'g1', amount: 300, billingMonth: 8, billingYear: 2026 }),
     ]
-    const result = contributionMarginByCategory(payments, groups, configs, [], [], [], [], new Set(['2026-7', '2026-8']))
+    const result = contributionMarginByCategory({
+      payments, groups, coachSalaryConfigs,
+      events: [], eventPayments: [], privateLessons: [], privateLessonPayments: [],
+      monthKeys: new Set(['2026-7', '2026-8']),
+    })
     expect(result.cuotas).toEqual({ revenue: 600, cost: 200, margin: 400, marginPct: (400 * 100) / 600 })
   })
 
   it('calcula margen de eventos restando gastos y comision del coach', () => {
-    const configs = [makeSalaryConfig({ coachId: 'c1', eventPaymentType: 'fixed', eventRate: 20 })]
+    const coachSalaryConfigs = [makeSalaryConfig({ coachId: 'c1', eventPaymentType: 'fixed', eventRate: 20 })]
     const event = makeEvent({ id: 'ev1', coachIds: ['c1'], expenses: [{ concept: 'Trofeos', amount: 30 }] as any })
     const eventPayments = [makeEventPayment({ eventId: 'ev1', amount: 100, status: 'pagado' })]
-    const result = contributionMarginByCategory([], [], configs, [event], eventPayments, [], [], new Set(['2026-8']))
+    const result = contributionMarginByCategory({
+      payments: [], groups: [], coachSalaryConfigs,
+      events: [event], eventPayments, privateLessons: [], privateLessonPayments: [],
+      monthKeys: new Set(['2026-8']),
+    })
     expect(result.eventos).toEqual({ revenue: 100, cost: 50, margin: 50, marginPct: 50 })
   })
 
   it('calcula margen de clases particulares restando la comision del coach', () => {
-    const configs = [makeSalaryConfig({ coachId: 'c1', privateLessonPaymentType: 'fixed', privateLessonRate: 15 })]
+    const coachSalaryConfigs = [makeSalaryConfig({ coachId: 'c1', privateLessonPaymentType: 'fixed', privateLessonRate: 15 })]
     const lesson = makeLesson({ id: 'l1', coachId: 'c1', price: 40 })
     const lessonPayments = [makeLessonPayment({ lessonId: 'l1', amount: 40 })]
-    const result = contributionMarginByCategory([], [], configs, [], [], [lesson], lessonPayments, new Set(['2026-8']))
+    const result = contributionMarginByCategory({
+      payments: [], groups: [], coachSalaryConfigs,
+      events: [], eventPayments: [], privateLessons: [lesson], privateLessonPayments: lessonPayments,
+      monthKeys: new Set(['2026-8']),
+    })
     expect(result.clases).toEqual({ revenue: 40, cost: 15, margin: 25, marginPct: 62.5 })
+  })
+
+  it('no descuenta coste cuando el groupId de la cuota no resuelve a un grupo (revenue se cuenta igual)', () => {
+    const groups: Group[] = []
+    const coachSalaryConfigs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', groupId: 'g-inexistente', amount: 300, billingMonth: 8, billingYear: 2026 }),
+    ]
+    const result = contributionMarginByCategory({
+      payments, groups, coachSalaryConfigs,
+      events: [], eventPayments: [], privateLessons: [], privateLessonPayments: [],
+      monthKeys: new Set(['2026-8']),
+    })
+    expect(result.cuotas).toEqual({ revenue: 300, cost: 0, margin: 300, marginPct: 100 })
+  })
+
+  it('no suma comision cuando el coach del evento no tiene CoachSalaryConfig (solo cuentan los gastos)', () => {
+    const coachSalaryConfigs: CoachSalaryConfig[] = []
+    const event = makeEvent({ id: 'ev1', coachIds: ['c1'], expenses: [{ concept: 'Trofeos', amount: 30 }] as any })
+    const eventPayments = [makeEventPayment({ eventId: 'ev1', amount: 100, status: 'pagado' })]
+    const result = contributionMarginByCategory({
+      payments: [], groups: [], coachSalaryConfigs,
+      events: [event], eventPayments, privateLessons: [], privateLessonPayments: [],
+      monthKeys: new Set(['2026-8']),
+    })
+    expect(result.eventos).toEqual({ revenue: 100, cost: 30, margin: 70, marginPct: 70 })
+  })
+
+  it('con dos coaches en un evento, suma la comision de calculateEventSalary calculada para cada uno (cada llamada ya divide por numCoaches)', () => {
+    const coachSalaryConfigs = [
+      makeSalaryConfig({ coachId: 'c1', eventPaymentType: 'fixed', eventRate: 20 }),
+      makeSalaryConfig({ coachId: 'c2', eventPaymentType: 'fixed', eventRate: 20 }),
+    ]
+    const event = makeEvent({ id: 'ev1', coachIds: ['c1', 'c2'] })
+    const eventPayments = [makeEventPayment({ eventId: 'ev1', amount: 100, status: 'pagado' })]
+    const result = contributionMarginByCategory({
+      payments: [], groups: [], coachSalaryConfigs,
+      events: [event], eventPayments, privateLessons: [], privateLessonPayments: [],
+      monthKeys: new Set(['2026-8']),
+    })
+    // calculateEventSalary usa event.coachIds.length (2) como divisor en cada llamada:
+    // c1 -> 20/2=10, c2 -> 20/2=10, total comision = 20. Sin gastos, cost = 20.
+    expect(result.eventos).toEqual({ revenue: 100, cost: 20, margin: 80, marginPct: 80 })
   })
 })

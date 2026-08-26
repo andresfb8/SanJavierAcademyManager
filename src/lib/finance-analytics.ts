@@ -132,14 +132,20 @@ function toMargin(revenue: number, cost: number): CategoryMargin {
   return { revenue, cost, margin, marginPct }
 }
 
-function eventMonthKey(ev: AcademyEvent): string {
-  const d = ev.date instanceof Date ? ev.date : new Date(ev.date)
+function dateToMonthKey(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date)
   return `${d.getFullYear()}-${d.getMonth() + 1}`
 }
 
-function lessonMonthKey(pl: PrivateLesson): string {
-  const d = pl.date instanceof Date ? pl.date : new Date(pl.date)
-  return `${d.getFullYear()}-${d.getMonth() + 1}`
+export interface ContributionMarginInput {
+  payments: NormalizedPayment[]
+  groups: Group[]
+  coachSalaryConfigs: CoachSalaryConfig[]
+  events: AcademyEvent[]
+  eventPayments: EventPayment[]
+  privateLessons: PrivateLesson[]
+  privateLessonPayments: PrivateLessonPayment[]
+  monthKeys: Set<string>
 }
 
 /**
@@ -150,17 +156,24 @@ function lessonMonthKey(pl: PrivateLesson): string {
  *   no infravalorar el coste en periodos de varios meses).
  * - Eventos: `event.expenses` mas la comision del coach via `calculateEventSalary`.
  * - Clases particulares: comision del coach via `calculatePrivateLessonSalary`.
+ *
+ * Limitacion conocida: si un grupo/entrenador no tiene `CoachSalaryConfig` (o un pago de
+ * cuota referencia un `groupId` que ya no existe en `groups`), ese coste se trata como 0 en
+ * vez de excluir el ingreso — el margen mostrado puede ser optimista si la configuracion de
+ * nominas esta incompleta. No se corrige aqui; queda como limitacion aceptada por ahora.
  */
-export function contributionMarginByCategory(
-  payments: NormalizedPayment[],
-  groups: Group[],
-  coachSalaryConfigs: CoachSalaryConfig[],
-  events: AcademyEvent[],
-  eventPayments: EventPayment[],
-  privateLessons: PrivateLesson[],
-  privateLessonPayments: PrivateLessonPayment[],
-  monthKeys: Set<string>
-): MarginByCategory {
+export function contributionMarginByCategory(input: ContributionMarginInput): MarginByCategory {
+  const {
+    payments,
+    groups,
+    coachSalaryConfigs,
+    events,
+    eventPayments,
+    privateLessons,
+    privateLessonPayments,
+    monthKeys,
+  } = input
+
   // Cuotas: coste del coach cobrado una vez por cada (grupo, mes) con ingreso.
   const cuotaByGroupMonth = new Map<string, number>()
   for (const p of payments) {
@@ -186,7 +199,7 @@ export function contributionMarginByCategory(
   let eventRevenue = 0
   let eventCost = 0
   for (const ev of events) {
-    if (!monthKeys.has(eventMonthKey(ev))) continue
+    if (!monthKeys.has(dateToMonthKey(ev.date))) continue
     const revenue = eventPayments
       .filter(ep => ep.eventId === ev.id && ep.status === 'pagado')
       .reduce((s, ep) => s + ep.amount, 0)
@@ -202,7 +215,7 @@ export function contributionMarginByCategory(
   let lessonRevenue = 0
   let lessonCost = 0
   for (const pl of privateLessons) {
-    if (!monthKeys.has(lessonMonthKey(pl))) continue
+    if (!monthKeys.has(dateToMonthKey(pl.date))) continue
     const revenue = privateLessonPayments
       .filter(lp => lp.lessonId === pl.id && lp.status === 'pagado')
       .reduce((s, lp) => s + lp.amount, 0)
