@@ -1,4 +1,5 @@
 import type { NormalizedPayment } from '@/lib/payment-utils'
+import type { Group, Player } from '@/types'
 
 /** Variacion porcentual de `current` respecto a `previous`. `null` si no es comparable (previo 0, actual > 0). */
 export function pctChange(current: number, previous: number): number | null {
@@ -31,5 +32,40 @@ export function revenueByOrigin(payments: NormalizedPayment[], monthKeys: Set<st
     else if (p.source === 'clase_particular') result.clases += p.amount
   }
   result.total = result.cuotas + result.eventos + result.clases
+  return result
+}
+
+export interface RevenueByAgeGroup {
+  adultos: number
+  menores: number
+}
+
+/**
+ * Ingresos pagados dentro de `monthKeys`, agrupados por franja de edad.
+ * Las cuotas de grupo se clasifican por `Group.level === 'menores'` (mismo criterio que
+ * la nomina de entrenadores); eventos y clases particulares, al no estar ligados a un
+ * grupo, se clasifican por `Player.isMinor` del jugador que paga.
+ */
+export function revenueByAgeGroup(
+  payments: NormalizedPayment[],
+  groups: Group[],
+  players: Player[],
+  monthKeys: Set<string>
+): RevenueByAgeGroup {
+  const result: RevenueByAgeGroup = { adultos: 0, menores: 0 }
+  for (const p of payments) {
+    if (!isPaidInPeriod(p, monthKeys)) continue
+
+    const group = p.groupId ? groups.find(g => g.id === p.groupId) : undefined
+    if (group) {
+      if (group.level === 'menores') result.menores += p.amount
+      else result.adultos += p.amount
+      continue
+    }
+
+    const player = players.find(pl => pl.id === p.playerId)
+    if (player?.isMinor) result.menores += p.amount
+    else result.adultos += p.amount
+  }
   return result
 }
