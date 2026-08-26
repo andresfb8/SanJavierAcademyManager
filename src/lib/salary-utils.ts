@@ -1,4 +1,4 @@
-import { AcademyEvent, EventPayment, CoachSalaryConfig } from '@/types'
+import { AcademyEvent, EventPayment, CoachSalaryConfig, PrivateLesson } from '@/types'
 
 /**
  * Calcula el salario de un entrenador para un evento específico.
@@ -38,4 +38,20 @@ export function calculateEventSalary(
     const fixedRate = salaryConfig.eventRate || 0
     return fixedRate / numCoaches
   }
+}
+
+/**
+ * Calcula la comision del entrenador por una clase particular, segun el
+ * mismo criterio ya usado (duplicado) en CoachesPage, CoachDashboard,
+ * CoachProfilePage, PayrollCloseDialog y ReportsPage: tarifa fija por clase,
+ * o porcentaje sobre el precio de la clase.
+ */
+export function calculatePrivateLessonSalary(
+  lesson: PrivateLesson,
+  salaryConfig: CoachSalaryConfig
+): number {
+  if (salaryConfig.privateLessonPaymentType === 'fixed') {
+    return salaryConfig.privateLessonRate || 0
+  }
+  return lesson.price * ((salaryConfig.privateLessonRate || 0) / 100)
 }
