@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
-import type { Group, Player } from '@/types'
+import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player } from '@/types'
 
 function makePayment(overrides: Partial<NormalizedPayment> = {}): NormalizedPayment {
   return {
@@ -180,5 +180,126 @@ describe('revenueByLevel', () => {
     const total = Object.values(result).reduce((a, b) => a + b, 0)
     const expectedCuotas = revenueByOrigin(payments, new Set(['2026-8'])).cuotas
     expect(total).toBe(expectedCuotas)
+  })
+})
+
+function makeSalaryConfig(overrides: Partial<CoachSalaryConfig> = {}): CoachSalaryConfig {
+  return {
+    coachId: 'c1',
+    ratePerGroupAdults: 100,
+    ratePerGroupMinors: 60,
+    privateLessonPaymentType: 'fixed',
+    privateLessonRate: 15,
+    eventPaymentType: 'fixed',
+    eventRate: 20,
+    bonuses: 0,
+    ...overrides,
+  }
+}
+
+function makeEvent(overrides: Partial<AcademyEvent> = {}): AcademyEvent {
+  return {
+    id: 'ev1',
+    name: 'Torneo',
+    type: 'torneo',
+    date: new Date('2026-08-10'),
+    startTime: '10:00',
+    endTime: '13:00',
+    courtIds: ['ct1'],
+    courtNames: ['Pista 1'],
+    coachIds: ['c1'],
+    coachNames: ['Coach'],
+    attendeePlayerIds: [],
+    attendeePlayerNames: [],
+    price: 20,
+    vatRate: 21,
+    isActive: true,
+    ...overrides,
+  } as AcademyEvent
+}
+
+function makeEventPayment(overrides: Partial<EventPayment> = {}): EventPayment {
+  return {
+    id: 'ep1',
+    eventId: 'ev1',
+    eventName: 'Torneo',
+    playerId: 'p1',
+    playerName: 'Jugador',
+    amount: 20,
+    status: 'pagado',
+    createdAt: new Date('2026-08-10'),
+    ...overrides,
+  }
+}
+
+function makeLesson(overrides: Partial<PrivateLesson> = {}): PrivateLesson {
+  return {
+    id: 'l1',
+    playerIds: ['p1'],
+    playerNames: ['Jugador'],
+    coachId: 'c1',
+    coachName: 'Coach',
+    courtId: 'ct1',
+    courtName: 'Pista 1',
+    date: new Date('2026-08-05'),
+    startTime: '10:00',
+    endTime: '11:00',
+    price: 40,
+    isPaid: true,
+    createdAt: new Date('2026-08-05'),
+    ...overrides,
+  }
+}
+
+function makeLessonPayment(overrides: Partial<PrivateLessonPayment> = {}): PrivateLessonPayment {
+  return {
+    id: 'lp1',
+    lessonId: 'l1',
+    lessonDate: new Date('2026-08-05'),
+    playerId: 'p1',
+    playerName: 'Jugador',
+    amount: 40,
+    status: 'pagado',
+    createdAt: new Date('2026-08-05'),
+    ...overrides,
+  }
+}
+
+describe('contributionMarginByCategory', () => {
+  it('calcula margen de cuotas restando la tarifa del coach por grupo y mes con ingreso', () => {
+    const groups = [makeGroup({ id: 'g1', level: 'avanzado', coachId: 'c1' })]
+    const configs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', groupId: 'g1', amount: 300, billingMonth: 8, billingYear: 2026 }),
+    ]
+    const result = contributionMarginByCategory(payments, groups, configs, [], [], [], [], new Set(['2026-8']))
+    expect(result.cuotas).toEqual({ revenue: 300, cost: 100, margin: 200, marginPct: (200 * 100) / 300 })
+  })
+
+  it('cobra la tarifa del coach una vez por cada mes distinto con ingreso del mismo grupo', () => {
+    const groups = [makeGroup({ id: 'g1', level: 'avanzado', coachId: 'c1' })]
+    const configs = [makeSalaryConfig({ coachId: 'c1', ratePerGroupAdults: 100 })]
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', groupId: 'g1', amount: 300, billingMonth: 7, billingYear: 2026 }),
+      makePayment({ source: 'cuota', groupId: 'g1', amount: 300, billingMonth: 8, billingYear: 2026 }),
+    ]
+    const result = contributionMarginByCategory(payments, groups, configs, [], [], [], [], new Set(['2026-7', '2026-8']))
+    expect(result.cuotas).toEqual({ revenue: 600, cost: 200, margin: 400, marginPct: (400 * 100) / 600 })
+  })
+
+  it('calcula margen de eventos restando gastos y comision del coach', () => {
+    const configs = [makeSalaryConfig({ coachId: 'c1', eventPaymentType: 'fixed', eventRate: 20 })]
+    const event = makeEvent({ id: 'ev1', coachIds: ['c1'], expenses: [{ concept: 'Trofeos', amount: 30 }] as any })
+    const eventPayments = [makeEventPayment({ eventId: 'ev1', amount: 100, status: 'pagado' })]
+    const result = contributionMarginByCategory([], [], configs, [event], eventPayments, [], [], new Set(['2026-8']))
+    expect(result.eventos).toEqual({ revenue: 100, cost: 50, margin: 50, marginPct: 50 })
+  })
+
+  it('calcula margen de clases particulares restando la comision del coach', () => {
+    const configs = [makeSalaryConfig({ coachId: 'c1', privateLessonPaymentType: 'fixed', privateLessonRate: 15 })]
+    const lesson = makeLesson({ id: 'l1', coachId: 'c1', price: 40 })
+    const lessonPayments = [makeLessonPayment({ lessonId: 'l1', amount: 40 })]
+    const result = contributionMarginByCategory([], [], configs, [], [], [lesson], lessonPayments, new Set(['2026-8']))
+    expect(result.clases).toEqual({ revenue: 40, cost: 15, margin: 25, marginPct: 62.5 })
   })
 })

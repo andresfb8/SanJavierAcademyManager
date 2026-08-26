@@ -1,5 +1,15 @@
 import type { NormalizedPayment } from '@/lib/payment-utils'
-import type { Group, Player, PlayerLevel } from '@/types'
+import type {
+  AcademyEvent,
+  CoachSalaryConfig,
+  EventPayment,
+  Group,
+  Player,
+  PlayerLevel,
+  PrivateLesson,
+  PrivateLessonPayment,
+} from '@/types'
+import { calculateEventSalary, calculatePrivateLessonSalary } from '@/lib/salary-utils'
 
 /** Variacion porcentual de `current` respecto a `previous`. `null` si no es comparable (previo 0, actual > 0). */
 export function pctChange(current: number, previous: number): number | null {
@@ -101,4 +111,109 @@ export function revenueByLevel(
     result[group.level] += p.amount
   }
   return result
+}
+
+export interface CategoryMargin {
+  revenue: number
+  cost: number
+  margin: number
+  marginPct: number
+}
+
+export interface MarginByCategory {
+  cuotas: CategoryMargin
+  eventos: CategoryMargin
+  clases: CategoryMargin
+}
+
+function toMargin(revenue: number, cost: number): CategoryMargin {
+  const margin = revenue - cost
+  const marginPct = revenue > 0 ? (margin * 100) / revenue : 0
+  return { revenue, cost, margin, marginPct }
+}
+
+function eventMonthKey(ev: AcademyEvent): string {
+  const d = ev.date instanceof Date ? ev.date : new Date(ev.date)
+  return `${d.getFullYear()}-${d.getMonth() + 1}`
+}
+
+function lessonMonthKey(pl: PrivateLesson): string {
+  const d = pl.date instanceof Date ? pl.date : new Date(pl.date)
+  return `${d.getFullYear()}-${d.getMonth() + 1}`
+}
+
+/**
+ * Margen de contribucion por categoria de ingreso: a cada ingreso se le resta el coste
+ * directamente atribuible.
+ * - Cuotas: tarifa mensual del coach del grupo (`ratePerGroupAdults/Minors`), cobrada una
+ *   vez por cada par (grupo, mes) con ingreso dentro del periodo (no una vez por pago, para
+ *   no infravalorar el coste en periodos de varios meses).
+ * - Eventos: `event.expenses` mas la comision del coach via `calculateEventSalary`.
+ * - Clases particulares: comision del coach via `calculatePrivateLessonSalary`.
+ */
+export function contributionMarginByCategory(
+  payments: NormalizedPayment[],
+  groups: Group[],
+  coachSalaryConfigs: CoachSalaryConfig[],
+  events: AcademyEvent[],
+  eventPayments: EventPayment[],
+  privateLessons: PrivateLesson[],
+  privateLessonPayments: PrivateLessonPayment[],
+  monthKeys: Set<string>
+): MarginByCategory {
+  // Cuotas: coste del coach cobrado una vez por cada (grupo, mes) con ingreso.
+  const cuotaByGroupMonth = new Map<string, number>()
+  for (const p of payments) {
+    if (!isPaidInPeriod(p, monthKeys)) continue
+    if (p.source !== 'cuota' && p.source !== 'manual') continue
+    if (!p.groupId) continue
+    const key = `${p.groupId}|${monthKeyOf(p)}`
+    cuotaByGroupMonth.set(key, (cuotaByGroupMonth.get(key) ?? 0) + p.amount)
+  }
+  let cuotaRevenue = 0
+  let cuotaCost = 0
+  for (const [key, revenue] of cuotaByGroupMonth) {
+    cuotaRevenue += revenue
+    const groupId = key.split('|')[0]
+    const group = groups.find(g => g.id === groupId)
+    if (!group) continue
+    const config = coachSalaryConfigs.find(c => c.coachId === group.coachId)
+    if (!config) continue
+    cuotaCost += group.level === 'menores' ? (config.ratePerGroupMinors || 0) : (config.ratePerGroupAdults || 0)
+  }
+
+  // Eventos: ingreso pagado del evento, menos gastos y comision del coach.
+  let eventRevenue = 0
+  let eventCost = 0
+  for (const ev of events) {
+    if (!monthKeys.has(eventMonthKey(ev))) continue
+    const revenue = eventPayments
+      .filter(ep => ep.eventId === ev.id && ep.status === 'pagado')
+      .reduce((s, ep) => s + ep.amount, 0)
+    eventRevenue += revenue
+    eventCost += (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0)
+    for (const coachId of ev.coachIds) {
+      const config = coachSalaryConfigs.find(c => c.coachId === coachId)
+      if (config) eventCost += calculateEventSalary(ev, eventPayments, config)
+    }
+  }
+
+  // Clases particulares: ingreso pagado de la clase, menos comision del coach.
+  let lessonRevenue = 0
+  let lessonCost = 0
+  for (const pl of privateLessons) {
+    if (!monthKeys.has(lessonMonthKey(pl))) continue
+    const revenue = privateLessonPayments
+      .filter(lp => lp.lessonId === pl.id && lp.status === 'pagado')
+      .reduce((s, lp) => s + lp.amount, 0)
+    lessonRevenue += revenue
+    const config = coachSalaryConfigs.find(c => c.coachId === pl.coachId)
+    if (config) lessonCost += calculatePrivateLessonSalary(pl, config)
+  }
+
+  return {
+    cuotas: toMargin(cuotaRevenue, cuotaCost),
+    eventos: toMargin(eventRevenue, eventCost),
+    clases: toMargin(lessonRevenue, lessonCost),
+  }
 }
