@@ -433,4 +433,22 @@ describe('breakEvenPoint', () => {
     expect(result.studentsNeeded).toBe(Infinity)
     expect(result.marginStudents).toBe(-Infinity)
   })
+
+  it('devuelve Infinity tambien cuando el margen medio por alumno es negativo', () => {
+    const result = breakEvenPoint(1000, -10, 10)
+    expect(result.studentsNeeded).toBe(Infinity)
+    expect(result.marginStudents).toBe(-Infinity)
+  })
+
+  it('calcula un margen negativo cuando los alumnos actuales no llegan al punto de equilibrio', () => {
+    const result = breakEvenPoint(1000, 45, 10)
+    expect(result.studentsNeeded).toBe(23)
+    expect(result.marginStudents).toBe(-13)
+  })
+
+  it('no redondea de mas cuando la division es exacta', () => {
+    const result = breakEvenPoint(900, 45, 20)
+    expect(result.studentsNeeded).toBe(20)
+    expect(result.marginStudents).toBe(0)
+  })
 })

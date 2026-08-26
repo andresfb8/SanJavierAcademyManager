@@ -275,6 +275,12 @@ export interface BreakEvenPoint {
   marginStudents: number
 }
 
+/**
+ * Alumnos de cuota necesarios para cubrir `fixedCosts`, dado el margen medio por alumno.
+ * Devuelve `Infinity` (no `null`, a diferencia de `pctChange`) cuando el margen medio es 0
+ * o negativo, para que `marginStudents` siga siendo una resta valida (`-Infinity`) en vez
+ * de requerir un guard adicional antes de esa aritmetica.
+ */
 export function breakEvenPoint(
   fixedCosts: number,
   avgMarginPerStudent: number,
