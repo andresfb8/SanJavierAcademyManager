@@ -43,7 +43,7 @@ describe('revenueByOrigin', () => {
       makePayment({ source: 'cuota', amount: 999, status: 'pendiente' }),
     ]
     const result = revenueByOrigin(payments, new Set(['2026-8']))
-    expect(result).toEqual({ cuotas: 120, eventos: 30, clases: 40, total: 190 })
+    expect(result).toEqual({ cuotas: 120, eventos: 30, clases: 40, otros: 0, total: 190 })
   })
 
   it('ignora pagos fuera de las claves de mes dadas', () => {
@@ -51,7 +51,17 @@ describe('revenueByOrigin', () => {
       makePayment({ billingMonth: 7, billingYear: 2026, amount: 500 }),
     ]
     const result = revenueByOrigin(payments, new Set(['2026-8']))
-    expect(result).toEqual({ cuotas: 0, eventos: 0, clases: 0, total: 0 })
+    expect(result).toEqual({ cuotas: 0, eventos: 0, clases: 0, otros: 0, total: 0 })
+  })
+
+  it('suma pagos con source "otro" (p. ej. recargos SEPA) en su propio bucket, incluidos en el total', () => {
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', amount: 100 }),
+      makePayment({ source: 'otro', amount: 15 }),
+    ]
+    const result = revenueByOrigin(payments, new Set(['2026-8']))
+    expect(result.otros).toBe(15)
+    expect(result.total).toBe(115)
   })
 })
 
@@ -126,15 +136,14 @@ describe('revenueByAgeGroup', () => {
     expect(result).toEqual({ adultos: 30, menores: 40 })
   })
 
-  it('excluye pagos con source "otro" para reconciliar con revenueByOrigin', () => {
-    const groups = [makeGroup({ id: 'g-menores', level: 'menores' })]
-    const players = [makePlayer({ id: 'p-menor', isMinor: true })]
+  it('clasifica pagos con source "otro" via el mismo fallback que eventos/clases', () => {
+    const players = [makePlayer({ id: 'p-adulto', isMinor: false }), makePlayer({ id: 'p-menor', isMinor: true })]
     const payments: NormalizedPayment[] = [
-      makePayment({ source: 'otro', groupId: 'g-menores', amount: 500 }),
+      makePayment({ source: 'otro', playerId: 'p-adulto', amount: 500 }),
       makePayment({ source: 'otro', playerId: 'p-menor', amount: 700 }),
     ]
-    const result = revenueByAgeGroup(payments, groups, players, new Set(['2026-8']))
-    expect(result).toEqual({ adultos: 0, menores: 0 })
+    const result = revenueByAgeGroup(payments, [], players, new Set(['2026-8']))
+    expect(result).toEqual({ adultos: 500, menores: 700 })
   })
 })
 
@@ -484,5 +493,22 @@ describe('collectionStats', () => {
     const result = collectionStats([], new Set(['2026-8']))
     expect(result.collectionRate).toBe(0)
     expect(result.topDebtors).toEqual([])
+  })
+})
+
+describe('reconciliacion revenueByOrigin <-> collectionStats', () => {
+  it('el total de revenueByOrigin coincide con el pagado de collectionStats para los mismos pagos, incluyendo source "otro"', () => {
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', amount: 100 }),
+      makePayment({ source: 'manual', amount: 20 }),
+      makePayment({ source: 'evento', amount: 30 }),
+      makePayment({ source: 'clase_particular', amount: 40 }),
+      makePayment({ source: 'otro', amount: 15 }), // p. ej. recargo de devolucion SEPA
+      makePayment({ source: 'cuota', amount: 999, status: 'pendiente' }),
+    ]
+    const monthKeys = new Set(['2026-8'])
+    const origin = revenueByOrigin(payments, monthKeys)
+    const collection = collectionStats(payments, monthKeys)
+    expect(origin.total).toBe(collection.paidAmount)
   })
 })

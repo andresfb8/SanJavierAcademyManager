@@ -116,6 +116,9 @@ export function FinanceTab() {
   // ── Seccion 1: Ingresos por origen ──────────────────────────────────
   const originCurrent = useMemo(() => revenueByOrigin(allPayments, currentKeys), [allPayments, currentKeys])
   const originPrevious = useMemo(() => revenueByOrigin(allPayments, previousKeys), [allPayments, previousKeys])
+  // "Otros" (p. ej. recargos de devolucion SEPA) es infrecuente: solo se muestra la fila
+  // cuando hay importe en el periodo actual o el anterior, para no ensuciar el caso comun.
+  const hasOtrosOrigin = originCurrent.otros > 0 || originPrevious.otros > 0
 
   // ── Seccion 2: Adultos vs Menores ────────────────────────────────────
   const ageCurrent = useMemo(
@@ -226,7 +229,7 @@ export function FinanceTab() {
         <CardHeader>
           <CardTitle className="text-base font-semibold">Ingresos por origen</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <CardContent className={`grid grid-cols-1 gap-4 ${hasOtrosOrigin ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cuotas</p>
             <p className="text-xl font-bold text-foreground">{formatCurrency(originCurrent.cuotas)}</p>
@@ -242,7 +245,14 @@ export function FinanceTab() {
             <p className="text-xl font-bold text-foreground">{formatCurrency(originCurrent.clases)}</p>
             <VariationBadge current={originCurrent.clases} previous={originPrevious.clases} />
           </div>
-          <div className="sm:col-span-3 pt-2 border-t border-border/60 flex items-center justify-between">
+          {hasOtrosOrigin && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Otros</p>
+              <p className="text-xl font-bold text-foreground">{formatCurrency(originCurrent.otros)}</p>
+              <VariationBadge current={originCurrent.otros} previous={originPrevious.otros} />
+            </div>
+          )}
+          <div className={`${hasOtrosOrigin ? 'sm:col-span-4' : 'sm:col-span-3'} pt-2 border-t border-border/60 flex items-center justify-between`}>
             <p className="text-sm font-medium text-foreground">Total</p>
             <div className="flex items-center gap-2">
               <p className="text-lg font-bold text-foreground">{formatCurrency(originCurrent.total)}</p>

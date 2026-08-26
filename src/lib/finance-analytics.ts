@@ -31,19 +31,21 @@ export interface RevenueByOrigin {
   cuotas: number
   eventos: number
   clases: number
+  otros: number
   total: number
 }
 
-/** Ingresos pagados dentro de `monthKeys`, agrupados por origen (cuota+manual, evento, clase particular). */
+/** Ingresos pagados dentro de `monthKeys`, agrupados por origen (cuota+manual, evento, clase particular, otro). */
 export function revenueByOrigin(payments: NormalizedPayment[], monthKeys: Set<string>): RevenueByOrigin {
-  const result: RevenueByOrigin = { cuotas: 0, eventos: 0, clases: 0, total: 0 }
+  const result: RevenueByOrigin = { cuotas: 0, eventos: 0, clases: 0, otros: 0, total: 0 }
   for (const p of payments) {
     if (!isPaidInPeriod(p, monthKeys)) continue
     if (p.source === 'cuota' || p.source === 'manual') result.cuotas += p.amount
     else if (p.source === 'evento') result.eventos += p.amount
     else if (p.source === 'clase_particular') result.clases += p.amount
+    else if (p.source === 'otro') result.otros += p.amount
   }
-  result.total = result.cuotas + result.eventos + result.clases
+  result.total = result.cuotas + result.eventos + result.clases + result.otros
   return result
 }
 
@@ -55,8 +57,11 @@ export interface RevenueByAgeGroup {
 /**
  * Ingresos pagados dentro de `monthKeys`, agrupados por franja de edad.
  * Las cuotas de grupo se clasifican por `Group.level === 'menores'` (mismo criterio que
- * la nomina de entrenadores); eventos y clases particulares, al no estar ligados a un
- * grupo, se clasifican por `Player.isMinor` del jugador que paga.
+ * la nomina de entrenadores); eventos, clases particulares y pagos de source 'otro'
+ * (p. ej. recargos de devolucion SEPA), al no estar ligados a un grupo normalmente,
+ * se clasifican por `Player.isMinor` del jugador que paga. Se incluyen los 5 origenes
+ * posibles de `NormalizedPayment.source` para que el total (adultos + menores) siga
+ * siendo reconciliable con `revenueByOrigin(...).total`.
  */
 export function revenueByAgeGroup(
   payments: NormalizedPayment[],
@@ -67,7 +72,14 @@ export function revenueByAgeGroup(
   const result: RevenueByAgeGroup = { adultos: 0, menores: 0 }
   for (const p of payments) {
     if (!isPaidInPeriod(p, monthKeys)) continue
-    if (p.source !== 'cuota' && p.source !== 'manual' && p.source !== 'evento' && p.source !== 'clase_particular') continue
+    if (
+      p.source !== 'cuota' &&
+      p.source !== 'manual' &&
+      p.source !== 'evento' &&
+      p.source !== 'clase_particular' &&
+      p.source !== 'otro'
+    )
+      continue
 
     const group = p.groupId ? groups.find(g => g.id === p.groupId) : undefined
     if (group) {
