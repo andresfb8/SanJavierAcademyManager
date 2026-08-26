@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player, ClubTransaction } from '@/types'
 
@@ -411,5 +411,26 @@ describe('costStructure', () => {
     ]
     const result = costStructure(transactions, new Set(['2026-8']))
     expect(result).toEqual({ fixed: 0, variable: 0, total: 0, fixedPct: 0, variablePct: 0 })
+  })
+})
+
+describe('breakEvenPoint', () => {
+  it('calcula alumnos necesarios redondeando hacia arriba', () => {
+    const result = breakEvenPoint(1000, 45, 25)
+    expect(result.studentsNeeded).toBe(23) // 1000/45 = 22.22 -> 23
+    expect(result.actualStudents).toBe(25)
+    expect(result.marginStudents).toBe(2)
+  })
+
+  it('devuelve 0 alumnos necesarios cuando no hay costes fijos', () => {
+    const result = breakEvenPoint(0, 45, 10)
+    expect(result.studentsNeeded).toBe(0)
+    expect(result.marginStudents).toBe(10)
+  })
+
+  it('devuelve Infinity cuando el margen medio por alumno es 0 o negativo', () => {
+    const result = breakEvenPoint(1000, 0, 10)
+    expect(result.studentsNeeded).toBe(Infinity)
+    expect(result.marginStudents).toBe(-Infinity)
   })
 })

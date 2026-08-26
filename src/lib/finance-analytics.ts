@@ -268,3 +268,22 @@ export function costStructure(clubTransactions: ClubTransaction[], monthKeys: Se
     variablePct: total > 0 ? (variable / total) * 100 : 0,
   }
 }
+
+export interface BreakEvenPoint {
+  studentsNeeded: number
+  actualStudents: number
+  marginStudents: number
+}
+
+export function breakEvenPoint(
+  fixedCosts: number,
+  avgMarginPerStudent: number,
+  activeEnrollmentCount: number
+): BreakEvenPoint {
+  const studentsNeeded = avgMarginPerStudent > 0 ? Math.ceil(fixedCosts / avgMarginPerStudent) : Infinity
+  return {
+    studentsNeeded,
+    actualStudents: activeEnrollmentCount,
+    marginStudents: activeEnrollmentCount - studentsNeeded,
+  }
+}
