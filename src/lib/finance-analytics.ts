@@ -73,23 +73,31 @@ export function revenueByAgeGroup(
 
 const ALL_LEVELS: PlayerLevel[] = ['iniciacion', 'intermedio', 'avanzado', 'competicion', 'menores']
 
-/** Ingresos de cuotas (cuota+manual) pagados dentro de `monthKeys`, agrupados por nivel del grupo. Los 5 niveles siempre estan presentes en el resultado. */
+/**
+ * Ingresos de cuotas (cuota+manual) pagados dentro de `monthKeys`, agrupados por nivel del grupo.
+ * Los 5 niveles siempre estan presentes en el resultado, mas un bucket `sinGrupo` para ingresos
+ * de cuota/manual sin grupo atribuible (p. ej. facturas manuales sin `groupId`, o un `groupId`
+ * que ya no resuelve a un grupo existente), de forma que el total sea siempre reconciliable con
+ * `revenueByOrigin(...).cuotas` y no se pierda ingreso silenciosamente.
+ */
 export function revenueByLevel(
   payments: NormalizedPayment[],
   groups: Group[],
   monthKeys: Set<string>
-): Record<PlayerLevel, number> {
+): Record<PlayerLevel | 'sinGrupo', number> {
   const result = ALL_LEVELS.reduce((acc, level) => {
     acc[level] = 0
     return acc
-  }, {} as Record<PlayerLevel, number>)
+  }, { sinGrupo: 0 } as Record<PlayerLevel | 'sinGrupo', number>)
 
   for (const p of payments) {
     if (!isPaidInPeriod(p, monthKeys)) continue
     if (p.source !== 'cuota' && p.source !== 'manual') continue
-    if (!p.groupId) continue
-    const group = groups.find(g => g.id === p.groupId)
-    if (!group) continue
+    const group = p.groupId ? groups.find(g => g.id === p.groupId) : undefined
+    if (!group) {
+      result.sinGrupo += p.amount
+      continue
+    }
     result[group.level] += p.amount
   }
   return result

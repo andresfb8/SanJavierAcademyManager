@@ -156,6 +156,29 @@ describe('revenueByLevel', () => {
       avanzado: 0,
       competicion: 50,
       menores: 0,
+      sinGrupo: 0,
     })
+  })
+
+  it('atribuye a "sinGrupo" las cuotas/manual sin groupId o con groupId que no resuelve a un grupo, sin perder ingreso', () => {
+    const groups = [makeGroup({ id: 'g1', level: 'iniciacion' })]
+    const payments: NormalizedPayment[] = [
+      makePayment({ source: 'cuota', groupId: undefined, amount: 70 }),
+      makePayment({ source: 'manual', groupId: 'g-inexistente', amount: 30 }),
+      makePayment({ source: 'cuota', groupId: 'g1', amount: 100 }),
+    ]
+    const result = revenueByLevel(payments, groups, new Set(['2026-8']))
+    expect(result).toEqual({
+      iniciacion: 100,
+      intermedio: 0,
+      avanzado: 0,
+      competicion: 0,
+      menores: 0,
+      sinGrupo: 100,
+    })
+
+    const total = Object.values(result).reduce((a, b) => a + b, 0)
+    const expectedCuotas = revenueByOrigin(payments, new Set(['2026-8'])).cuotas
+    expect(total).toBe(expectedCuotas)
   })
 })
