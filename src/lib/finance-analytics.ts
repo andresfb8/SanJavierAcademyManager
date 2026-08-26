@@ -1,6 +1,7 @@
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import type {
   AcademyEvent,
+  ClubTransaction,
   CoachSalaryConfig,
   EventPayment,
   Group,
@@ -8,6 +9,7 @@ import type {
   PlayerLevel,
   PrivateLesson,
   PrivateLessonPayment,
+  TransactionCategory,
 } from '@/types'
 import { calculateEventSalary, calculatePrivateLessonSalary } from '@/lib/salary-utils'
 
@@ -228,5 +230,41 @@ export function contributionMarginByCategory(input: ContributionMarginInput): Ma
     cuotas: toMargin(cuotaRevenue, cuotaCost),
     eventos: toMargin(eventRevenue, eventCost),
     clases: toMargin(lessonRevenue, lessonCost),
+  }
+}
+
+export interface CostStructure {
+  fixed: number
+  variable: number
+  total: number
+  fixedPct: number
+  variablePct: number
+}
+
+const FIXED_COST_CATEGORIES = new Set<TransactionCategory>(['alquiler', 'suministros', 'limpieza', 'publicidad'])
+
+/**
+ * Estructura de costes (gastos) dentro de `monthKeys`, dividida en fijos y variables.
+ * Fijos: alquiler, suministros, limpieza, publicidad. Variables: nomina, material,
+ * reparaciones, otro. La nomina se clasifica como variable porque en este club los
+ * entrenadores cobran por grupo/clase/evento en vez de un salario fijo, y ya se descuenta
+ * como coste directo en `contributionMarginByCategory`.
+ */
+export function costStructure(clubTransactions: ClubTransaction[], monthKeys: Set<string>): CostStructure {
+  let fixed = 0
+  let variable = 0
+  for (const t of clubTransactions) {
+    if (t.type !== 'gasto') continue
+    if (!monthKeys.has(dateToMonthKey(t.date))) continue
+    if (FIXED_COST_CATEGORIES.has(t.category)) fixed += t.amount
+    else variable += t.amount
+  }
+  const total = fixed + variable
+  return {
+    fixed,
+    variable,
+    total,
+    fixedPct: total > 0 ? (fixed / total) * 100 : 0,
+    variablePct: total > 0 ? (variable / total) * 100 : 0,
   }
 }

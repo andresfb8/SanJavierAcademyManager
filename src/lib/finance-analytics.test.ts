@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
-import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player } from '@/types'
+import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player, ClubTransaction } from '@/types'
 
 function makePayment(overrides: Partial<NormalizedPayment> = {}): NormalizedPayment {
   return {
@@ -360,5 +360,56 @@ describe('contributionMarginByCategory', () => {
     // calculateEventSalary usa event.coachIds.length (2) como divisor en cada llamada:
     // c1 -> 20/2=10, c2 -> 20/2=10, total comision = 20. Sin gastos, cost = 20.
     expect(result.eventos).toEqual({ revenue: 100, cost: 20, margin: 80, marginPct: 80 })
+  })
+})
+
+function makeTransaction(overrides: Partial<ClubTransaction> = {}): ClubTransaction {
+  return {
+    id: 't1',
+    clubId: 'club-001',
+    type: 'gasto',
+    category: 'alquiler',
+    concept: 'Alquiler pistas',
+    amount: 500,
+    date: new Date('2026-08-01'),
+    createdAt: new Date('2026-08-01'),
+    ...overrides,
+  }
+}
+
+describe('costStructure', () => {
+  it('clasifica alquiler, suministros, limpieza y publicidad como fijos', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ category: 'alquiler', amount: 500 }),
+      makeTransaction({ category: 'suministros', amount: 100 }),
+      makeTransaction({ category: 'limpieza', amount: 80 }),
+      makeTransaction({ category: 'publicidad', amount: 20 }),
+    ]
+    const result = costStructure(transactions, new Set(['2026-8']))
+    expect(result.fixed).toBe(700)
+    expect(result.variable).toBe(0)
+    expect(result.fixedPct).toBe(100)
+  })
+
+  it('clasifica nomina, material, reparaciones y otro como variables', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ category: 'nomina', amount: 300 }),
+      makeTransaction({ category: 'material', amount: 50 }),
+      makeTransaction({ category: 'reparaciones', amount: 40 }),
+      makeTransaction({ category: 'otro', amount: 10 }),
+    ]
+    const result = costStructure(transactions, new Set(['2026-8']))
+    expect(result.variable).toBe(400)
+    expect(result.fixed).toBe(0)
+    expect(result.variablePct).toBe(100)
+  })
+
+  it('ignora ingresos y transacciones fuera del periodo', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ type: 'ingreso', category: 'otro', amount: 1000 }),
+      makeTransaction({ category: 'alquiler', amount: 500, date: new Date('2026-07-01') }),
+    ]
+    const result = costStructure(transactions, new Set(['2026-8']))
+    expect(result).toEqual({ fixed: 0, variable: 0, total: 0, fixedPct: 0, variablePct: 0 })
   })
 })
