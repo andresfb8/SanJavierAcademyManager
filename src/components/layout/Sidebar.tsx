@@ -26,6 +26,7 @@ import {
   User,
   TrendingUp,
   CalendarRange,
+  Euro,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
@@ -75,6 +76,7 @@ const navGroups: NavGroup[] = [
       { name: 'Pagos', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
       { name: 'Facturas', href: '/facturas', icon: Receipt, requiredModule: 'payments' },
       { name: 'Beneficios y Gastos', href: '/finanzas', icon: BarChart3, requiredModule: 'informes_mensuales' },
+      { name: 'Análisis Financiero', href: '/finanzas-analitica', icon: Euro, requiredModule: 'informes_mensuales' },
     ],
   },
   {
