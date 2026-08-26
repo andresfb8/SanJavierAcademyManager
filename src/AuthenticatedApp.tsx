@@ -34,6 +34,7 @@ const PlayerDashboard = lazy(() => import('@/pages/PlayerDashboard'))
 const CoachDashboard = lazy(() => import('@/pages/CoachDashboard'))
 const FreeSlotsPage = lazy(() => import('@/pages/FreeSlotsPage'))
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
+const FinancialAnalyticsPage = lazy(() => import('@/pages/FinancialAnalyticsPage'))
 const SeasonsPage = lazy(() => import('@/pages/SeasonsPage'))
 
 const PageLoader = () => (
@@ -142,6 +143,7 @@ export default function AuthenticatedApp() {
         <Route path="/informes" element={<RoleRoute module="settings"><EvaluacionesPage /></RoleRoute>} />
         <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
         <Route path="/finanzas" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
+        <Route path="/finanzas-analitica" element={<RoleRoute module="informes_mensuales"><FinancialAnalyticsPage /></RoleRoute>} />
         <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
         <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
         <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
