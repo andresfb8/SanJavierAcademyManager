@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint, collectionStats } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player, ClubTransaction } from '@/types'
 
@@ -450,5 +450,39 @@ describe('breakEvenPoint', () => {
     const result = breakEvenPoint(900, 45, 20)
     expect(result.studentsNeeded).toBe(20)
     expect(result.marginStudents).toBe(0)
+  })
+})
+
+describe('collectionStats', () => {
+  it('suma cobrado, pendiente y cancelado, y calcula la tasa de cobro', () => {
+    const payments: NormalizedPayment[] = [
+      makePayment({ status: 'pagado', amount: 300 }),
+      makePayment({ status: 'pendiente', amount: 100, playerId: 'p1', playerName: 'Ana' }),
+      makePayment({ status: 'cancelado', amount: 50 }),
+    ]
+    const result = collectionStats(payments, new Set(['2026-8']))
+    expect(result.paidAmount).toBe(300)
+    expect(result.pendingAmount).toBe(100)
+    expect(result.cancelledAmount).toBe(50)
+    expect(result.collectionRate).toBeCloseTo((300 / 450) * 100)
+  })
+
+  it('agrupa los pendientes por jugador y devuelve el top 5 por importe', () => {
+    const payments: NormalizedPayment[] = [
+      makePayment({ status: 'pendiente', amount: 100, playerId: 'p1', playerName: 'Ana' }),
+      makePayment({ status: 'pendiente', amount: 50, playerId: 'p1', playerName: 'Ana' }),
+      makePayment({ status: 'pendiente', amount: 200, playerId: 'p2', playerName: 'Bea' }),
+    ]
+    const result = collectionStats(payments, new Set(['2026-8']))
+    expect(result.topDebtors).toEqual([
+      { playerId: 'p2', playerName: 'Bea', pendingAmount: 200, pendingCount: 1 },
+      { playerId: 'p1', playerName: 'Ana', pendingAmount: 150, pendingCount: 2 },
+    ])
+  })
+
+  it('devuelve tasa de cobro 0 cuando no hay pagos generados en el periodo', () => {
+    const result = collectionStats([], new Set(['2026-8']))
+    expect(result.collectionRate).toBe(0)
+    expect(result.topDebtors).toEqual([])
   })
 })

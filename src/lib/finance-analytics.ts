@@ -293,3 +293,60 @@ export function breakEvenPoint(
     marginStudents: activeEnrollmentCount - studentsNeeded,
   }
 }
+
+export interface DebtorSummary {
+  playerId: string
+  playerName: string
+  pendingAmount: number
+  pendingCount: number
+}
+
+export interface CollectionStats {
+  paidAmount: number
+  pendingAmount: number
+  cancelledAmount: number
+  collectionRate: number
+  topDebtors: DebtorSummary[]
+}
+
+/**
+ * Estadisticas de cobro dentro de `monthKeys`: importes pagado, pendiente y cancelado,
+ * tasa de cobro (pagado / total generado) y el top 5 de jugadores con mas importe pendiente.
+ */
+export function collectionStats(payments: NormalizedPayment[], monthKeys: Set<string>): CollectionStats {
+  let paidAmount = 0
+  let pendingAmount = 0
+  let cancelledAmount = 0
+  const debtors = new Map<string, DebtorSummary>()
+
+  for (const p of payments) {
+    if (!monthKeys.has(monthKeyOf(p))) continue
+    if (p.status === 'pagado') {
+      paidAmount += p.amount
+    } else if (p.status === 'pendiente') {
+      pendingAmount += p.amount
+      const existing = debtors.get(p.playerId)
+      if (existing) {
+        existing.pendingAmount += p.amount
+        existing.pendingCount += 1
+      } else {
+        debtors.set(p.playerId, {
+          playerId: p.playerId,
+          playerName: p.playerName,
+          pendingAmount: p.amount,
+          pendingCount: 1,
+        })
+      }
+    } else if (p.status === 'cancelado') {
+      cancelledAmount += p.amount
+    }
+  }
+
+  const generated = paidAmount + pendingAmount + cancelledAmount
+  const collectionRate = generated > 0 ? (paidAmount / generated) * 100 : 0
+  const topDebtors = Array.from(debtors.values())
+    .sort((a, b) => b.pendingAmount - a.pendingAmount)
+    .slice(0, 5)
+
+  return { paidAmount, pendingAmount, cancelledAmount, collectionRate, topDebtors }
+}
