@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getPeriodStart } from '@/lib/period'
+import { getPeriodStart, getCurrentPeriodMonthKeys, getPreviousPeriodMonthKeys, getLastNMonthKeys } from '@/lib/period'
 
 describe('getPeriodStart', () => {
   it('devuelve el dia 1 del mes actual para "month"', () => {
@@ -18,8 +18,6 @@ describe('getPeriodStart', () => {
     expect(getPeriodStart('year', new Date('2026-08-15T12:00:00'))).toEqual(new Date(2026, 0, 1))
   })
 })
-
-import { getCurrentPeriodMonthKeys, getPreviousPeriodMonthKeys, getLastNMonthKeys } from '@/lib/period'
 
 describe('getCurrentPeriodMonthKeys', () => {
   it('devuelve solo el mes actual para "month"', () => {
