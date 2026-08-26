@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getPeriodStart, getCurrentPeriodMonthKeys, getPreviousPeriodMonthKeys, getLastNMonthKeys } from '@/lib/period'
+import { getPeriodStart, getCurrentPeriodMonthKeys, getPreviousPeriodMonthKeys, getLastNMonthKeys, formatMonthKeyLabel } from '@/lib/period'
 
 describe('getPeriodStart', () => {
   it('devuelve el dia 1 del mes actual para "month"', () => {
@@ -63,5 +63,13 @@ describe('getLastNMonthKeys', () => {
     expect(getLastNMonthKeys(6, new Date('2026-02-10T12:00:00'))).toEqual([
       '2025-9', '2025-10', '2025-11', '2025-12', '2026-1', '2026-2',
     ])
+  })
+})
+
+describe('formatMonthKeyLabel', () => {
+  it('formatea una clave YYYY-M como mes corto y ano', () => {
+    expect(formatMonthKeyLabel('2026-8')).toBe('Ago 2026')
+    expect(formatMonthKeyLabel('2026-12')).toBe('Dic 2026')
+    expect(formatMonthKeyLabel('2026-1')).toBe('Ene 2026')
   })
 })

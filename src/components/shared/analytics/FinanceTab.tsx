@@ -18,7 +18,13 @@ import {
 } from 'recharts'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
-import { getCurrentPeriodMonthKeys, getPreviousPeriodMonthKeys, getLastNMonthKeys, type AnalyticsPeriod } from '@/lib/period'
+import {
+  getCurrentPeriodMonthKeys,
+  getPreviousPeriodMonthKeys,
+  getLastNMonthKeys,
+  formatMonthKeyLabel,
+  type AnalyticsPeriod,
+} from '@/lib/period'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import {
   revenueByOrigin,
@@ -30,6 +36,7 @@ import {
   collectionStats,
   pctChange,
 } from '@/lib/finance-analytics'
+import { PLAYER_LEVELS } from '@/constants'
 import type { PlayerLevel } from '@/types'
 
 // Paleta categorica de la skill dataviz (orden fijo, no ciclico): slot 1 azul, slot 2 naranja.
@@ -45,21 +52,9 @@ const CHART_COLORS = {
   muted: '#898781',
 }
 
-const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-
-function monthKeyLabel(key: string): string {
-  const [yearStr, monthStr] = key.split('-')
-  const monthIdx = Number(monthStr) - 1
-  return `${MONTH_SHORT[monthIdx] ?? monthStr} ${yearStr}`
-}
-
-const LEVEL_LABELS: Record<PlayerLevel, string> = {
-  iniciacion: 'Iniciación',
-  intermedio: 'Intermedio',
-  avanzado: 'Avanzado',
-  competicion: 'Competición',
-  menores: 'Menores',
-}
+const LEVEL_LABELS: Record<PlayerLevel, string> = Object.fromEntries(
+  PLAYER_LEVELS.map(l => [l.value, l.label])
+) as Record<PlayerLevel, string>
 
 function VariationBadge({ current, previous }: { current: number; previous: number }) {
   const change = pctChange(current, previous)
@@ -172,7 +167,7 @@ export function FinanceTab() {
       last6MonthKeys.map(key => {
         const stats = costStructure(clubTransactions, new Set([key]))
         return {
-          name: monthKeyLabel(key),
+          name: formatMonthKeyLabel(key),
           'Fijos %': Math.round(stats.fixedPct),
           'Variables %': Math.round(stats.variablePct),
         }
@@ -205,7 +200,7 @@ export function FinanceTab() {
     () =>
       last6MonthKeys.map(key => {
         const stats = collectionStats(allPayments, new Set([key]))
-        return { name: monthKeyLabel(key), 'Tasa de cobro %': Math.round(stats.collectionRate) }
+        return { name: formatMonthKeyLabel(key), 'Tasa de cobro %': Math.round(stats.collectionRate) }
       }),
     [allPayments, last6MonthKeys]
   )

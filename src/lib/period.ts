@@ -59,3 +59,11 @@ export function getLastNMonthKeys(n: number, now: Date = new Date()): string[] {
   const start = new Date(now.getFullYear(), now.getMonth() - (n - 1), 1)
   return monthKeysFrom(start, n)
 }
+
+const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+/** Convierte una clave 'YYYY-M' (como las que devuelven las funciones de este modulo) a una etiqueta corta, ej. 'Ago 2026'. */
+export function formatMonthKeyLabel(key: string): string {
+  const [year, month] = key.split('-').map(Number)
+  return `${MONTH_SHORT[month - 1]} ${year}`
+}
