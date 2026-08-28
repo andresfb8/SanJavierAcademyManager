@@ -51,10 +51,6 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
   const { seasons, enrollments, tariffs, renewGroups } = useDataStore()
   const season = seasons.find((s) => s.id === seasonId)
   const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
-  const activeIndividualTariffs = useMemo(
-    () => activeTariffs.filter((t) => t.billingFrequency !== 'installments'),
-    [activeTariffs]
-  )
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(groups.map((g) => [g.id, true]))
@@ -333,24 +329,19 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                   <td className="p-1.5">{student.playerName}</td>
                                   <td className="p-1.5">
                                     <Select
-                                      className="h-7 min-w-[170px] text-xs"
+                                      className={cn('h-7 min-w-[170px] text-xs', studentInvalid && 'border-red-400 ring-1 ring-red-300')}
                                       value={student.tariffId}
                                       onChange={(e) => {
                                         const tariffId = e.target.value
                                         const tariff = tariffs.find((t) => t.id === tariffId)
+                                        const freq = tariff?.billingFrequency ?? 'monthly'
                                         updateStudent(group.id, student.playerId, {
                                           tariffId,
-                                          customPrice: tariff?.price ?? 0,
-                                          billingFrequency: tariff?.billingFrequency ?? 'monthly',
+                                          customPrice: freq === 'installments' ? undefined : (tariff?.price ?? 0),
+                                          billingFrequency: freq,
                                         })
                                       }}
-                                      options={(() => {
-                                        const currentTariff = tariffs.find((t) => t.id === student.tariffId)
-                                        const rowTariffs = currentTariff?.billingFrequency === 'installments'
-                                          ? [...activeIndividualTariffs, currentTariff]
-                                          : activeIndividualTariffs
-                                        return rowTariffs.map((t) => ({ value: t.id, label: t.name }))
-                                      })()}
+                                      options={activeTariffs.map((t) => ({ value: t.id, label: t.name }))}
                                       disabled={!student.included}
                                     />
                                     {studentInvalid && (
@@ -358,18 +349,22 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                     )}
                                   </td>
                                   <td className="p-1.5">
-                                    <Input
-                                      type="number"
-                                      className="h-7 min-w-[70px] text-xs"
-                                      value={student.customPrice ?? ''}
-                                      onChange={(e) => {
-                                        const raw = e.target.value
-                                        updateStudent(group.id, student.playerId, {
-                                          customPrice: raw === '' ? undefined : (parseFloat(raw) || 0),
-                                        })
-                                      }}
-                                      disabled={!student.included}
-                                    />
+                                    {student.billingFrequency === 'installments' ? (
+                                      <span className="text-slate-400 text-[11px]">Según cuotas del grupo</span>
+                                    ) : (
+                                      <Input
+                                        type="number"
+                                        className="h-7 min-w-[70px] text-xs"
+                                        value={student.customPrice ?? ''}
+                                        onChange={(e) => {
+                                          const raw = e.target.value
+                                          updateStudent(group.id, student.playerId, {
+                                            customPrice: raw === '' ? undefined : (parseFloat(raw) || 0),
+                                          })
+                                        }}
+                                        disabled={!student.included}
+                                      />
+                                    )}
                                   </td>
                                   <td className="p-1.5 whitespace-nowrap text-slate-600">
                                     {billingFrequencyLabel(student.billingFrequency)}
