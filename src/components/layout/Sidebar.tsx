@@ -162,6 +162,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
         key={item.name}
         to={item.href}
         onClick={() => setMobileOpen(false)}
+        aria-label={item.name}
         className={cn(
           'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
           isCollapsed && 'justify-center px-0',

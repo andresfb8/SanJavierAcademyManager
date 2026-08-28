@@ -21,7 +21,7 @@ function Tooltip({ children, content, className, side = 'top' }: TooltipProps) {
     <div className="relative group inline-flex">
       {children}
       <div className={cn(
-        "absolute px-3 py-2 text-[10px] leading-tight rounded-lg bg-slate-900 text-slate-50 opacity-0 group-hover:opacity-100 transition-opacity w-48 text-center pointer-events-none z-[100] shadow-xl",
+        "absolute px-3 py-2 text-[10px] leading-tight rounded-lg bg-slate-900 text-slate-50 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity w-48 text-center pointer-events-none z-[100] shadow-xl",
         positionClasses,
         className
       )}>
