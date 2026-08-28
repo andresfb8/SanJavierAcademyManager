@@ -9,7 +9,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useDataStore } from '@/stores/dataStore'
 import { toast } from '@/hooks/use-toast'
 import type { Group, BillingFrequency } from '@/types'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { billingFrequencyLabel } from '@/lib/billing-utils'
 import { MONTHS } from '@/constants'
 
@@ -102,6 +102,21 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
     )
   )
   const [submitting, setSubmitting] = useState(false)
+
+  const validationSummary = useMemo(() => {
+    let invalidStudentCount = 0
+    let invalidGroupCount = 0
+    for (const group of groups) {
+      const draft = drafts[group.id]
+      const defaultTariffInvalid = !tariffs.some((t) => t.id === draft.defaultTariffId)
+      const groupInvalidStudents = draft.includeStudents
+        ? draft.students.filter((s) => s.included && !tariffs.some((t) => t.id === s.tariffId)).length
+        : 0
+      invalidStudentCount += groupInvalidStudents
+      if (defaultTariffInvalid || groupInvalidStudents > 0) invalidGroupCount += 1
+    }
+    return { invalidStudentCount, invalidGroupCount, hasBlockingIssues: invalidGroupCount > 0 }
+  }, [groups, drafts, tariffs])
 
   const updateDraft = (groupId: string, patch: Partial<GroupDraft>) => {
     setDrafts((prev) => ({ ...prev, [groupId]: { ...prev[groupId], ...patch } }))
@@ -199,15 +214,33 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
           {groups.map((group) => {
             const draft = drafts[group.id]
             const isOpen = expanded[group.id]
+            const defaultTariffInvalid = !tariffs.some((t) => t.id === draft.defaultTariffId)
+            const invalidStudentIds = new Set(
+              draft.includeStudents
+                ? draft.students
+                    .filter((s) => s.included && !tariffs.some((t) => t.id === s.tariffId))
+                    .map((s) => s.playerId)
+                : []
+            )
+            const groupHasIssue = defaultTariffInvalid || invalidStudentIds.size > 0
 
             return (
-              <div key={group.id} className="border rounded-lg">
+              <div key={group.id} className={cn('border rounded-lg', groupHasIssue && 'border-red-300')}>
                 <button
                   type="button"
                   className="w-full flex items-center justify-between gap-2 p-3 text-left font-medium"
                   onClick={() => setExpanded((prev) => ({ ...prev, [group.id]: !prev[group.id] }))}
                 >
-                  <span className="min-w-0 truncate">{group.name}</span>
+                  <span className="min-w-0 truncate flex items-center gap-2">
+                    {group.name}
+                    {groupHasIssue && (
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 shrink-0">
+                        {defaultTariffInvalid
+                          ? 'Tarifa por defecto no válida'
+                          : `${invalidStudentIds.size} alumno(s) con tarifa no válida`}
+                      </span>
+                    )}
+                  </span>
                   {isOpen ? <ChevronDown className="h-4 w-4 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 flex-shrink-0" />}
                 </button>
 
@@ -217,6 +250,7 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                       <div>
                         <Label>Tarifa por defecto</Label>
                         <Select
+                          className={cn(defaultTariffInvalid && 'border-red-400 ring-1 ring-red-300')}
                           options={activeTariffs.map((t) => ({
                             value: t.id,
                             label: `${t.name} (${formatCurrency(t.price)})`,
@@ -233,6 +267,9 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                             })
                           }}
                         />
+                        {defaultTariffInvalid && (
+                          <p className="text-xs text-red-600 mt-1">Esta tarifa ya no existe — elige otra.</p>
+                        )}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -281,8 +318,10 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                               </tr>
                             </thead>
                             <tbody>
-                              {draft.students.map((student) => (
-                                <tr key={student.playerId} className="border-t">
+                              {draft.students.map((student) => {
+                                const studentInvalid = invalidStudentIds.has(student.playerId)
+                                return (
+                                <tr key={student.playerId} className={cn('border-t', studentInvalid && 'bg-red-50')}>
                                   <td className="p-1.5">
                                     <Checkbox
                                       checked={student.included}
@@ -314,6 +353,9 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                       })()}
                                       disabled={!student.included}
                                     />
+                                    {studentInvalid && (
+                                      <p className="text-[10px] text-red-600 mt-0.5">Tarifa no disponible — elige otra o desmárcalo.</p>
+                                    )}
                                   </td>
                                   <td className="p-1.5">
                                     <Input
@@ -348,7 +390,8 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                     )}
                                   </td>
                                 </tr>
-                              ))}
+                                )
+                              })}
                             </tbody>
                           </table>
                         )}
@@ -361,11 +404,18 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
           })}
         </div>
 
+        {validationSummary.hasBlockingIssues && (
+          <p className="text-xs text-red-600 -mb-1">
+            {validationSummary.invalidStudentCount > 0
+              ? `Resuelve ${validationSummary.invalidStudentCount} alumno(s) con tarifa no válida antes de continuar: elige otra tarifa o desmárcalos.`
+              : 'Alguno de los grupos tiene una tarifa por defecto no válida — elige otra antes de continuar.'}
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={submitting}>
+          <Button onClick={handleConfirm} disabled={submitting || validationSummary.hasBlockingIssues}>
             {submitting ? 'Traspasando...' : `Confirmar traspaso de ${groups.length} grupo(s)`}
           </Button>
         </DialogFooter>
