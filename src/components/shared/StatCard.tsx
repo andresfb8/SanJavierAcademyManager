@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Minus, HelpCircle } from 'lucide-react'
+import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tooltip } from '@/components/ui/tooltip'
 
@@ -13,12 +14,13 @@ interface StatCardProps {
     value: number
     label: string
   }
+  sparkline?: number[]
   className?: string
   iconClassName?: string
   accentColor?: string
 }
 
-export function StatCard({ title, value, description, info, icon: Icon, trend, className, iconClassName, accentColor }: StatCardProps) {
+export function StatCard({ title, value, description, info, icon: Icon, trend, sparkline, className, iconClassName, accentColor }: StatCardProps) {
   return (
     <Card className={cn('hover-lift border-border/40 shadow-sm relative bg-white/60 backdrop-blur-sm', className)}>
       {/* Container for background glow to allow clipping while card remains overflow-visible */}
@@ -54,8 +56,8 @@ export function StatCard({ title, value, description, info, icon: Icon, trend, c
               <div className="flex items-center gap-1.5 pt-1">
                 <div className={cn(
                   'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
-                  trend.value > 0 ? 'bg-emerald-50 text-emerald-600' : 
-                  trend.value < 0 ? 'bg-rose-50 text-rose-600' : 
+                  trend.value > 0 ? 'bg-emerald-50 text-emerald-600' :
+                  trend.value < 0 ? 'bg-rose-50 text-rose-600' :
                   'bg-slate-50 text-slate-500'
                 )}>
                   {trend.value > 0 ? (
@@ -68,6 +70,22 @@ export function StatCard({ title, value, description, info, icon: Icon, trend, c
                   <span>{trend.value > 0 ? '+' : ''}{trend.value}%</span>
                 </div>
                 <span className="text-[11px] text-muted-foreground font-medium">{trend.label}</span>
+              </div>
+            )}
+            {sparkline && sparkline.length > 1 && (
+              <div className="h-8 -mx-1 mt-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={sparkline.map((v, i) => ({ i, v }))}>
+                    <Line
+                      type="monotone"
+                      dataKey="v"
+                      stroke={accentColor || 'var(--color-primary)'}
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
