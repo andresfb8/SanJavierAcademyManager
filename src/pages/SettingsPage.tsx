@@ -12,6 +12,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
 import { billingFrequencyLabel, buildInstallmentMonthKeys } from '@/lib/billing-utils'
+import { toast } from '@/hooks/use-toast'
+import { isTariffInUse, tariffUsageCount } from '@/lib/tariff-utils'
 import { COURT_TYPES, COURT_SURFACES, BILLING_FREQUENCIES, MONTHS } from '@/constants'
 import type { CourtType, CourtSurface, BillingFrequency, VatRate } from '@/types'
 import {
@@ -29,7 +31,7 @@ import { HolidaysManager } from '@/components/settings/HolidaysManager'
 
 export default function SettingsPage() {
   const {
-    club, courts, tariffs,
+    club, courts, tariffs, enrollments, groups,
     updateClub, addCourt, updateCourt, deleteCourt,
     addTariff, updateTariff, deleteTariff,
   } = useDataStore()
@@ -522,7 +524,25 @@ export default function SettingsPage() {
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTariff(tariff.id)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTariffId(tariff.id)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => {
+                                if (isTariffInUse(tariff.id, enrollments, groups)) {
+                                  const { enrollmentCount, groupCount } = tariffUsageCount(tariff.id, enrollments, groups)
+                                  const parts = []
+                                  if (enrollmentCount > 0) parts.push(`${enrollmentCount} alumno(s)`)
+                                  if (groupCount > 0) parts.push(`${groupCount} grupo(s)`)
+                                  toast.error(
+                                    `No se puede eliminar "${tariff.name}": la usan ${parts.join(' y ')}. Desactívala en su lugar (Editar → Activa/Inactiva) si no quieres que se siga usando.`,
+                                    7000
+                                  )
+                                  return
+                                }
+                                setDeleteTariffId(tariff.id)
+                              }}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
