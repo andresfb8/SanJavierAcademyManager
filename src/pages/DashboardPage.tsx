@@ -835,6 +835,7 @@ export default function DashboardPage() {
                   value={activePlayers}
                   info="Número total de alumnos con estado 'Activo' en el sistema."
                   icon={Users}
+                  sparkline={evolutionData.map(d => d.jugadores)}
                   iconClassName="bg-cyan-50 text-cyan-600"
                   accentColor="#0891b2"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
@@ -847,6 +848,7 @@ export default function DashboardPage() {
                   info="Suma de todos los pagos marcados como 'Pagado' en el mes en curso, incluyendo ingresos manuales."
                   icon={DollarSign}
                   trend={{ value: revenueDiff, label: 'vs mes anterior' }}
+                  sparkline={evolutionData.map(d => d.ingresos)}
                   iconClassName="bg-cyan-50 text-cyan-600"
                   accentColor="#0891b2"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
@@ -859,6 +861,7 @@ export default function DashboardPage() {
                   info="Total de importes de pagos que aún están en estado 'Pendiente' para el mes en curso."
                   icon={AlertCircle}
                   trend={{ value: pendingDiff, label: 'vs mes anterior' }}
+                  sparkline={financialData.map(d => d.pendiente)}
                   iconClassName="bg-cyan-50 text-cyan-600"
                   accentColor="#0891b2"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
@@ -881,6 +884,7 @@ export default function DashboardPage() {
                   value={`${collectionRate}%`}
                   info="Porcentaje de dinero cobrado respecto al total facturado (cobrado + pendiente). Mide la eficiencia de la recaudación."
                   icon={TrendingUp}
+                  sparkline={evolutionData.map(d => d.ratioCobro)}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
@@ -922,6 +926,7 @@ export default function DashboardPage() {
                   value={`${rotationIndex}%`}
                   info="Mide el movimiento total de alumnos (altas + bajas) respecto al volumen total. Un índice alto indica mucha variabilidad en el alumnado."
                   icon={RefreshCw}
+                  sparkline={evolutionData.map(d => d.rotacion)}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
@@ -933,6 +938,7 @@ export default function DashboardPage() {
                   value={`${churnRate}%`}
                   info="Porcentaje de alumnos que han causado baja respecto al total de alumnos activos en el mes."
                   icon={UserMinus}
+                  sparkline={evolutionData.map(d => d.abandono)}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
@@ -945,6 +951,7 @@ export default function DashboardPage() {
                   description={`${occupancyStats.totalOccupied} / ${occupancyStats.totalCapacity} plazas`}
                   info="Porcentaje de plazas ocupadas respecto a la capacidad máxima de todos los grupos activos."
                   icon={CalendarCheck}
+                  sparkline={evolutionData.map(d => d.ocupacion)}
                   iconClassName="bg-primary/10 text-primary"
                   accentColor="#0e7490"
                   className="min-w-[280px] shrink-0 sm:min-w-0 snap-center"
