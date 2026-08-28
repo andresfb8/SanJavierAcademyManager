@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
@@ -774,6 +775,13 @@ export default function SettingsPage() {
                 onChange={(e) => setTariffForm({ ...tariffForm, vatRate: Number(e.target.value) as VatRate })}
               />
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={tariffForm.isActive}
+                onCheckedChange={(checked) => setTariffForm({ ...tariffForm, isActive: checked === true })}
+              />
+              Tarifa activa
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTariffDialog(false)}>Cancelar</Button>
