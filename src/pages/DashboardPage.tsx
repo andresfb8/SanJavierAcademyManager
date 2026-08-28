@@ -17,6 +17,7 @@ import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import { useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery, useClassReviewsQuery } from '@/hooks/useQueries'
 import { IntelligenceCards } from '@/components/shared/analytics/IntelligenceCards'
+import { SmartAlertsPanel } from '@/components/shared/dashboard/SmartAlertsPanel'
 import { isGroupCurrentlyActive } from '@/lib/group-utils'
 import {
   Users,
@@ -961,9 +962,12 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ── Inteligencia del Club ────────────────────────────── */}
+        {/* ── Alertas inteligentes + Inteligencia del Club ────────── */}
         {isAdmin && (
-          <IntelligenceCards classReviews={classReviewsData} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            <SmartAlertsPanel />
+            <IntelligenceCards classReviews={classReviewsData} />
+          </div>
         )}
 
         {/* ── Charts row 1 ────────────────────────────────────── */}
