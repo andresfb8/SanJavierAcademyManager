@@ -349,21 +349,26 @@ export function RenewGroupsDialog({ open, onOpenChange, seasonId, groups, onDone
                                     )}
                                   </td>
                                   <td className="p-1.5">
-                                    {student.billingFrequency === 'installments' ? (
+                                    {student.billingFrequency === 'installments' && student.customPrice === undefined ? (
                                       <span className="text-slate-400 text-[11px]">Según cuotas del grupo</span>
                                     ) : (
-                                      <Input
-                                        type="number"
-                                        className="h-7 min-w-[70px] text-xs"
-                                        value={student.customPrice ?? ''}
-                                        onChange={(e) => {
-                                          const raw = e.target.value
-                                          updateStudent(group.id, student.playerId, {
-                                            customPrice: raw === '' ? undefined : (parseFloat(raw) || 0),
-                                          })
-                                        }}
-                                        disabled={!student.included}
-                                      />
+                                      <>
+                                        <Input
+                                          type="number"
+                                          className="h-7 min-w-[70px] text-xs"
+                                          value={student.customPrice ?? ''}
+                                          onChange={(e) => {
+                                            const raw = e.target.value
+                                            updateStudent(group.id, student.playerId, {
+                                              customPrice: raw === '' ? undefined : (parseFloat(raw) || 0),
+                                            })
+                                          }}
+                                          disabled={!student.included}
+                                        />
+                                        {student.billingFrequency === 'installments' && (
+                                          <p className="text-[10px] text-amber-600 mt-0.5">Anula el calendario de cuotas del grupo.</p>
+                                        )}
+                                      </>
                                     )}
                                   </td>
                                   <td className="p-1.5 whitespace-nowrap text-slate-600">
