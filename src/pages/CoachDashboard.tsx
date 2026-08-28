@@ -210,6 +210,41 @@ export default function CoachDashboard() {
       .sort((a, b) => a.classStart.getTime() - b.classStart.getTime())
   }, [currentCoachId, groups, attendance, enrollments, cancelledClasses, todayDateStr])
 
+  // -- Avisos de hoy agrupados por grupo (para el héroe y los badges de la lista) --
+  const todayNoticesForCoach = useMemo(() => {
+    return attendanceNotices.filter(notice => {
+      const noticeDate = notice.date instanceof Date ? notice.date : new Date(notice.date as unknown as string)
+      const noticeLocal = new Date(noticeDate.getTime() - noticeDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+      const nowLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+      const coachGroupIds = groups.filter(g => g.coachId === currentCoachId).map(g => g.id)
+      return noticeLocal === nowLocal && coachGroupIds.includes(notice.groupId)
+    })
+  }, [attendanceNotices, groups, currentCoachId, now])
+
+  const noticesByGroupId = useMemo(() => {
+    const map = new Map<string, typeof todayNoticesForCoach>()
+    for (const notice of todayNoticesForCoach) {
+      const list = map.get(notice.groupId) ?? []
+      list.push(notice)
+      map.set(notice.groupId, list)
+    }
+    return map
+  }, [todayNoticesForCoach])
+
+  // -- Clase destacada del héroe: la activa si existe, si no la próxima sin empezar/cancelar --
+  const nextUpcomingClass = useMemo(() => {
+    if (activeClass) return null
+    return todayClasses.find(tc => !tc.isCancelled && tc.classStart > now) ?? null
+  }, [activeClass, todayClasses, now])
+
+  const featuredClassGroupId = activeClass?.id ?? nextUpcomingClass?.group.id ?? null
+
+  // -- Resto de clases de hoy, excluyendo la destacada del héroe --
+  const remainingClasses = useMemo(
+    () => todayClasses.filter(tc => tc.group.id !== featuredClassGroupId),
+    [todayClasses, featuredClassGroupId]
+  )
+
   if (!currentCoachId) {
     return (
       <div className="p-6">
