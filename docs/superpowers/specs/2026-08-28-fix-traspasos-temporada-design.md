@@ -146,6 +146,28 @@ UI:
   borrada de antes de este fix) — el nuevo aviso en el diálogo es precisamente la herramienta
   para detectarlos y corregirlos caso a caso, no hace falta un script aparte.
 
+## Ajustes descubiertos durante la implementación
+
+Dos correcciones que no estaban en el diseño original, encontradas por revisión de código
+durante la implementación (documentadas aquí para que este spec siga reflejando lo construido):
+
+1. **Falta el control para desactivar una tarifa.** El mensaje de bloqueo de borrado (punto 2 de
+   Arquitectura) sugiere desactivar la tarifa en vez de borrarla ("Editar → Activa/Inactiva"),
+   pero el formulario de edición de tarifas no tenía ningún control para ese campo — se leía y
+   guardaba `isActive` internamente sin exponerlo en el formulario. Se añadió un checkbox
+   "Tarifa activa" al formulario de edición, para que el mensaje de bloqueo señale una acción que
+   de verdad se puede hacer.
+2. **Ocultar el precio de un alumno en cuotas podía esconder un dato ya erróneo.** El diseño
+   original decía que la facturación de cuotas siempre usa `group.installmentPrices`, nunca
+   `customPrice`. Se verificó en `functions/src/billing/generateMonthlyReceipts.ts:257`
+   (`enrollment.customPrice ?? baseAmount`) que eso es cierto solo cuando `customPrice` es
+   `undefined` — si ya tiene un valor (p.ej. de datos de antes de este fix, cuando elegir una
+   tarifa de cuotas sí escribía el total como `customPrice`), ese valor manda sobre el calendario
+   del grupo. Por eso, el campo de precio solo se sustituye por el texto "Según cuotas del grupo"
+   cuando `billingFrequency === 'installments'` **y** `customPrice` está sin definir; si ya tiene
+   un valor, se sigue mostrando editable (con un aviso de que anula el calendario del grupo), para
+   no esconder precisamente el dato que puede estar mal.
+
 ## Verificación manual
 
 1. Crear una tarifa, asignarla a un alumno activo, intentar borrarla desde Configuración → debe
