@@ -52,7 +52,21 @@ en sitios distintos con distinto nivel de detalle.
 4. **Sin componentes nuevos de shadcn/ui ni CLI.** Se construye a mano con `Card`/`Button`/`Badge`
    ya existentes en `src/components/ui/`, mismo enfoque que la Fase 1 (probado y descartado el CLI
    por sobreescribir archivos personalizados del proyecto sin fusionar).
-5. **Sin cambios de lógica de negocio.** `currentCoachId`, `coachHoursThisMonth`,
+5. **Mobile-first.** El entrenador usa esto sobre todo desde el móvil (en la pista, entre
+   clases), así que el móvil es el diseño de referencia, no un extra que "también funcione":
+   - El héroe ocupa **siempre el 100% del ancho**, en cualquier breakpoint — no comparte fila con
+     nada ni en desktop, precisamente para que destaque igual de bien en pantallas pequeñas.
+   - Su CTA principal ("Pasar lista" / "Abrir Gestión de Lista") es un botón de ancho completo
+     (`w-full`), igual que ya lo es hoy el de la `Card` de clase activa.
+   - Los avisos dentro del héroe se listan en columna simple (no en grid de 2-3 columnas como la
+     sección "Avisos de Alumnos" actual, que no cabría bien dentro de una tarjeta en pantallas
+     estrechas), máximo 3 visibles con un "+N más" si hay más.
+   - "Resto de clases de hoy" + "Mi Rendimiento" mantienen el `grid-cols-1 lg:grid-cols-12` que
+     ya existe (apilado completo en móvil, lista de clases antes que rendimiento), y las
+     `StatCard` de rendimiento mantienen su `grid-cols-2` actual (ya pensado para móvil).
+   - Se mantiene el `pb-20 lg:pb-8` del contenedor para que el contenido no quede tapado por el
+     bottom-nav fijo en móvil.
+6. **Sin cambios de lógica de negocio.** `currentCoachId`, `coachHoursThisMonth`,
    `coachAssignedPlayers`, `coachClassesToday`, `activeClass`, `estimatedSalary`, `todayClasses`,
    el diálogo de cancelar clase y `visibleActivities` no se tocan — es una reorganización de cómo
    se presentan los mismos datos, más dos derivaciones nuevas puramente de presentación (ver
