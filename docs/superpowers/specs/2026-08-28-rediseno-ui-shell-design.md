@@ -1,7 +1,7 @@
 # Rediseño de UI — Fase 1: Shell (Sidebar/Header) y Dashboard del director
 
 **Fecha:** 2026-08-28
-**Estado:** en revisión con el usuario
+**Estado:** aprobado, pendiente de plan de implementación
 **Rama:** `claude/rediseno-ui`
 
 ## Contexto
@@ -38,9 +38,14 @@ El usuario aportó 4 capturas de inspiración (sin URLs, pegadas directamente en
 1. **Paleta:** se mantiene la actual (`src/index.css`): primario teal `#0891b2`, sidebar slate
    `#0f172a`, semánticos (éxito/aviso/error) y paleta de 5 colores de gráfico ya definidos. No se
    introducen colores nuevos, solo se reorganiza cómo se usan.
-2. **Herramienta:** se usa el CLI oficial de shadcn/ui (`npx shadcn@latest add ...`) para traer
-   bloques nuevos (sidebar colapsable, componente `chart` con sparkline) y adaptarlos a la
-   paleta anterior — no una skill dedicada (no existe ninguna en este entorno).
+2. **Herramienta:** se probó el CLI oficial de shadcn/ui en vivo (`npx shadcn@latest init`) y se
+   descartó — sobreescribe sin fusionar archivos ya existentes y personalizados del proyecto:
+   borró por completo `src/lib/utils.ts` (incluidas `formatCurrency`, `formatDate`,
+   `calculateAge`, `normalizeText`, `ensureDate`, usadas en toda la app), reescribió
+   `button.tsx` con otro sistema de variantes, y añadió a `index.css` un tema gris duplicado
+   (oklch) en conflicto con la paleta teal actual, sin flag para evitarlo. Se construyen los
+   componentes nuevos **a mano**, siguiendo el mismo estilo que ya usa `src/components/ui/`
+   (CVA, Tailwind, sin Radix, tokens de `src/index.css`), sin CLI ni dependencias nuevas.
 3. **Contenido del Dashboard del director:** combinar imagen 1 + imagen 2 — tarjetas KPI con
    sparkline, panel de alertas accionables (imagen 1) y panel "Inteligencia del Club" (imagen 2,
    ya existe como `IntelligenceCards.tsx`) más la gráfica de evolución histórica (ya existe).
@@ -57,18 +62,18 @@ El usuario aportó 4 capturas de inspiración (sin URLs, pegadas directamente en
 
 ## Arquitectura
 
-### 1. Componentes shadcn/ui nuevos (vía CLI)
+### 1. Piezas nuevas, construidas a mano (sin CLI)
 
-- `npx shadcn@latest add sidebar` — trae el bloque de sidebar colapsable de shadcn (usa
-  `SidebarProvider`, `SidebarTrigger`, estado icon-only) junto con sus dependencias
-  (`@radix-ui/react-*` que falten). Se adapta: colores del bloque sustituidos por los tokens
-  `--color-sidebar-*` ya existentes, estructura de `navGroups` reutilizada tal cual.
-- `npx shadcn@latest add chart` — trae el wrapper de gráficos de shadcn sobre Recharts
-  (`ChartContainer`, `ChartTooltip`) usado para el sparkline dentro de `StatCard`. Se usa un
-  `LineChart` minimal sin ejes, altura ~32px, color = `accentColor` que ya recibe cada `StatCard`.
+- **Sidebar colapsable:** el modo icon-only se añade directamente sobre la estructura actual de
+  `Sidebar.tsx` (misma lista `navGroups`, mismo filtrado por rol) con clases Tailwind
+  condicionales — no se sustituye por ningún primitivo nuevo tipo `SidebarProvider`.
+- **Sparkline del `StatCard`:** se usa `recharts` directamente (ya es dependencia del proyecto y
+  se usa así — sin wrapper — en `FinanceTab.tsx` y `DashboardPage.tsx`): un `<LineChart>` sin
+  ejes ni grid, altura ~32px, color = `accentColor` que ya recibe cada `StatCard`. No se añade
+  ningún componente `chart.tsx` nuevo en `src/components/ui/`.
 
-Estos son los únicos dos `add` necesarios para esta fase; no se tocan Table/Select/Dialog/etc.
-(ya existen y no cambian en esta fase).
+No se instalan dependencias nuevas ni se toca `src/index.css`, `src/lib/utils.ts` ni
+`src/components/ui/button.tsx`.
 
 ### 2. Estado de colapso del sidebar (`src/stores/uiStore.ts`, nuevo)
 
@@ -92,8 +97,9 @@ no cambia y no participa del colapso.
 - Nuevo botón de colapsar/expandir en la cabecera del sidebar (icono `PanelLeftClose` /
   `PanelLeftOpen` de lucide-react).
 - Cuando `sidebarCollapsed`: `lg:w-72` → `lg:w-[72px]`, se ocultan labels de texto y de grupo,
-  cada `NavItem` muestra tooltip con el nombre al hover (usa el componente `Tooltip` de
-  shadcn/ui ya existente en `src/components/ui/tooltip.tsx`). Los grupos colapsables
+  cada `NavItem` muestra tooltip con el nombre al hover (usa el componente `Tooltip` ya
+  existente en `src/components/ui/tooltip.tsx`, reposicionado a la derecha del icono en vez de
+  arriba). Los grupos colapsables
   (`collapsedGroups`) se ignoran visualmente en modo icon-only: se listan todos los iconos sin
   separación de grupo, ya que las etiquetas de grupo no caben.
 - El bloque de usuario (avatar, cambiar contraseña, logout) se reduce a solo avatar + icono
@@ -115,8 +121,8 @@ API (`title`, `subtitle`, `actions`) no cambia — ningún consumidor necesita t
 ### 6. `StatCard.tsx` (editado)
 
 Se añade una prop opcional `sparkline?: number[]` que, si se pasa, renderiza un `LineChart`
-compacto (vía el nuevo componente `chart` de shadcn) a la derecha del valor, usando
-`accentColor` como color de línea. Sin la prop, la tarjeta se ve igual que hoy — cambio
+compacto de `recharts` a la derecha del valor, usando `accentColor` como color de línea. Sin la
+prop, la tarjeta se ve igual que hoy — cambio
 retrocompatible, no rompe los usos existentes en `CoachDashboard`, `PlayerDashboard`, etc.
 
 ### 7. `DashboardPage.tsx` — reorganización de la vista admin (`isAdmin`, no `isCoach`)
