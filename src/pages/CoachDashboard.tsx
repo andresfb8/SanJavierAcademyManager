@@ -237,13 +237,23 @@ export default function CoachDashboard() {
     return todayClasses.find(tc => !tc.isCancelled && tc.classStart > now) ?? null
   }, [activeClass, todayClasses, now])
 
-  const featuredClassGroupId = activeClass?.id ?? nextUpcomingClass?.group.id ?? null
+  const featuredClassKey = activeClass
+    ? `${activeClass.id}-${activeClass.startTime}`
+    : nextUpcomingClass
+      ? `${nextUpcomingClass.group.id}-${nextUpcomingClass.slot.startTime}`
+      : null
 
   // -- Resto de clases de hoy, excluyendo la destacada del héroe --
   const remainingClasses = useMemo(
-    () => todayClasses.filter(tc => tc.group.id !== featuredClassGroupId),
-    [todayClasses, featuredClassGroupId]
+    () => todayClasses.filter(tc => `${tc.group.id}-${tc.slot.startTime}` !== featuredClassKey),
+    [todayClasses, featuredClassKey]
   )
+
+  // -- Avisos "huérfanos": grupos sin clase en todayClasses hoy (p.ej. fuera de temporada) --
+  const orphanNotices = useMemo(() => {
+    const knownGroupIds = new Set(todayClasses.map(tc => tc.group.id))
+    return todayNoticesForCoach.filter(notice => !knownGroupIds.has(notice.groupId))
+  }, [todayNoticesForCoach, todayClasses])
 
   // -- Lista compacta de avisos para el héroe (máx. 3 + "+N más") --
   const renderNoticesList = (notices: typeof todayNoticesForCoach) => {
@@ -517,6 +527,13 @@ export default function CoachDashboard() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {orphanNotices.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Otros avisos</h4>
+                {renderNoticesList(orphanNotices)}
               </div>
             )}
 
