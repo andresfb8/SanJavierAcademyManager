@@ -127,6 +127,26 @@ los avisos relevantes de cada clase en vez de una lista plana global.
 - El estado "perfil no vinculado" (`!currentCoachId`) no cambia.
 - `Header` (título/subtítulo) no cambia.
 
+### 4. Riesgo de superposición en móvil (a vigilar explícitamente)
+
+El usuario ha señalado que las superposiciones en móvil son un problema recurrente en la app, así
+que este punto se trata como requisito, no como nota al margen. Elementos con posicionamiento
+especial ya existentes en la página/layout, que este rediseño **no debe añadir ni tocar**:
+
+- `Header` (`src/components/layout/Header.tsx`): `sticky top-0 z-30`.
+- Bottom-nav móvil (`src/components/layout/Sidebar.tsx`): `fixed bottom-0 ... z-40`, altura `h-16`
+  — por eso el contenedor de `CoachDashboard.tsx` lleva `pb-20` (más margen que la altura real del
+  nav, para no pegar el contenido al borde).
+- Diálogo de cancelar clase (ya existente en `CoachDashboard.tsx`): `fixed inset-0 z-50`.
+
+**Regla para este rediseño:** el héroe, la lista de "Resto de clases de hoy" y los badges de
+avisos van en flujo normal del documento — nada de `fixed`/`sticky`/`absolute` nuevo. El único
+riesgo real de superposición que introduce este cambio es de contenido, no de posicionamiento:
+que la lista de avisos dentro del héroe (hasta 3 + "+N más") crezca más de la cuenta y empuje o
+recorte el botón CTA en pantallas muy estrechas — se evita dejando que la tarjeta crezca en
+altura de forma natural (sin `overflow-hidden` ni alturas fijas en el héroe) en vez de intentar
+encajarlo en un contenedor de tamaño fijo.
+
 ## Fuera de alcance
 
 - `QuickAttendanceSheet.tsx`, `AttendancePage.tsx`, `CoachProfilePage.tsx` — no se tocan.
@@ -151,4 +171,13 @@ los avisos relevantes de cada clase en vez de una lista plana global.
    lista, no se pierde.
 5. Confirmar que Mi Rendimiento, Acciones Rápidas y Actividad Reciente siguen funcionando igual
    (salario, StatCards, nueva evaluación, ver perfil, colapsar actividad).
-6. `npm run build` y `npm test` sin errores.
+6. **Superposición en móvil (ancho ~360-390px, el más estrecho habitual):**
+   - Scrollear toda la página de arriba a abajo: ningún elemento debe quedar tapado por el
+     bottom-nav fijo ni por el `Header` sticky al hacer scroll.
+   - Con 3+ avisos en el héroe (forzar datos de prueba si hace falta): el "+N más" y el botón CTA
+     deben seguir siendo pulsables, sin recortarse ni solaparse con la tarjeta.
+   - Abrir el diálogo de cancelar clase con el teclado virtual activo (foco en el `select` de
+     motivo): el diálogo debe seguir centrado/anclado abajo sin que el bottom-nav se superponga.
+   - Nombres de alumno o de grupo largos (usa uno de prueba si no hay ninguno largo en los datos
+     actuales) no deben desbordar la tarjeta ni superponerse con el badge de avisos o el botón.
+7. `npm run build` y `npm test` sin errores.
