@@ -245,6 +245,45 @@ export default function CoachDashboard() {
     [todayClasses, featuredClassGroupId]
   )
 
+  // -- Lista compacta de avisos para el héroe (máx. 3 + "+N más") --
+  const renderNoticesList = (notices: typeof todayNoticesForCoach) => {
+    if (notices.length === 0) return null
+    const visible = notices.slice(0, 3)
+    const extra = notices.length - visible.length
+    return (
+      <div className="space-y-2">
+        {visible.map(notice => (
+          <div key={notice.id} className={cn(
+            "flex items-center gap-3 rounded-2xl border p-3",
+            notice.type === 'absent' ? "border-amber-100 bg-amber-50/40"
+            : notice.type === 'uncertain' ? "border-violet-100 bg-violet-50/40"
+            : "border-blue-100 bg-blue-50/40"
+          )}>
+            <div className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+              notice.type === 'absent' ? "bg-amber-100 text-amber-600"
+              : notice.type === 'uncertain' ? "bg-violet-100 text-violet-600"
+              : "bg-blue-100 text-blue-600"
+            )}>
+              <Bell className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black truncate text-slate-800">{notice.playerName}</p>
+              <p className="text-[11px] font-medium text-slate-500 truncate">
+                {notice.type === 'absent' ? 'No asistirá a clase hoy'
+                : notice.type === 'uncertain' ? 'Está en duda para clase hoy'
+                : 'Ha confirmado su asistencia'}
+              </p>
+            </div>
+          </div>
+        ))}
+        {extra > 0 && (
+          <p className="text-[11px] font-bold text-slate-400 text-center">+{extra} más</p>
+        )}
+      </div>
+    )
+  }
+
   if (!currentCoachId) {
     return (
       <div className="p-6">
@@ -269,77 +308,118 @@ export default function CoachDashboard() {
       />
 
       <div className="px-5 lg:px-8 space-y-8 mt-6">
-        
-        {/* -- Alertas de Asistencia -- */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Avisos de Alumnos</h3>
-            <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-500 border-slate-200">Hoy</Badge>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {attendanceNotices
-              .filter(notice => {
-                const noticeDate = notice.date instanceof Date ? notice.date : new Date(notice.date as unknown as string);
-                const noticeLocal = new Date(noticeDate.getTime() - noticeDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                const nowLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                const coachGroupIds = groups.filter(g => g.coachId === currentCoachId).map(g => g.id);
-                return noticeLocal === nowLocal && coachGroupIds.includes(notice.groupId);
-              })
-              .map(notice => (
-                <div key={notice.id} className={cn(
-                  "rounded-[1.5rem] border p-5 shadow-sm transition-all hover:shadow-md",
-                  notice.type === 'absent' ? "border-amber-100 bg-amber-50/40"
-                  : notice.type === 'uncertain' ? "border-violet-100 bg-violet-50/40"
-                  : "border-blue-100 bg-blue-50/40"
-                )}>
-                  <div className="flex gap-4">
-                    <div className={cn(
-                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl",
-                      notice.type === 'absent' ? "bg-amber-100 text-amber-600"
-                      : notice.type === 'uncertain' ? "bg-violet-100 text-violet-600"
-                      : "bg-blue-100 text-blue-600"
-                    )}>
-                      {notice.type === 'absent' ? <Trophy className="h-6 w-6" />
-                      : notice.type === 'uncertain' ? <Bell className="h-6 w-6" />
-                      : <Bell className="h-6 w-6" />}
+
+        {/* -- Héroe: clase destacada + sus avisos -- */}
+        {activeClass ? (
+          <Card className="border-none shadow-xl shadow-primary/5 rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-slate-100">
+            <CardHeader className="pb-4 px-8 pt-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">{activeClass.name}</h3>
+                  <p className="text-sm font-bold text-primary flex items-center gap-1.5 mt-0.5">
+                    <Clock className="h-4 w-4" />
+                    {activeClass.startTime} - {activeClass.endTime} · Pista {activeClass.courtName}
+                  </p>
+                </div>
+                <Badge className="bg-emerald-500 text-white border-none px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-emerald-200">
+                  En curso
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="px-8 pb-8 space-y-6">
+              {/* Contador presentes/pendientes */}
+              {(() => {
+                const enrolled = enrollments.filter(e => e.groupId === activeClass.id && e.isActive);
+                const record = attendance.find(a => a.groupId === activeClass.id && new Date(a.date).toDateString() === now.toDateString());
+                const present = record ? record.records.filter(r => r.status === 'presente').length : 0;
+                const pending = enrolled.length - (record?.records.length || 0);
+
+                return (
+                  <div className="flex gap-3">
+                    <div className="flex-1 rounded-2xl bg-emerald-50 p-4 border border-emerald-100/50">
+                      <div className="text-2xl font-black text-emerald-600">{present}</div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600/60">Presentes</div>
                     </div>
-                    <div className="space-y-1 min-w-0">
-                      <h4 className={cn("text-sm font-black truncate",
-                        notice.type === 'absent' ? "text-amber-900"
-                        : notice.type === 'uncertain' ? "text-violet-900"
-                        : "text-blue-900"
-                      )}>
-                        {notice.playerName}
-                      </h4>
-                      <p className={cn("text-xs font-medium leading-relaxed",
-                        notice.type === 'absent' ? "text-amber-700/80"
-                        : notice.type === 'uncertain' ? "text-violet-700/80"
-                        : "text-blue-700/80"
-                      )}>
-                        {notice.type === 'absent' ? 'No asistirá a clase hoy'
-                        : notice.type === 'uncertain' ? 'Está en duda para clase hoy'
-                        : 'Ha confirmado su asistencia'}
-                      </p>
-                      {notice.notes && <p className="text-[10px] mt-1 italic opacity-60 truncate">"{notice.notes}"</p>}
+                    <div className="flex-1 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                      <div className="text-2xl font-black text-slate-600">{pending}</div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-500/60">Pendientes</div>
                     </div>
                   </div>
-                </div>
-              ))}
-            
-            {attendanceNotices.filter(notice => {
-              const noticeDate = notice.date instanceof Date ? notice.date : new Date(notice.date as unknown as string);
-              const noticeLocal = new Date(noticeDate.getTime() - noticeDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-              const nowLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-              const coachGroupIds = groups.filter(g => g.coachId === currentCoachId).map(g => g.id);
-              return noticeLocal === nowLocal && coachGroupIds.includes(notice.groupId);
-            }).length === 0 && (
-              <div className="col-span-full py-8 text-center rounded-[1.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50">
-                <p className="text-xs font-bold text-slate-400">Sin avisos relevantes para hoy</p>
+                );
+              })()}
+
+              {renderNoticesList(noticesByGroupId.get(activeClass.id) ?? [])}
+
+              <div className="space-y-4">
+                {enrollments.filter(e => e.groupId === activeClass.id && e.isActive).slice(0, 5).map((enrollment) => {
+                  const student = players.find(p => p.id === enrollment.playerId);
+                  if (!student) return null;
+                  const record = attendance.find(a => a.groupId === activeClass.id && new Date(a.date).toDateString() === now.toDateString());
+                  const studentStatus = record?.records.find(r => r.playerId === student.id)?.status;
+
+                  return (
+                    <div key={student.id} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-sm">
+                          {student.firstName[0]}
+                        </div>
+                        <div>
+                          <span className="text-sm font-black text-slate-800">{student.firstName} {student.lastName}</span>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{student.level}</p>
+                        </div>
+                      </div>
+                      <div className={cn(
+                        "h-7 w-7 rounded-full border-2 flex items-center justify-center transition-all",
+                        studentStatus === 'presente' ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-200 text-slate-200"
+                      )}>
+                        <CheckCircle2 className="h-4.5 w-4.5" />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            )}
+
+              <Button
+                className="w-full bg-slate-900 hover:bg-black text-white h-14 rounded-[1.5rem] font-black text-sm shadow-xl shadow-slate-200 transition-all active:scale-[0.98] mt-4"
+                onClick={() => navigate(`/asistencia?groupId=${activeClass.id}`)}
+              >
+                Abrir Gestión de Lista
+                <ChevronRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        ) : nextUpcomingClass ? (
+          <Card className="border-none shadow-sm rounded-[2.5rem] bg-white ring-1 ring-slate-100">
+            <CardContent className="p-8 space-y-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tu próxima clase</p>
+                <h3 className="text-lg font-black text-slate-900 mt-1">{nextUpcomingClass.group.name}</h3>
+                <p className="text-sm font-bold text-primary flex items-center gap-1.5 mt-0.5">
+                  <Clock className="h-4 w-4" />
+                  {nextUpcomingClass.slot.startTime}–{nextUpcomingClass.slot.endTime} · {nextUpcomingClass.group.courtName} · {nextUpcomingClass.enrolledCount} alumnos
+                </p>
+              </div>
+
+              {renderNoticesList(noticesByGroupId.get(nextUpcomingClass.group.id) ?? [])}
+
+              <Button
+                className="w-full bg-slate-900 hover:bg-black text-white h-14 rounded-[1.5rem] font-black text-sm shadow-xl shadow-slate-200 transition-all active:scale-[0.98]"
+                onClick={() => navigate(`/asistencia?groupId=${nextUpcomingClass.group.id}`)}
+              >
+                Pasar lista
+                <ChevronRight className="h-5 w-5 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50">
+            <div className="h-16 w-16 rounded-3xl bg-white shadow-sm flex items-center justify-center mb-4">
+              <CalendarCheck className="h-8 w-8 text-slate-300" />
+            </div>
+            <p className="text-sm font-bold text-slate-400">Sin clases programadas hoy</p>
+            <Button variant="link" onClick={() => navigate('/agenda')} className="text-xs text-primary font-black uppercase tracking-widest mt-2">Ver mi agenda</Button>
           </div>
-        </section>
+        )}
 
         {/* -- Widget Pasar Lista Rápido -- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -438,92 +518,6 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {/* Clase activa con widget detallado (solo si hay) */}
-            {activeClass ? (
-              <Card className="border-none shadow-xl shadow-primary/5 rounded-[2.5rem] bg-white overflow-hidden ring-1 ring-slate-100">
-                <CardHeader className="pb-4 px-8 pt-8">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-black text-slate-900">{activeClass.name}</h3>
-                      <p className="text-sm font-bold text-primary flex items-center gap-1.5 mt-0.5">
-                        <Clock className="h-4 w-4" />
-                        {activeClass.startTime} - {activeClass.endTime} · Pista {activeClass.courtName}
-                      </p>
-                    </div>
-                    <Badge className="bg-emerald-500 text-white border-none px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-emerald-200">
-                      En curso
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-8 pb-8 space-y-6">
-                  {/* Visual Status */}
-                  {(() => {
-                    const enrolled = enrollments.filter(e => e.groupId === activeClass.id && e.isActive);
-                    const record = attendance.find(a => a.groupId === activeClass.id && new Date(a.date).toDateString() === now.toDateString());
-                    const present = record ? record.records.filter(r => r.status === 'presente').length : 0;
-                    const pending = enrolled.length - (record?.records.length || 0);
-
-                    return (
-                      <div className="flex gap-3">
-                        <div className="flex-1 rounded-2xl bg-emerald-50 p-4 border border-emerald-100/50">
-                          <div className="text-2xl font-black text-emerald-600">{present}</div>
-                          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600/60">Presentes</div>
-                        </div>
-                        <div className="flex-1 rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                          <div className="text-2xl font-black text-slate-600">{pending}</div>
-                          <div className="text-[10px] font-black uppercase tracking-wider text-slate-500/60">Pendientes</div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="space-y-4">
-                    {enrollments.filter(e => e.groupId === activeClass.id && e.isActive).slice(0, 5).map((enrollment) => {
-                      const student = players.find(p => p.id === enrollment.playerId);
-                      if (!student) return null;
-                      const record = attendance.find(a => a.groupId === activeClass.id && new Date(a.date).toDateString() === now.toDateString());
-                      const studentStatus = record?.records.find(r => r.playerId === student.id)?.status;
-
-                      return (
-                        <div key={student.id} className="flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <div className="h-11 w-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-sm">
-                              {student.firstName[0]}
-                            </div>
-                            <div>
-                              <span className="text-sm font-black text-slate-800">{student.firstName} {student.lastName}</span>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{student.level}</p>
-                            </div>
-                          </div>
-                          <div className={cn(
-                            "h-7 w-7 rounded-full border-2 flex items-center justify-center transition-all",
-                            studentStatus === 'presente' ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-200 text-slate-200"
-                          )}>
-                            <CheckCircle2 className="h-4.5 w-4.5" />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <Button 
-                    className="w-full bg-slate-900 hover:bg-black text-white h-14 rounded-[1.5rem] font-black text-sm shadow-xl shadow-slate-200 transition-all active:scale-[0.98] mt-4"
-                    onClick={() => navigate(`/asistencia?groupId=${activeClass.id}`)}
-                  >
-                    Abrir Gestión de Lista
-                    <ChevronRight className="h-5 w-5 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : todayClasses.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50">
-                <div className="h-16 w-16 rounded-3xl bg-white shadow-sm flex items-center justify-center mb-4">
-                  <CalendarCheck className="h-8 w-8 text-slate-300" />
-                </div>
-                <p className="text-sm font-bold text-slate-400">Sin clases programadas hoy</p>
-                <Button variant="link" onClick={() => navigate('/agenda')} className="text-xs text-primary font-black uppercase tracking-widest mt-2">Ver mi agenda</Button>
-              </div>
-            ) : null}
           </div>
 
           <div className="lg:col-span-5 space-y-8">
