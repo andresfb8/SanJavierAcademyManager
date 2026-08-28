@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isTariffInUse } from '@/lib/tariff-utils'
+import { isTariffInUse, tariffUsageCount } from '@/lib/tariff-utils'
 import type { Enrollment, Group } from '@/types'
 
 function makeEnrollment(overrides: Partial<Enrollment> = {}): Enrollment {
@@ -61,5 +61,24 @@ describe('isTariffInUse', () => {
     const enrollments = [makeEnrollment({ tariffId: 'otra', isActive: true })]
     const groups = [makeGroup({ defaultTariffId: 'otra', isActive: true })]
     expect(isTariffInUse('t1', enrollments, groups)).toBe(false)
+  })
+})
+
+describe('tariffUsageCount', () => {
+  it('cuenta matriculas y grupos activos por separado', () => {
+    const enrollments = [
+      makeEnrollment({ id: 'e1', tariffId: 't1', isActive: true }),
+      makeEnrollment({ id: 'e2', tariffId: 't1', isActive: true }),
+      makeEnrollment({ id: 'e3', tariffId: 't1', isActive: false }),
+    ]
+    const groups = [
+      makeGroup({ id: 'g1', defaultTariffId: 't1', isActive: true }),
+      makeGroup({ id: 'g2', defaultTariffId: 't1', isActive: false }),
+    ]
+    expect(tariffUsageCount('t1', enrollments, groups)).toEqual({ enrollmentCount: 2, groupCount: 1 })
+  })
+
+  it('devuelve ceros si nadie la usa', () => {
+    expect(tariffUsageCount('t1', [], [])).toEqual({ enrollmentCount: 0, groupCount: 0 })
   })
 })

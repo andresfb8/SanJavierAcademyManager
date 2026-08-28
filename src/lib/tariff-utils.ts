@@ -6,3 +6,16 @@ export function isTariffInUse(tariffId: string, enrollments: Enrollment[], group
   const usedByGroup = groups.some((g) => g.isActive && g.defaultTariffId === tariffId)
   return usedByEnrollment || usedByGroup
 }
+
+export interface TariffUsageCount {
+  enrollmentCount: number
+  groupCount: number
+}
+
+/** Cuantas matriculas activas y cuantos grupos activos usan esta tarifa, para mensajes de error. */
+export function tariffUsageCount(tariffId: string, enrollments: Enrollment[], groups: Group[]): TariffUsageCount {
+  return {
+    enrollmentCount: enrollments.filter((e) => e.isActive && e.tariffId === tariffId).length,
+    groupCount: groups.filter((g) => g.isActive && g.defaultTariffId === tariffId).length,
+  }
+}
