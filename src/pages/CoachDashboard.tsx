@@ -426,12 +426,12 @@ export default function CoachDashboard() {
           <div className="lg:col-span-7 space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
-                Clases de Hoy
-                {todayClasses.length > 0 && (
-                  <span className="ml-2 normal-case font-bold text-slate-300">({todayClasses.length})</span>
+                Resto de Clases de Hoy
+                {remainingClasses.length > 0 && (
+                  <span className="ml-2 normal-case font-bold text-slate-300">({remainingClasses.length})</span>
                 )}
               </h3>
-              {todayClasses.length > 0 && (
+              {remainingClasses.length > 0 && (
                 <button
                   onClick={() => navigate('/asistencia')}
                   className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
@@ -441,38 +441,40 @@ export default function CoachDashboard() {
               )}
             </div>
 
-            {/* Lista de todas las clases de hoy */}
-            {todayClasses.length > 0 && (
+            {/* Lista del resto de clases de hoy (sin la destacada del héroe) */}
+            {remainingClasses.length > 0 && (
               <div className="space-y-3">
-                {todayClasses.map(({ group, slot, isMarked, enrolledCount, isCancelled, cancelledId }) => {
-                  const isActive = activeClass?.id === group.id
+                {remainingClasses.map(({ group, slot, isMarked, enrolledCount, isCancelled, cancelledId }) => {
+                  const noticeCount = noticesByGroupId.get(group.id)?.length ?? 0
                   return (
                     <div
                       key={`${group.id}-${slot.startTime}`}
                       className={cn(
                         'flex items-center gap-4 rounded-2xl border p-4 transition-all',
                         isCancelled ? 'bg-red-50 border-red-200 opacity-75'
-                        : isActive ? 'bg-emerald-50 border-emerald-200'
                         : 'bg-white border-slate-100',
                       )}
                     >
                       <div className={cn(
                         'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-black',
                         isCancelled ? 'bg-red-100 text-red-400 line-through'
-                        : isActive ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-slate-100 text-slate-500',
                       )}>
                         {slot.startTime.slice(0, 5)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={cn('text-sm font-bold truncate', isCancelled ? 'text-red-600 line-through' : isActive ? 'text-emerald-900' : 'text-slate-800')}>
+                        <p className={cn('text-sm font-bold truncate', isCancelled ? 'text-red-600 line-through' : 'text-slate-800')}>
                           {group.name}
-                          {isActive && !isCancelled && <span className="ml-2 text-[10px] font-black text-emerald-600 uppercase">● En curso</span>}
                         </p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
                           {slot.startTime}–{slot.endTime} · {group.courtName} · {enrolledCount} alumnos
                         </p>
                       </div>
+                      {noticeCount > 0 && (
+                        <Badge className="bg-amber-50 text-amber-700 border-amber-100 text-[10px] font-bold shrink-0">
+                          {noticeCount} {noticeCount === 1 ? 'aviso' : 'avisos'}
+                        </Badge>
+                      )}
                       {isCancelled ? (
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[10px] font-black text-red-500 uppercase tracking-wide">Cancelada</span>
