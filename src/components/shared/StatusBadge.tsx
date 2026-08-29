@@ -4,6 +4,7 @@ interface StatusBadgeProps {
   status: string
   colorMap?: Record<string, string>
   className?: string
+  label?: string
 }
 
 // Each entry: "dot-color bg text-color"
@@ -23,6 +24,8 @@ const defaultColorMap: Record<string, { dot: string; badge: string }> = {
   avanzado: { dot: 'bg-indigo-500', badge: 'bg-indigo-100 text-indigo-800 ring-indigo-600/10' },
   competicion: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-800 ring-red-600/10' },
   menores: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800 ring-yellow-600/10' },
+  al_dia: { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-800 ring-emerald-600/10' },
+  vencido: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-800 ring-red-600/10' },
 }
 
 const labelMap: Record<string, string> = {
@@ -40,11 +43,13 @@ const labelMap: Record<string, string> = {
   avanzado: 'Avanzado',
   competicion: 'Competición',
   menores: 'Menores',
+  al_dia: 'Al día',
+  vencido: 'Vencido',
 }
 
 const fallback = { dot: 'bg-slate-400', badge: 'bg-slate-50 text-slate-600 ring-slate-200' }
 
-export function StatusBadge({ status, colorMap, className }: StatusBadgeProps) {
+export function StatusBadge({ status, colorMap, className, label }: StatusBadgeProps) {
   // colorMap prop stays backward-compatible: if plain string map passed, render legacy style
   if (colorMap) {
     const colorClass = colorMap[status] || 'bg-gray-100 text-gray-800'
@@ -57,7 +62,7 @@ export function StatusBadge({ status, colorMap, className }: StatusBadgeProps) {
   }
 
   const styles = defaultColorMap[status] || fallback
-  const label = labelMap[status] || status
+  const resolvedLabel = label ?? labelMap[status] ?? status
 
   return (
     <span
@@ -68,7 +73,7 @@ export function StatusBadge({ status, colorMap, className }: StatusBadgeProps) {
       )}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', styles.dot)} />
-      {label}
+      {resolvedLabel}
     </span>
   )
 }
