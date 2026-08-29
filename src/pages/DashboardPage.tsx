@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
 import { StatCard } from '@/components/shared/StatCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ActivityFeed } from '@/components/shared/ActivityFeed'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -36,10 +36,10 @@ import {
   UserMinus,
   CheckCircle2,
   ChevronRight,
-  Phone,
   Trophy,
-  MapPin,
   Bell,
+  Search,
+  Plus,
 } from 'lucide-react'
 import {
   BarChart,
@@ -81,12 +81,12 @@ const defaultKpiConfig: KpiConfig = {
 
 // Chart theme tokens
 const CHART_COLORS = {
-  primary: '#0891b2',
-  secondary: '#f59e0b',
-  success: '#10b981',
-  danger: '#ef4444',
-  grid: '#f1f5f9',
-  tooltip: { background: '#ffffff', border: '#e2e8f0' },
+  primary: '#2A5FD9',
+  secondary: '#A96A05',
+  success: '#158060',
+  danger: '#C13A2B',
+  grid: '#F1EEE6',
+  tooltip: { background: '#FFFFFF', border: '#E2DDD1' },
 }
 
 export default function DashboardPage() {
@@ -385,6 +385,62 @@ export default function DashboardPage() {
     return todayGroups.filter(g => g.coachId === currentCoachId).length
   }, [currentCoachId, todayGroups])
 
+  const classesInProgress = useMemo(() => {
+    return todayGroups.filter((g) => {
+      const slot = g.schedule.find((s) => s.dayOfWeek === today)
+      if (!slot) return false
+      const [startH, startM] = slot.startTime.split(':').map(Number)
+      const [endH, endM] = slot.endTime.split(':').map(Number)
+      const start = new Date(now)
+      start.setHours(startH, startM, 0, 0)
+      const end = new Date(now)
+      end.setHours(endH, endM, 0, 0)
+      return now >= start && now <= end
+    }).length
+  }, [todayGroups, today])
+
+  const netPlayerChange = altasEsteMes - bajasEsteMes
+
+  const weekAttendanceStats = useMemo(() => {
+    const rangeRate = (start: Date, end: Date) => {
+      let present = 0
+      let total = 0
+      for (const record of attendance) {
+        const recordDate = new Date(record.date)
+        if (recordDate < start || recordDate > end) continue
+        for (const entry of record.records) {
+          total++
+          if (entry.status === 'presente') present++
+        }
+      }
+      return total > 0 ? Math.round((present / total) * 100) : 0
+    }
+
+    const dayOfWeek = now.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() + mondayOffset)
+    weekStart.setHours(0, 0, 0, 0)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    weekEnd.setHours(23, 59, 59, 999)
+
+    const prevWeekStart = new Date(weekStart)
+    prevWeekStart.setDate(weekStart.getDate() - 7)
+    const prevWeekEnd = new Date(weekEnd)
+    prevWeekEnd.setDate(weekEnd.getDate() - 7)
+
+    const current = rangeRate(weekStart, weekEnd)
+    const previous = rangeRate(prevWeekStart, prevWeekEnd)
+    return { current, diff: current - previous }
+  }, [attendance, now])
+
+  const pendingPlayersCount = useMemo(() => {
+    return new Set(
+      currentMonthAllPayments.filter((p) => p.status === 'pendiente').map((p) => p.playerId)
+    ).size
+  }, [currentMonthAllPayments])
+
   // ── Occupancy calculation ─────────────────────────────────────────
   const occupancyStats = useMemo(() => {
     // Solo grupos de clases vigentes actualmente
@@ -579,21 +635,185 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <Header
-        title={`Hola, ${user?.displayName?.split(' ')[0] || 'Director'} 👋`}
-        subtitle={`Resumen de hoy · ${now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}`}
-        actions={
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowKpiDialog(true)}
-            title="Configurar KPIs"
-            className="rounded-xl text-muted-foreground hover:text-foreground"
-          >
-            <SettingsIcon className="h-5 w-5" />
-          </Button>
-        }
-      />
+      <div className="sticky top-0 z-30 border-b border-border bg-card">
+        <div className="flex flex-wrap items-center gap-4 px-5 py-5 lg:px-8">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">HOY</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative hidden md:block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar jugador, grupo, pago…"
+                className="h-10 w-64 rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <NotificationBell />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/agenda')}
+              title="Ir a la agenda"
+              className="rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              <CalendarDays className="h-5 w-5" />
+            </Button>
+            <Button
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => navigate('/jugadores')}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Nuevo jugador
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowKpiDialog(true)}
+              title="Configurar KPIs"
+              className="rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              <SettingsIcon className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 pt-5 lg:px-8">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            title="Jugadores activos"
+            value={activePlayers}
+            icon={Users}
+            description={`${netPlayerChange >= 0 ? '+' : ''}${netPlayerChange} este mes`}
+            iconClassName="bg-accent text-primary"
+            accentColor="#2A5FD9"
+          />
+          <StatCard
+            title="Clases hoy"
+            value={todayGroups.length}
+            icon={CalendarDays}
+            description={`${classesInProgress} en curso`}
+            iconClassName="bg-accent text-primary"
+            accentColor="#2A5FD9"
+          />
+          <StatCard
+            title="Asistencia media"
+            value={`${weekAttendanceStats.current}%`}
+            icon={CheckCircle2}
+            description={`${weekAttendanceStats.diff >= 0 ? '+' : ''}${weekAttendanceStats.diff} pts vs. semana`}
+            iconClassName="bg-accent text-primary"
+            accentColor="#2A5FD9"
+          />
+          {isAdmin && (
+            <StatCard
+              title="Pendiente de cobro"
+              value={formatCurrency(currentPending)}
+              icon={AlertCircle}
+              description={`${pendingPlayersCount} jugadores`}
+              iconClassName="bg-accent text-primary"
+              accentColor="#2A5FD9"
+            />
+          )}
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div className="grid grid-cols-1 gap-5 px-5 pt-5 lg:grid-cols-2 lg:px-8">
+          <div className="space-y-5">
+            <div>
+              <h2 className="mb-3 text-sm font-bold text-foreground">Indicadores del club</h2>
+              <IntelligenceCards classReviews={classReviewsData} />
+            </div>
+            <Card className="border-border/60 shadow-[var(--shadow-card)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold text-foreground">Cobros del mes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Cobrado</span>
+                  <span className="font-num text-lg font-bold text-foreground">{formatCurrency(currentRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Pendiente</span>
+                  <span className="font-num text-lg font-bold text-foreground">{formatCurrency(currentPending)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Ratio de cobro</span>
+                  <span className="font-num text-lg font-bold text-foreground">{collectionRate}%</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="space-y-5">
+            <div>
+              <h2 className="mb-3 text-sm font-bold text-foreground">Clases de hoy</h2>
+              <Card className="border-none shadow-sm rounded-[2rem] bg-white overflow-hidden">
+                <CardContent className="px-6 py-6">
+                  {todayGroups.length === 0 ? (
+                    <div className="text-center py-8">
+                      <CalendarDays className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                      <p className="text-sm text-slate-400 font-medium">Libre hoy</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {todayGroups
+                        .sort((a, b) => {
+                          const aTime = a.schedule.find((s) => s.dayOfWeek === today)?.startTime || ''
+                          const bTime = b.schedule.find((s) => s.dayOfWeek === today)?.startTime || ''
+                          return aTime.localeCompare(bTime)
+                        })
+                        .map((group) => {
+                          const slot = group.schedule.find((s) => s.dayOfWeek === today)!
+                          const isNext = activeClass?.id === group.id
+
+                          return (
+                            <div key={group.id} className={cn(
+                              "flex items-center gap-4 rounded-2xl p-4 transition-all duration-150 border-2",
+                              isNext
+                                ? "bg-emerald-50/50 border-emerald-100 shadow-sm"
+                                : "bg-slate-50/30 border-transparent hover:border-slate-100"
+                            )}>
+                              <div className="text-center shrink-0 w-12">
+                                <span className={cn(
+                                  "text-xs font-black block",
+                                  isNext ? "text-emerald-600" : "text-slate-400"
+                                )}>
+                                  {slot.startTime}
+                                </span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className={cn(
+                                  "text-sm font-bold truncate",
+                                  isNext ? "text-emerald-900" : "text-slate-700"
+                                )}>
+                                  {group.name}
+                                </h4>
+                                <p className="text-[11px] text-slate-400 font-medium truncate">
+                                  {group.courtName} · {group.currentEnrollment} alumnos
+                                </p>
+                              </div>
+                              {isNext && (
+                                <ChevronRight className="h-4 w-4 text-emerald-400 shrink-0" />
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            <div>
+              <h2 className="mb-3 text-sm font-bold text-foreground">Atención requerida</h2>
+              <SmartAlertsPanel />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Coach-First Interface - Only for Coaches */}
       {isCoach && (
@@ -962,14 +1182,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ── Alertas inteligentes + Inteligencia del Club ────────── */}
-        {isAdmin && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-            <SmartAlertsPanel />
-            <IntelligenceCards classReviews={classReviewsData} />
-          </div>
-        )}
-
         {/* ── Charts row 1 ────────────────────────────────────── */}
         {!isCoach && (kpiConfig.attendanceChart || kpiConfig.levelChart) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -1236,74 +1448,10 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── Bottom row ───────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-          {/* Activity feed */}
-          <Card className="border-border/60 shadow-[var(--shadow-card)] flex flex-col min-h-[460px]">
-            <ActivityFeed activities={visibleActivities} canReadPayments={canReadPayments} />
-          </Card>
-
-          {/* Today's schedule - Redesigned for Coach View */}
-          <Card className="border-none shadow-sm rounded-[2rem] bg-white overflow-hidden">
-            <CardHeader className="px-6 pt-6 pb-3">
-              <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400">Tu Agenda Hoy</CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
-              {todayGroups.length === 0 ? (
-                <div className="text-center py-8">
-                  <CalendarDays className="h-8 w-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400 font-medium">Libre hoy</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {todayGroups
-                    .sort((a, b) => {
-                      const aTime = a.schedule.find((s) => s.dayOfWeek === today)?.startTime || ''
-                      const bTime = b.schedule.find((s) => s.dayOfWeek === today)?.startTime || ''
-                      return aTime.localeCompare(bTime)
-                    })
-                    .map((group) => {
-                      const slot = group.schedule.find((s) => s.dayOfWeek === today)!
-                      const isNext = activeClass?.id === group.id
-                      
-                      return (
-                        <div key={group.id} className={cn(
-                          "flex items-center gap-4 rounded-2xl p-4 transition-all duration-150 border-2",
-                          isNext 
-                            ? "bg-emerald-50/50 border-emerald-100 shadow-sm" 
-                            : "bg-slate-50/30 border-transparent hover:border-slate-100"
-                        )}>
-                          <div className="text-center shrink-0 w-12">
-                            <span className={cn(
-                              "text-xs font-black block",
-                              isNext ? "text-emerald-600" : "text-slate-400"
-                            )}>
-                              {slot.startTime}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className={cn(
-                              "text-sm font-bold truncate",
-                              isNext ? "text-emerald-900" : "text-slate-700"
-                            )}>
-                              {group.name}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 font-medium truncate">
-                              {group.courtName} · {group.currentEnrollment} alumnos
-                            </p>
-                          </div>
-                          {isNext && (
-                            <ChevronRight className="h-4 w-4 text-emerald-400 shrink-0" />
-                          )}
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* ── Activity feed ────────────────────────────────────── */}
+        <Card className="border-border/60 shadow-[var(--shadow-card)] flex flex-col min-h-[460px]">
+          <ActivityFeed activities={visibleActivities} canReadPayments={canReadPayments} />
+        </Card>
       </div>
 
       {/* ── KPI Config Dialog ─────────────────────────────────── */}
