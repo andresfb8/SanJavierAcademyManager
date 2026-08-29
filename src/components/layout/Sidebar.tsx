@@ -1,32 +1,25 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard,
+  Home,
   Users,
   GraduationCap,
   CalendarDays,
-  ClipboardCheck,
   CreditCard,
-  UserCog,
-  Calendar,
+  Trophy,
   Settings,
-  BookOpen,
   ShieldCheck,
-  FileText,
+  CalendarRange,
+  History,
   LogOut,
   Menu,
   X,
   ChevronDown,
   ChevronRight,
-  CalendarPlus,
-  History,
-  Receipt,
-  Map,
   KeyRound,
-  BarChart3,
   User,
-  TrendingUp,
-  CalendarRange,
-  Euro,
+  ClipboardCheck,
+  LayoutDashboard,
+  Search,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
@@ -46,51 +39,20 @@ interface NavItem {
   requiredModule?: string
 }
 
-interface NavGroup {
-  label?: string
-  items: NavItem[]
-}
+const navItems: NavItem[] = [
+  { name: 'Hoy', href: '/', icon: Home },
+  { name: 'Personas', href: '/jugadores', icon: Users },
+  { name: 'Clases', href: '/agenda', icon: GraduationCap },
+  { name: 'Calendario', href: '/agenda', icon: CalendarDays },
+  { name: 'Finanzas', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
+  { name: 'Deportivo', href: '/informes-mensuales', icon: Trophy, requiredModule: 'informes_mensuales' },
+]
 
-const navGroups: NavGroup[] = [
-  {
-    items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: 'Administración',
-    items: [
-      { name: 'Jugadores', href: '/jugadores', icon: Users },
-      { name: 'Grupos', href: '/grupos', icon: GraduationCap },
-      { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
-      { name: 'Agenda', href: '/agenda', icon: Calendar },
-      { name: 'Eventos y Actividades', href: '/eventos', icon: CalendarPlus },
-      { name: 'Personal', href: '/entrenadores', icon: UserCog, requiredModule: 'coaches' },
-      { name: 'Evaluaciones', href: '/informes', icon: FileText, requiredModule: 'settings' },
-      { name: 'Informes Mensuales', href: '/informes-mensuales', icon: BarChart3, requiredModule: 'informes_mensuales' },
-      { name: 'Metodología', href: '/methodology', icon: BookOpen, requiredModule: 'settings' },
-      { name: 'Planificación', href: '/planificacion', icon: Map, requiredModule: 'settings' },
-      { name: 'Analítica', href: '/analitica', icon: TrendingUp, requiredModule: 'settings' },
-    ],
-  },
-  {
-    label: 'Financiera',
-    items: [
-      { name: 'Pagos', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
-      { name: 'Facturas', href: '/facturas', icon: Receipt, requiredModule: 'payments' },
-      { name: 'Beneficios y Gastos', href: '/finanzas', icon: BarChart3, requiredModule: 'informes_mensuales' },
-      { name: 'Análisis Financiero', href: '/finanzas-analitica', icon: Euro, requiredModule: 'informes_mensuales' },
-    ],
-  },
-  {
-    label: 'Configuración',
-    items: [
-      { name: 'Configuración', href: '/configuracion', icon: Settings, requiredModule: 'settings' },
-      { name: 'Registro de actividad', href: '/actividad', icon: History, requiredModule: 'settings' },
-      { name: 'Temporadas', href: '/temporadas', icon: CalendarRange, requiredModule: 'settings' },
-      { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
-    ],
-  },
+const settingsItems: NavItem[] = [
+  { name: 'Configuración', href: '/configuracion', icon: Settings, requiredModule: 'settings' },
+  { name: 'Usuarios', href: '/usuarios', icon: ShieldCheck, requiredModule: 'users' },
+  { name: 'Temporadas', href: '/temporadas', icon: CalendarRange, requiredModule: 'settings' },
+  { name: 'Registro de actividad', href: '/actividad', icon: History, requiredModule: 'settings' },
 ]
 
 const ROLE_COLORS: Record<string, string> = {
@@ -109,12 +71,8 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
-
-  const toggleGroup = (label: string) => {
-    setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
-  }
 
   const isItemActive = (href: string) => {
     if (href === '/') return location.pathname === '/'
@@ -122,12 +80,9 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
     return location.pathname.startsWith(`${href}/`)
   }
 
-  const isGroupActive = (items: NavItem[]) =>
-    items.some((item) => isItemActive(item.href))
+  const activeRole = user?.activeRole ?? user?.role
 
   const filterItem = (item: NavItem) => {
-    const activeRole = user?.activeRole ?? user?.role
-
     // Jugador y tutor: solo ven el Dashboard (portal)
     if (activeRole === 'jugador' || activeRole === 'tutor') {
       return item.href === '/'
@@ -135,17 +90,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
 
     // Entrenador: módulos permitidos explícitamente
     if (activeRole === 'entrenador') {
-      const coachAllowedPaths = [
-        '/',
-        '/jugadores',
-        '/grupos',
-        '/asistencia',
-        '/agenda',
-        '/eventos',
-        '/informes',
-        '/methodology',
-        '/planificacion'
-      ]
+      const coachAllowedPaths = ['/', '/jugadores', '/agenda']
       if (!coachAllowedPaths.includes(item.href)) return false
     }
 
@@ -154,6 +99,9 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
     }
     return true
   }
+
+  const visibleNavItems = navItems.filter(filterItem)
+  const visibleSettingsItems = settingsItems.filter(filterItem)
 
   const renderNavItem = (item: NavItem, isCollapsed: boolean) => {
     const isActive = isItemActive(item.href)
@@ -167,14 +115,14 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
           'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
           isCollapsed && 'justify-center px-0',
           isActive
-            ? 'bg-primary text-white shadow-md'
+            ? 'bg-accent text-primary'
             : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
         )}
       >
         <item.icon
           className={cn(
             'h-[18px] w-[18px] shrink-0 transition-colors duration-150',
-            isActive ? 'text-white' : 'text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80'
+            isActive ? 'text-primary' : 'text-sidebar-foreground/50 group-hover:text-sidebar-foreground/80'
           )}
         />
         {!isCollapsed && <span className="truncate">{item.name}</span>}
@@ -190,65 +138,40 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
     )
   }
 
-  const renderGroup = (group: NavGroup, index: number, isCollapsed: boolean) => {
-    const visibleItems = group.items.filter(filterItem)
-    if (visibleItems.length === 0) return null
-
-    if (!group.label) {
-      return (
-        <div key={index} className="mb-1">
-          {visibleItems.map((item) => renderNavItem(item, isCollapsed))}
-        </div>
-      )
-    }
+  const renderSettingsSection = (isCollapsed: boolean) => {
+    if (visibleSettingsItems.length === 0) return null
 
     if (isCollapsed) {
-      // En modo icono no caben las etiquetas de grupo: se listan los iconos sin separador,
-      // ignorando collapsedGroups (que solo aplica al sidebar expandido).
       return (
-        <div key={group.label} className="mb-1">
-          {visibleItems.map((item) => renderNavItem(item, true))}
+        <div className="mb-1 mt-2 border-t border-sidebar-border/60 pt-2">
+          {visibleSettingsItems.map((item) => renderNavItem(item, true))}
         </div>
       )
     }
 
-    const isGroupCollapsedState = collapsedGroups[group.label] ?? false
-    const groupActive = isGroupActive(visibleItems)
-
     return (
-      <div key={group.label} className="mb-1">
+      <div className="mb-1 mt-2 border-t border-sidebar-border/60 pt-2">
         <button
-          onClick={() => toggleGroup(group.label!)}
-          className={cn(
-            'flex w-full items-center justify-between rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-widest transition-colors duration-150',
-            groupActive
-              ? 'text-sidebar-foreground/90'
-              : 'text-sidebar-foreground/40 hover:text-sidebar-foreground/60'
-          )}
+          onClick={() => setSettingsOpen((o) => !o)}
+          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 hover:text-sidebar-foreground/60 transition-colors duration-150"
         >
           <div className="flex items-center gap-2">
-            <span className={cn('h-1.5 w-1.5 rounded-full', groupActive ? 'bg-sidebar-primary' : 'bg-sidebar-foreground/30')} />
-            {group.label}
+            <Settings className="h-3.5 w-3.5" />
+            Ajustes
           </div>
-          {isGroupCollapsedState ? (
-            <ChevronRight className="h-3 w-3" />
-          ) : (
-            <ChevronDown className="h-3 w-3" />
-          )}
+          {settingsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
-        {!isGroupCollapsedState && (
+        {settingsOpen && (
           <div className="ml-1 mt-0.5 space-y-0.5">
-            {visibleItems.map((item) => renderNavItem(item, false))}
+            {visibleSettingsItems.map((item) => renderNavItem(item, false))}
           </div>
         )}
       </div>
     )
   }
 
-  const avatarGradient = ROLE_COLORS[user?.activeRole ?? user?.role ?? ''] || 'from-slate-500 to-slate-600'
+  const avatarGradient = ROLE_COLORS[activeRole ?? ''] || 'from-slate-500 to-slate-600'
 
-  // Bottom Nav items depending on active role
-  const activeRole = user?.activeRole ?? user?.role
   const { studentId: effectiveStudentId } = useEffectiveStudent()
 
   const bottomNavItems = activeRole === 'jugador' || activeRole === 'tutor'
@@ -271,12 +194,12 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
         'flex h-20 items-center gap-3 border-b border-sidebar-border/50 shrink-0',
         isCollapsed ? 'justify-center px-2' : 'px-6'
       )}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sidebar-primary to-cyan-600 text-sidebar-primary-foreground font-black text-lg select-none shadow-lg shadow-sidebar-primary/20">
-          🎾
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-black text-sm select-none">
+          SJ
         </div>
         {!isCollapsed && (
           <div className="flex flex-col leading-none">
-            <span className="text-[16px] font-extrabold text-sidebar-foreground tracking-tight font-jakarta">San Javier</span>
+            <span className="text-[16px] font-extrabold text-sidebar-foreground tracking-tight">San Javier</span>
             <span className="text-[10px] text-sidebar-foreground/40 font-bold uppercase tracking-widest mt-0.5">Academy Manager</span>
           </div>
         )}
@@ -295,9 +218,25 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
         {!isCollapsed && <span>Colapsar</span>}
       </button>
 
+      {!isCollapsed && (
+        <div className="mx-3 mt-3 flex items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-sidebar-foreground/40">
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1 truncate text-xs">Buscar…</span>
+          <kbd className="text-[10px] font-semibold">⌘K</kbd>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navGroups.map((group, index) => renderGroup(group, index, isCollapsed))}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        {!isCollapsed && (
+          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+            Navegación
+          </div>
+        )}
+        <div className="space-y-0.5">
+          {visibleNavItems.map((item) => renderNavItem(item, isCollapsed))}
+        </div>
+        {renderSettingsSection(isCollapsed)}
       </nav>
 
       {/* User section */}
@@ -317,7 +256,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
                   {user?.displayName || 'Usuario'}
                 </p>
                 <p className="text-[11px] text-sidebar-foreground/50 truncate capitalize font-medium">
-                  {user?.activeRole ?? user?.role ?? 'director'}
+                  {activeRole ?? 'director'}
                 </p>
               </div>
             )}
@@ -399,7 +338,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
 
       {/* Desktop sidebar */}
       <aside className={cn(
-        'hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col bg-sidebar-background border-r border-slate-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-[width] duration-200',
+        'hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col bg-sidebar-background border-r border-sidebar-border shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-[width] duration-200',
         collapsed ? 'lg:w-[72px]' : 'lg:w-72'
       )}>
         {renderSidebarContent(collapsed)}
