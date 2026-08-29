@@ -2,8 +2,9 @@ import { lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore, hasPermission } from '@/stores/authStore'
 import { useEffectiveStudent } from '@/hooks/usePlayerData'
-import type { UserRole } from '@/types'
+import type { UserRole, PlayerStatus } from '@/types'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { PersonasLayout } from '@/components/layout/PersonasLayout'
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const PlayersPage = lazy(() => import('@/pages/PlayersPage'))
@@ -90,7 +91,7 @@ function GroupsRouter() {
   return <GroupsPage />
 }
 
-function PlayersRouter() {
+function PlayersRouter({ initialStatusFilter }: { initialStatusFilter?: PlayerStatus }) {
   const { user } = useAuthStore()
   const { studentId } = useEffectiveStudent()
   const activeRole = user?.activeRole ?? user?.role
@@ -100,7 +101,7 @@ function PlayersRouter() {
     }
     return <Navigate to="/" replace />
   }
-  return <PlayersPage />
+  return <PlayersPage initialStatusFilter={initialStatusFilter} />
 }
 
 export default function AuthenticatedApp() {
@@ -124,8 +125,15 @@ export default function AuthenticatedApp() {
             return <DashboardPage />
           })()}
         />
-        <Route path="/jugadores" element={<PlayersRouter />} />
+        <Route path="/jugadores" element={<Navigate to="/personas/jugadores" replace />} />
         <Route path="/jugadores/:id" element={<PlayerProfilePage />} />
+        <Route path="/personas" element={<PersonasLayout />}>
+          <Route index element={<Navigate to="/personas/jugadores" replace />} />
+          <Route path="jugadores" element={<PlayersRouter />} />
+          <Route path="lista-espera" element={<PlayersRouter initialStatusFilter="lista_espera" />} />
+          <Route path="entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
+          <Route path="usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
+        </Route>
         <Route path="/grupos" element={<GroupsRouter />} />
         <Route path="/grupos/:id" element={<GroupDetailPage />} />
         <Route path="/asistencia" element={<AttendancePage />} />
@@ -137,14 +145,14 @@ export default function AuthenticatedApp() {
         <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
         <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsRouter /></RoleRoute>} />
         <Route path="/facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
-        <Route path="/entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
+        <Route path="/entrenadores" element={<Navigate to="/personas/entrenadores" replace />} />
         {/* Sin RoleRoute: los entrenadores pueden ver su propio perfil */}
         <Route path="/entrenadores/:id" element={<CoachProfilePage />} />
         <Route path="/informes" element={<RoleRoute module="settings"><EvaluacionesPage /></RoleRoute>} />
         <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
         <Route path="/finanzas" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
         <Route path="/finanzas-analitica" element={<RoleRoute module="informes_mensuales"><FinancialAnalyticsPage /></RoleRoute>} />
-        <Route path="/usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
+        <Route path="/usuarios" element={<Navigate to="/personas/usuarios" replace />} />
         <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
         <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
         <Route path="/temporadas" element={<RoleRoute module="settings"><SeasonsPage /></RoleRoute>} />

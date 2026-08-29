@@ -41,7 +41,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: 'Hoy', href: '/', icon: Home },
-  { name: 'Personas', href: '/jugadores', icon: Users },
+  { name: 'Personas', href: '/personas/jugadores', icon: Users },
   { name: 'Clases', href: '/agenda', icon: GraduationCap },
   { name: 'Calendario', href: '/agenda', icon: CalendarDays },
   { name: 'Finanzas', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
@@ -95,7 +95,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
 
     // Entrenador: módulos permitidos explícitamente
     if (activeRole === 'entrenador') {
-      const coachAllowedPaths = ['/', '/jugadores', '/agenda', '/grupos', '/asistencia']
+      const coachAllowedPaths = ['/', '/personas/jugadores', '/agenda', '/grupos', '/asistencia']
       if (!coachAllowedPaths.includes(item.href)) return false
     }
 
