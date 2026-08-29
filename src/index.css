@@ -1,58 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
   /* ── Base Canvas ── */
-  --color-background: #fcfdfe;
-  --color-foreground: #0f172a;
-  --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0f172a;
+  --color-background: #F4F1EA;
+  --color-foreground: #16202B;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #16202B;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #16202B;
 
-  /* ── Brand/Primary: Elite Teal ── */
-  --color-primary: #0891b2;
-  --color-primary-foreground: #ffffff;
+  /* ── Brand/Primary: San Javier Blue ── */
+  --color-primary: #2A5FD9;
+  --color-primary-foreground: #FFFFFF;
 
   /* ── Secondary / UI surfaces ── */
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #334155;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-accent: #ecfeff;
-  --color-accent-foreground: #0891b2;
+  --color-secondary: #F1EEE6;
+  --color-secondary-foreground: #16202B;
+  --color-muted: #F1EEE6;
+  --color-muted-foreground: #6E7A85;
+  --color-accent: #E5EDFC;
+  --color-accent-foreground: #2A5FD9;
 
   /* ── Semantic ── */
-  --color-destructive: #ef4444;
+  --color-destructive: #C13A2B;
   --color-destructive-foreground: #ffffff;
-  --color-success: #10b981;
+  --color-success: #158060;
   --color-success-foreground: #ffffff;
-  --color-warning: #f59e0b;
+  --color-warning: #A96A05;
   --color-warning-foreground: #ffffff;
 
   /* ── Borders & Inputs ── */
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
-  --color-ring: #0891b2;
+  --color-border: #E2DDD1;
+  --color-input: #E2DDD1;
+  --color-ring: #2A5FD9;
 
   /* ── Chart Palette ── */
-  --color-chart-1: #0891b2;
-  --color-chart-2: #f59e0b;
-  --color-chart-3: #10b981;
-  --color-chart-4: #f43f5e;
-  --color-chart-5: #6366f1;
+  --color-chart-1: #2A5FD9;
+  --color-chart-2: #A96A05;
+  --color-chart-3: #158060;
+  --color-chart-4: #C13A2B;
+  --color-chart-5: #5B41B8;
 
-  /* ── Sidebar: Deep Slate ── */
-  --color-sidebar-background: #0f172a;
-  --color-sidebar-foreground: #f1f5f9;
-  --color-sidebar-primary: #0891b2;
+  /* ── Badge categories (niveles / tipos de clase) ── */
+  --color-badge-escuela: #E5EDFC;
+  --color-badge-escuela-foreground: #2A5FD9;
+  --color-badge-adultos: #E1F0EB;
+  --color-badge-adultos-foreground: #0F6E53;
+  --color-badge-competicion: #EDE8FA;
+  --color-badge-competicion-foreground: #5B41B8;
+  --color-badge-particular: #FAEEDC;
+  --color-badge-particular-foreground: #9A6206;
+  --color-badge-eventos: #FBE7E3;
+  --color-badge-eventos-foreground: #B93C2C;
+
+  /* ── Sidebar: Light ── */
+  --color-sidebar-background: #FFFFFF;
+  --color-sidebar-foreground: #16202B;
+  --color-sidebar-primary: #2A5FD9;
   --color-sidebar-primary-foreground: #ffffff;
-  --color-sidebar-accent: #1e293b;
-  --color-sidebar-accent-foreground: #f1f5f9;
-  --color-sidebar-border: #1e293b;
-  --color-sidebar-ring: #0891b2;
+  --color-sidebar-accent: #F1EEE6;
+  --color-sidebar-accent-foreground: #16202B;
+  --color-sidebar-border: #E2DDD1;
+  --color-sidebar-ring: #2A5FD9;
 
   /* ── Radius ── */
   --radius-lg: 0.75rem;
@@ -73,7 +85,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Archivo', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -83,12 +95,15 @@
   h4,
   h5,
   h6 {
-    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    font-family: 'Archivo', system-ui, sans-serif;
     font-weight: 700;
   }
 }
 
 @layer utilities {
+  .font-num {
+    font-family: 'Barlow Condensed', 'Archivo', system-ui, sans-serif;
+  }
 
   /* Page fade-in animation */
   .animate-fade-in {
