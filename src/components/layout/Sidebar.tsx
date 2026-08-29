@@ -55,6 +55,11 @@ const settingsItems: NavItem[] = [
   { name: 'Registro de actividad', href: '/actividad', icon: History, requiredModule: 'settings' },
 ]
 
+const coachSettingsItems: NavItem[] = [
+  { name: 'Grupos', href: '/grupos', icon: GraduationCap },
+  { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
+]
+
 const ROLE_COLORS: Record<string, string> = {
   director: 'from-amber-500 to-amber-600',
   coordinador: 'from-teal-500 to-teal-600',
@@ -90,7 +95,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
 
     // Entrenador: módulos permitidos explícitamente
     if (activeRole === 'entrenador') {
-      const coachAllowedPaths = ['/', '/jugadores', '/agenda']
+      const coachAllowedPaths = ['/', '/jugadores', '/agenda', '/grupos', '/asistencia']
       if (!coachAllowedPaths.includes(item.href)) return false
     }
 
@@ -101,7 +106,7 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   }
 
   const visibleNavItems = navItems.filter(filterItem)
-  const visibleSettingsItems = settingsItems.filter(filterItem)
+  const visibleSettingsItems = (activeRole === 'entrenador' ? coachSettingsItems : settingsItems).filter(filterItem)
 
   const renderNavItem = (item: NavItem, isCollapsed: boolean) => {
     const isActive = isItemActive(item.href)
