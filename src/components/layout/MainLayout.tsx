@@ -30,7 +30,7 @@ export function MainLayout() {
   }, [sidebarCollapsed])
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16 lg:pb-0">
+    <div className="min-h-screen bg-background pb-16 lg:pb-0">
       <Sidebar collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((prev) => !prev)} />
       <main className={cn('transition-[padding] duration-200', sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-72')}>
         <div className="min-h-screen animate-fade-in p-4 lg:p-8">
