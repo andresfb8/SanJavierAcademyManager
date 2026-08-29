@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -16,28 +15,41 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { getPlayerPortalStatus } from '@/lib/player-portal-status'
+import { isGroupCurrentlyActive } from '@/lib/group-utils'
 import { cn, isMinor as checkIsMinor, formatDate, normalizeText, formatCurrency } from '@/lib/utils'
 import { PLAYER_LEVELS, PLAYER_STATUSES } from '@/constants'
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   flexRender,
   type ColumnDef,
   type SortingState,
+  type PaginationState,
 } from '@tanstack/react-table'
 import { downloadXlsx } from '@/lib/excel'
 import { useAllPendingNormalizedPaymentsQuery } from '@/hooks/useQueries'
 import type { Player, PlayerLevel, PlayerStatus } from '@/types'
 import {
-  Plus, Search, Upload, Download, Users, Mail, Phone,
+  Plus, Search, Upload, Download, Users, Mail,
   MoreHorizontal, Eye, Edit, Trash2, UserX, CheckCircle2,
   Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Gamepad2,
 } from 'lucide-react'
 
-export default function PlayersPage() {
+function calculateAge(birthDate: Date): number {
+  const bd = birthDate instanceof Date ? birthDate : new Date(birthDate)
+  const diffMs = Date.now() - bd.getTime()
+  return Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
+}
+
+interface PlayersPageProps {
+  initialStatusFilter?: PlayerStatus | ''
+}
+
+export default function PlayersPage({ initialStatusFilter = '' }: PlayersPageProps) {
   const navigate = useNavigate()
-  const { players, users, invitations, addPlayer, updatePlayer, cancelPlayer, deletePlayer, invitePlayer } = useDataStore()
+  const { players, users, invitations, groups, enrollments, attendance, seasons, club, addPlayer, updatePlayer, cancelPlayer, deletePlayer, invitePlayer } = useDataStore()
   const { user } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
   // Invitar al portal es cosa de admin (mismo criterio que isAdmin() en las rules).
@@ -46,7 +58,9 @@ export default function PlayersPage() {
   const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter)
+  const [groupFilter, setGroupFilter] = useState<string>('')
+  const [paymentFilter, setPaymentFilter] = useState<string>('')
   const [portalFilter, setPortalFilter] = useState<string>('')
   // El filtro de portal se oculta para no-admins. Cambiar de rol activo no
   // remonta esta página, así que un filtro puesto sobreviviría al cambio y
@@ -61,6 +75,11 @@ export default function PlayersPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 12 })
+
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }))
+  }, [search, levelFilter, statusFilter, groupFilter, paymentFilter, portalFilter])
 
   const { data: allPendingPayments = [] } = useAllPendingNormalizedPaymentsQuery()
 
@@ -71,6 +90,59 @@ export default function PlayersPage() {
     })
     return map
   }, [allPendingPayments])
+
+  const paymentStatusByPlayer = useMemo(() => {
+    const now = new Date()
+    const map: Record<string, { status: 'pendiente' | 'vencido'; amount: number }> = {}
+    for (const p of allPendingPayments) {
+      const isOverdue = p.dueDate != null && new Date(p.dueDate) < now
+      const prev = map[p.playerId]
+      const amount = (prev?.amount || 0) + p.amount
+      const status: 'pendiente' | 'vencido' = isOverdue || prev?.status === 'vencido' ? 'vencido' : 'pendiente'
+      map[p.playerId] = { status, amount }
+    }
+    return map
+  }, [allPendingPayments])
+
+  const activeGroups = useMemo(
+    () => groups.filter((g) => isGroupCurrentlyActive(g, new Date())),
+    [groups]
+  )
+
+  const activeEnrollmentByPlayer = useMemo(() => {
+    const map: Record<string, { groupId: string; groupName: string }> = {}
+    for (const e of enrollments) {
+      if (e.isActive && !map[e.playerId]) {
+        map[e.playerId] = { groupId: e.groupId, groupName: e.groupName }
+      }
+    }
+    return map
+  }, [enrollments])
+
+  const activeSeason = useMemo(
+    () => seasons.find((s) => s.id === club?.activeSeasonId),
+    [seasons, club]
+  )
+
+  const attendanceRateByPlayer = useMemo(() => {
+    const counts: Record<string, { present: number; total: number }> = {}
+    for (const record of attendance) {
+      const recordDate = record.date instanceof Date ? record.date : new Date(record.date)
+      if (activeSeason && (recordDate < activeSeason.startDate || recordDate > activeSeason.endDate)) continue
+      for (const entry of record.records) {
+        const c = counts[entry.playerId] ?? { present: 0, total: 0 }
+        c.total++
+        if (entry.status === 'presente') c.present++
+        counts[entry.playerId] = c
+      }
+    }
+    const rates: Record<string, number | null> = {}
+    for (const p of players) {
+      const c = counts[p.id]
+      rates[p.id] = c && c.total > 0 ? Math.round((c.present / c.total) * 100) : null
+    }
+    return rates
+  }, [attendance, activeSeason, players])
 
   const portalStatusById = useMemo(() => {
     // `now` se congela hasta que cambie alguno de los tres arrays. Con caducidad
@@ -93,6 +165,9 @@ export default function PlayersPage() {
         p.phone.includes(search)
       const matchesLevel = levelFilter === '' || p.level === levelFilter
       const matchesStatus = statusFilter === '' || p.status === statusFilter
+      const matchesGroup = groupFilter === '' || activeEnrollmentByPlayer[p.id]?.groupId === groupFilter
+      const paymentStatus = paymentStatusByPlayer[p.id]?.status ?? 'al_dia'
+      const matchesPayment = paymentFilter === '' || paymentStatus === paymentFilter
       const portalStatus = portalStatusById[p.id] ?? 'sin_acceso'
       const matchesPortal =
         portalFilter === '' ? true :
@@ -100,9 +175,9 @@ export default function PlayersPage() {
         portalFilter === 'sent' ? portalStatus === 'invitado' :
         portalFilter === 'none' ? portalStatus === 'sin_acceso' :
         true
-      return matchesSearch && matchesLevel && matchesStatus && matchesPortal
+      return matchesSearch && matchesLevel && matchesStatus && matchesGroup && matchesPayment && matchesPortal
     })
-  }, [players, search, levelFilter, statusFilter, portalFilter, portalStatusById])
+  }, [players, search, levelFilter, statusFilter, groupFilter, paymentFilter, portalFilter, portalStatusById, activeEnrollmentByPlayer, paymentStatusByPlayer])
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -263,7 +338,7 @@ export default function PlayersPage() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {player.isMinor && '👶 Menor · '}{player.dni}
+                {player.isMinor ? 'Menor' : 'Adulto'} · {calculateAge(player.birthDate)} años
               </p>
               {isAdmin && portalStatusById[player.id] === 'invitado' && (
                 <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded-md">
@@ -286,22 +361,15 @@ export default function PlayersPage() {
       },
     },
     {
-      id: 'contact',
-      header: 'Contacto',
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Mail className="h-3.5 w-3.5" />
-            {row.original.email}
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Phone className="h-3.5 w-3.5" />
-            {row.original.phone}
-          </div>
-        </div>
-      ),
+      id: 'group',
+      header: 'Grupo',
+      cell: ({ row }) => {
+        const info = activeEnrollmentByPlayer[row.original.id]
+        return info
+          ? <span className="text-sm text-foreground">{info.groupName}</span>
+          : <span className="text-sm text-muted-foreground">Sin grupo</span>
+      },
       enableSorting: false,
-      meta: { className: 'hidden md:table-cell' },
     },
     {
       accessorKey: 'level',
@@ -309,9 +377,34 @@ export default function PlayersPage() {
       cell: ({ row }) => <StatusBadge status={row.original.level} />,
     },
     {
-      accessorKey: 'status',
-      header: 'Estado',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      id: 'attendance',
+      header: 'Asistencia',
+      cell: ({ row }) => {
+        const rate = attendanceRateByPlayer[row.original.id]
+        if (rate === null || rate === undefined) {
+          return <span className="text-xs text-muted-foreground">Sin datos</span>
+        }
+        return (
+          <div className="flex items-center gap-2 w-28">
+            <div className="h-1.5 flex-1 rounded-full bg-secondary overflow-hidden">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${rate}%` }} />
+            </div>
+            <span className="text-xs font-medium text-foreground w-9 text-right">{rate}%</span>
+          </div>
+        )
+      },
+      enableSorting: false,
+    },
+    {
+      id: 'paymentStatus',
+      header: 'Estado de pago',
+      cell: ({ row }) => {
+        const info = paymentStatusByPlayer[row.original.id]
+        if (!info) return <StatusBadge status="al_dia" />
+        const label = `${info.status === 'vencido' ? 'Vencido' : 'Pendiente'} ${formatCurrency(info.amount)}`
+        return <StatusBadge status={info.status} label={label} />
+      },
+      enableSorting: false,
     },
     {
       id: 'actions',
@@ -361,52 +454,52 @@ export default function PlayersPage() {
       enableSorting: false,
       size: 40,
     },
-  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin, pendingByPlayer])
+  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin, pendingByPlayer, activeEnrollmentByPlayer, attendanceRateByPlayer, paymentStatusByPlayer])
 
   const table = useReactTable({
     data: filteredPlayers,
     columns,
-    state: { sorting },
+    state: { sorting, pagination },
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (
     <div>
-      <Header
-        title="Jugadores"
-        subtitle={`${players.filter((p) => p.status === 'activo').length} activos · ${players.length} total`}
-        actions={
+      <div className="border-b border-border bg-card">
+        <div className="flex flex-wrap items-center gap-4 px-5 py-5 lg:px-8">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">PERSONAS</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {players.filter((p) => p.status === 'activo').length} activos ·{' '}
+              {players.filter((p) => p.status === 'lista_espera').length} en lista de espera ·{' '}
+              {players.length} fichas totales
+            </p>
+          </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
-              <Upload className="h-4 w-4 mr-1" />
-              Importar
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-1" />
-              Exportar
-            </Button>
-            <Button size="sm" onClick={() => { setEditingPlayer(null); setShowCreateDialog(true) }}>
-              <Plus className="h-4 w-4 mr-1" />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Nombre, email o teléfono…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-64 pl-9"
+              />
+            </div>
+            <Button onClick={() => { setEditingPlayer(null); setShowCreateDialog(true) }}>
+              <Plus className="h-4 w-4 mr-1.5" />
               Nuevo jugador
             </Button>
           </div>
-        }
-      />
+        </div>
+      </div>
 
       <div className="p-6 space-y-4">
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, email o telefono..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
           <Select
             options={[{ value: '', label: 'Todos los niveles' }, ...PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label }))]}
             value={levelFilter}
@@ -417,6 +510,23 @@ export default function PlayersPage() {
             options={[{ value: '', label: 'Todos los estados' }, ...PLAYER_STATUSES.map((s) => ({ value: s.value, label: s.label }))]}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-40"
+          />
+          <Select
+            options={[{ value: '', label: 'Todos los grupos' }, ...activeGroups.map((g) => ({ value: g.id, label: g.name }))]}
+            value={groupFilter}
+            onChange={(e) => setGroupFilter(e.target.value)}
+            className="w-full sm:w-44"
+          />
+          <Select
+            options={[
+              { value: '', label: 'Todos los pagos' },
+              { value: 'al_dia', label: 'Al día' },
+              { value: 'pendiente', label: 'Pendiente' },
+              { value: 'vencido', label: 'Vencido' },
+            ]}
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value)}
             className="w-full sm:w-40"
           />
           {isAdmin && (
@@ -432,6 +542,17 @@ export default function PlayersPage() {
               className="w-full sm:w-44"
             />
           )}
+          <div className="flex-1" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4 mr-1" />
+              Importar
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-1" />
+              Exportar
+            </Button>
+          </div>
         </div>
 
         {/* Bulk actions */}
@@ -585,6 +706,24 @@ export default function PlayersPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
+                <span>
+                  Mostrando {pagination.pageIndex * pagination.pageSize + 1}
+                  –{Math.min((pagination.pageIndex + 1) * pagination.pageSize, filteredPlayers.length)}{' '}
+                  de {filteredPlayers.length} jugadores
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
+                    Anterior
+                  </Button>
+                  <span className="text-xs font-medium">
+                    Página {pagination.pageIndex + 1} de {Math.max(table.getPageCount(), 1)}
+                  </span>
+                  <Button variant="outline" size="sm" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>
+                    Siguiente
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
