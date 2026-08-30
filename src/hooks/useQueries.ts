@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { collection, query, where, getDocs, orderBy, limit, QueryConstraint } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -105,10 +106,19 @@ export function useAllPendingNormalizedPaymentsQuery() {
 
   const isLoading = pendingQ.isLoading || eventsQ.isLoading || privateQ.isLoading
 
-  const data = normalizeAllPayments(
-    pendingQ.data || [],
-    (eventsQ.data || []).filter(p => p.status === 'pendiente'),
-    (privateQ.data || []).filter(p => p.status === 'pendiente')
+  // Memoizado: sin esto, `data` es un array nuevo en cada render (aunque el
+  // contenido no haya cambiado), lo que rompe la igualdad referencial para
+  // cualquier consumidor que use este valor como dependencia de useMemo o
+  // como `data` de una tabla con paginacion controlada (react-table resetea
+  // la pagina cuando `data` cambia de referencia, entrando en un bucle de
+  // renderizado infinito).
+  const data = useMemo(
+    () => normalizeAllPayments(
+      pendingQ.data || [],
+      (eventsQ.data || []).filter(p => p.status === 'pendiente'),
+      (privateQ.data || []).filter(p => p.status === 'pendiente')
+    ),
+    [pendingQ.data, eventsQ.data, privateQ.data]
   )
 
   return { data, isLoading, refetch: () => { pendingQ.refetch(); eventsQ.refetch(); privateQ.refetch(); } }
