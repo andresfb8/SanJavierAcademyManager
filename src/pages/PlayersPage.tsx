@@ -83,14 +83,6 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
 
   const { data: allPendingPayments = [] } = useAllPendingNormalizedPaymentsQuery()
 
-  const pendingByPlayer = useMemo(() => {
-    const map: Record<string, number> = {}
-    allPendingPayments.forEach(p => {
-      map[p.playerId] = (map[p.playerId] || 0) + p.amount
-    })
-    return map
-  }, [allPendingPayments])
-
   const paymentStatusByPlayer = useMemo(() => {
     const now = new Date()
     const map: Record<string, { status: 'pendiente' | 'vencido'; amount: number }> = {}
@@ -322,7 +314,6 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
       header: 'Jugador',
       cell: ({ row }) => {
         const player = row.original
-        const debt = pendingByPlayer[player.id] || 0
         return (
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">
@@ -331,11 +322,6 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
             <div>
               <div className="flex items-center gap-2">
                 <p className="font-medium text-sm">{player.firstName} {player.lastName}</p>
-                {debt > 0 && (
-                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-destructive text-destructive-foreground">
-                    🔴 {formatCurrency(debt)}
-                  </span>
-                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {player.isMinor ? 'Menor' : 'Adulto'} · {calculateAge(player.birthDate)} años
@@ -454,7 +440,7 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
       enableSorting: false,
       size: 40,
     },
-  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin, pendingByPlayer, activeEnrollmentByPlayer, attendanceRateByPlayer, paymentStatusByPlayer])
+  ], [selectedIds, filteredPlayers.length, navigate, invitePlayer, portalStatusById, isAdmin, activeEnrollmentByPlayer, attendanceRateByPlayer, paymentStatusByPlayer])
 
   const table = useReactTable({
     data: filteredPlayers,
