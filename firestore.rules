@@ -321,6 +321,23 @@ service cloud.firestore {
       allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
     }
 
+    // ─── Match Reports Collection ───────────────────────────────────────
+    // playerIds es una lista (un informe puede cubrir a varios jugadores),
+    // a diferencia de evaluations que usa un playerId singular.
+
+    match /matchReports/{reportId} {
+      allow read: if isAuthenticated() && (isAdmin() || belongsToClub()) && (
+        isAdmin() ||
+        hasRole('entrenador') ||
+        (hasRole('jugador') && getUserData().linkedPlayerId in resource.data.playerIds) ||
+        (hasRole('tutor') && getUserData().linkedPlayerIds.hasAny(resource.data.playerIds))
+      );
+
+      allow create: if isAuthenticated() && (isAdmin() || hasRole('entrenador'));
+      allow update: if isAuthenticated() && (isAdmin() || hasRole('entrenador'));
+      allow delete: if isAdmin() && (belongsToClub() || resource.data.clubId == null);
+    }
+
     // ─── Coach Salary Configs Collection ────────────────────────────────
 
     match /coachSalaryConfigs/{configId} {

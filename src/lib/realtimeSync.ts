@@ -135,7 +135,7 @@ export function subscribeToAllData(
     const currentUser = useAuthStore.getState().user
 
     if (dbRole === 'jugador' || dbRole === 'tutor') {
-      const isPlayerRestricted = ['players', 'payments', 'privateLessonPayments', 'eventPayments', 'invoices', 'evaluations'].includes(name)
+      const isPlayerRestricted = ['players', 'payments', 'privateLessonPayments', 'eventPayments', 'invoices', 'evaluations', 'matchReports'].includes(name)
       if (isPlayerRestricted) {
         const playerIds = dbRole === 'tutor'
           ? (currentUser?.linkedPlayerIds?.length ? currentUser.linkedPlayerIds : ['none'])
@@ -144,9 +144,13 @@ export function subscribeToAllData(
         // Use 'in' operator to get only the allowed players
         // Firestore limits 'in' queries to 10 elements.
         const safePlayerIds = playerIds.slice(0, 10)
-        
+
         if (name === 'players') {
           q = query(collection(db, name), where('clubId', '==', clubId), where(documentId(), 'in', safePlayerIds))
+        } else if (name === 'matchReports') {
+          // playerIds es un array en este documento (un informe puede cubrir
+          // varios jugadores), a diferencia del playerId singular de los demas.
+          q = query(collection(db, name), where('clubId', '==', clubId), where('playerIds', 'array-contains-any', safePlayerIds))
         } else {
           q = query(collection(db, name), where('clubId', '==', clubId), where('playerId', 'in', safePlayerIds))
         }
