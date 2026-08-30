@@ -53,10 +53,10 @@ export function StatusBadge({ status, colorMap, className, label }: StatusBadgeP
   // colorMap prop stays backward-compatible: if plain string map passed, render legacy style
   if (colorMap) {
     const colorClass = colorMap[status] || 'bg-gray-100 text-gray-800'
-    const label = labelMap[status] || status
+    const displayLabel = label ?? labelMap[status] ?? status
     return (
       <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', colorClass, className)}>
-        {label}
+        {displayLabel}
       </span>
     )
   }
