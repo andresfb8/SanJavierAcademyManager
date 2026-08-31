@@ -13,6 +13,17 @@ Mockups de referencia en `san javier.pen`: `X60Ar` ("05 · Clases / Parrilla"),
 El tab-bar de estos 5 mocks incluye una 6ª pestaña, "Metodología", sin mock
 propio.
 
+**Corrección tras revisar el código** (esto invalida lo que se dijo más
+abajo sobre crear un placeholder): `src/pages/MethodologyPage.tsx` **ya
+existe** (314 líneas, gestión de "parámetros de metodología" por
+categoría/nivel con CRUD completo) y ya está enrutado en
+`/methodology` — pero huérfano, sin ningún enlace desde el sidebar ni desde
+ninguna otra página. No hace falta crear nada nuevo para la pestaña
+Metodología: solo enlazar esta página ya construida bajo
+`/clases/metodologia`. (`PlanningPage.tsx` en `/planificacion` es un
+huérfano similar pero no corresponde a ninguna pestaña de este mock — se
+deja fuera, sin tocar.)
+
 **Alcance decidido con el usuario para esta fase (Fase A):** solo el topbar +
 barra de 6 pestañas compartidos, enlazando las páginas ya existentes **tal
 cual** (sin rediseñar su contenido interno). El rediseño visual completo de
@@ -44,8 +55,9 @@ gigante.
    interna ya existente preseleccionada (ya tiene lista de eventos Y de
    clases particulares con búsqueda/filtros/scoping por entrenador — no
    hace falta página nueva).
-5. `MethodologyPage` nueva: placeholder simple ("Próximamente"), única
-   pestaña sin contenido real hoy.
+5. `/clases/metodologia` enlaza el `MethodologyPage.tsx` **ya existente**
+   (hoy huérfano en `/methodology`) — sin crear nada nuevo, sin tocar su
+   contenido interno.
 6. Entrenador pasa a ver las 6 pestañas (hoy solo veía 3 vías separadas:
    `/agenda`, `/grupos`, `/asistencia`) — no hace falta lógica nueva de
    filtrado de datos porque las 4 páginas reales ya filtran por
@@ -73,15 +85,16 @@ actualizar los `href`, pero no es un objetivo en sí.
 /clases/asistencia     → ClasesLayout > AttendancePage
 /clases/particulares   → ClasesLayout > EventsActivitiesPage initialTab="private"
 /clases/eventos        → ClasesLayout > EventsActivitiesPage initialTab="events"
-/clases/metodologia    → ClasesLayout > MethodologyPage (nueva)
+/clases/metodologia    → ClasesLayout > MethodologyPage (ya existente, hoy huérfana en /methodology)
 ```
 
 Redirects de compatibilidad — **solo para las dos rutas que hoy sirven
 exclusivamente a personal del club**:
 
 ```
-/agenda   → Navigate replace a /clases/parrilla   (rutas :id/:date no cambian)
-/eventos  → Navigate replace a /clases/eventos    (/eventos/:id no cambia)
+/agenda       → Navigate replace a /clases/parrilla    (rutas :id/:date no cambian)
+/eventos      → Navigate replace a /clases/eventos      (/eventos/:id no cambia)
+/methodology  → Navigate replace a /clases/metodologia  (huérfana hoy, sin riesgo de romper nada)
 ```
 
 **`/grupos` y `/asistencia` NO se redirigen** — a diferencia de `/agenda` y
@@ -141,7 +154,8 @@ abajo por qué esta fase no unifica el buscador), expuesto vía
   - Particulares: `"${lessonsCount} clases particulares"` (mismo cálculo que
     ya hace `EventsActivitiesPage`).
   - Eventos: `"${eventsCount} eventos"` (idem).
-  - Metodología: sin subtítulo (o `"Próximamente"`).
+  - Metodología: sin subtítulo (la página ya existente gestiona su propio
+    contenido; no hay ningún agregado obvio que mostrar desde el layout).
 - **Sin buscador en el topbar.** Cada página ya tiene su propio buscador
   funcional en su fila de filtros interna (`GroupsPage`,
   `EventsActivitiesPage`); duplicarlo en el topbar sin conectarlo (como el
@@ -170,7 +184,8 @@ abajo por qué esta fase no unifica el buscador), expuesto vía
     mismas dos acciones que ya tiene el `<Header>` de
     `EventsActivitiesPage` (idéntico en ambas pestañas, ya que es la misma
     página con distinto `initialTab`).
-  - Metodología: sin acción primaria.
+  - Metodología: sin acción primaria (la página ya tiene su propio botón
+    "Nuevo parámetro" dentro de su contenido, sin tocar).
 - Barra de 6 pestañas con contador donde tenga sentido (Grupos: nº grupos
   activos; Eventos: nº eventos activos; Particulares: nº clases
   particulares; Parrilla/Asistencia/Metodología: sin contador, igual que
@@ -226,11 +241,16 @@ que `initialStatusFilter` en `PlayersPage`). `/clases/eventos` renderiza
 renderiza `<EventsActivitiesPage initialTab="private" />`. El resto de la
 página (contenido, filtros, tabs internos, diálogos) no cambia.
 
-## 3. `MethodologyPage` (nueva)
+## 3. `MethodologyPage` (ya existente, sin cambios)
 
-Página mínima: título/mensaje "Próximamente — esta sección se diseñará en
-su propia fase", sin datos reales, sin diálogos, sin lógica. Existe solo
-para que la pestaña "Metodología" tenga algo que renderizar hoy.
+Se enruta tal cual bajo `/clases/metodologia`, sin tocar ni una línea de su
+contenido. No usa el `<Header>` compartido (tiene su propio `<h1>Metodología
+(Catálogo Global)</h1>` + botón "Nuevo Parámetro" inline, no el componente
+`@/components/layout/Header`), así que no aplica el patrón de "quitar
+Header + registrar primaryAction" de la sección 2 — se queda con su propio
+título duplicado debajo del topbar de Clases, igual que `CoachesPage`
+y `UsersPage` convivieron con su propio `<Header>` bajo la barra de
+pestañas de Personas antes de su propia fase de rediseño.
 
 ## Fuera de alcance / riesgos conocidos
 
@@ -247,5 +267,10 @@ para que la pestaña "Metodología" tenga algo que renderizar hoy.
   URL no se investiga ni se resuelve más allá de actualizar ambos `href` al
   mismo destino nuevo — si son redundantes de verdad, es una decisión para
   otra sesión.
-- Como en Personas, no existe mock propio para "Metodología" — placeholder
-  puro hasta su propia fase de diseño.
+- No existe mock propio para "Metodología" en `san javier.pen` — su diseño
+  visual actual (`MethodologyPage.tsx`, ya existente) queda tal cual hasta
+  que le toque su propia fase, igual que las otras 4 páginas.
+- `PlanningPage.tsx` (`/planificacion`) es otro huérfano de navegación
+  similar a `MethodologyPage` pero no corresponde a ninguna pestaña de este
+  mock — se queda exactamente como está (huérfano), sin redirect ni enlace
+  nuevo. No confundirlo con Metodología al tocar rutas.
