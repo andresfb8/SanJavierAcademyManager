@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import type { ClasesOutletContext } from '@/components/layout/ClasesLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,7 @@ interface EventsActivitiesPageProps {
 export default function EventsActivitiesPage({ initialTab = 'all' }: EventsActivitiesPageProps) {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const { setPrimaryAction } = useOutletContext<ClasesOutletContext>()
   const {
     club,
     events,
@@ -541,25 +542,20 @@ export default function EventsActivitiesPage({ initialTab = 'all' }: EventsActiv
     setEvGuestNames((prev) => prev.filter((_, i) => i !== index))
   }
 
+  useEffect(() => {
+    setPrimaryAction({
+      label: 'Nueva clase',
+      icon: Plus,
+      items: [
+        { label: 'Nuevo evento', icon: CalendarPlus, onClick: openNewEventDialog },
+        { label: 'Nueva clase particular', icon: Plus, onClick: openNewLessonDialog },
+      ],
+    })
+    return () => setPrimaryAction(null)
+  }, [setPrimaryAction, activeCourts, activeCoaches])
+
   return (
     <div>
-      <Header
-        title="Eventos y Actividades"
-        subtitle={`${eventsCount} eventos · ${lessonsCount} clases particulares`}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={openNewEventDialog}>
-              <CalendarPlus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Nuevo evento</span>
-            </Button>
-            <Button size="sm" onClick={openNewLessonDialog}>
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Nueva clase</span>
-            </Button>
-          </div>
-        }
-      />
-
       <div className="p-6 space-y-4">
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
