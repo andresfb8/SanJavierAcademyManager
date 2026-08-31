@@ -92,6 +92,35 @@ function GroupsRouter() {
   return <GroupsPage />
 }
 
+// Usado SOLO en la ruta antigua "/grupos" (fuera de ClasesLayout). Desde
+// que GroupsPage perdio su <Header> propio (ahora vive en el topbar de
+// ClasesLayout), quedarse aqui para personal del club dejaria la pagina
+// sin ningun titulo — se redirige a la ruta nueva, ya con el topbar
+// compartido. jugador/tutor siguen viendo su propia vista tal cual, sin
+// redirigir (PlayerGroupsPage no depende de ClasesLayout).
+function GroupsLegacyRedirect() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (activeRole === 'jugador' || activeRole === 'tutor') {
+    return <PlayerGroupsPage />
+  }
+  return <Navigate to="/clases/grupos" replace />
+}
+
+// Mismo motivo que GroupsLegacyRedirect, para "/asistencia". A diferencia
+// de GroupsPage/PlayerGroupsPage (dos componentes distintos), AttendancePage
+// ya distingue jugador/tutor internamente (vista "Mi Asistencia"), asi que
+// para ellos se sigue renderizando tal cual — solo el personal del club se
+// redirige a la ruta nueva, con el topbar compartido.
+function AttendanceLegacyRedirect() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (activeRole === 'jugador' || activeRole === 'tutor') {
+    return <AttendancePage />
+  }
+  return <Navigate to="/clases/asistencia" replace />
+}
+
 function PlayersRouter({ initialStatusFilter }: { initialStatusFilter?: PlayerStatus }) {
   const { user } = useAuthStore()
   const { studentId } = useEffectiveStudent()
@@ -147,12 +176,15 @@ export default function AuthenticatedApp() {
         <Route path="/agenda" element={<Navigate to="/clases/parrilla" replace />} />
         <Route path="/eventos" element={<Navigate to="/clases/eventos" replace />} />
         <Route path="/methodology" element={<Navigate to="/clases/metodologia" replace />} />
-        {/* /grupos y /asistencia NO se redirigen a proposito: sirven contenido
-            distinto a jugador/tutor (PlayerGroupsPage, vista "Mi Asistencia")
-            que no debe quedar anidado bajo el topbar de ClasesLayout. */}
-        <Route path="/grupos" element={<GroupsRouter />} />
+        {/* /grupos y /asistencia no son un simple <Navigate>: sirven
+            contenido distinto a jugador/tutor (PlayerGroupsPage, vista "Mi
+            Asistencia") que no debe quedar anidado bajo el topbar de
+            ClasesLayout, asi que cada uno usa un wrapper que solo redirige
+            al personal del club a la ruta /clases/* nueva. Ver
+            GroupsLegacyRedirect/AttendanceLegacyRedirect mas arriba. */}
+        <Route path="/grupos" element={<GroupsLegacyRedirect />} />
         <Route path="/grupos/:id" element={<GroupDetailPage />} />
-        <Route path="/asistencia" element={<AttendancePage />} />
+        <Route path="/asistencia" element={<AttendanceLegacyRedirect />} />
         <Route path="/huecos" element={<FreeSlotsPage />} />
         <Route path="/eventos/:id" element={<EventDetailPage />} />
         <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
