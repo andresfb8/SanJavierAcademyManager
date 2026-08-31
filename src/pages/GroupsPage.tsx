@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import type { ClasesOutletContext } from '@/components/layout/ClasesLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +73,7 @@ export default function GroupsPage() {
   const navigate = useNavigate()
   const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments, club, seasons } = useDataStore()
   const { user } = useAuthStore()
+  const clasesContext = useOutletContext<ClasesOutletContext | undefined>()
 
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
@@ -319,33 +320,19 @@ export default function GroupsPage() {
 
   const isFormValid = form.name.trim() !== '' && form.coachId !== '' && form.courtId !== '' && form.startDate !== '' && form.endDate !== ''
 
+  useEffect(() => {
+    if (!clasesContext) return
+    if (isEntrenador) {
+      clasesContext.setPrimaryAction(null)
+      return
+    }
+    clasesContext.setPrimaryAction({ label: 'Nuevo grupo', icon: Plus, onClick: openCreateDialog })
+    return () => clasesContext.setPrimaryAction(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEntrenador, clasesContext])
+
   return (
     <div>
-      <Header
-        title="Grupos"
-        subtitle={
-          (search || levelFilter || coachFilter || (seasonFilter !== '' && seasonFilter !== ALL_SEASONS))
-            ? `${filteredGroups.length} grupos encontrados`
-            : (seasonFilter === ALL_SEASONS || (seasonFilter === '' && !club?.activeSeasonId))
-              ? `${activeGroupsCount} activos · ${groups.length} total`
-              : `${filteredGroups.length} de la temporada actual`
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={filteredGroups.length === 0}>
-              <FileDown className="h-4 w-4 mr-1" />
-              Exportar PDF
-            </Button>
-            {!isEntrenador && (
-              <Button size="sm" onClick={openCreateDialog}>
-                <Plus className="h-4 w-4 mr-1" />
-                Nuevo grupo
-              </Button>
-            )}
-          </div>
-        }
-      />
-
       <div className="p-6 space-y-4">
         {/* Filters and view toggle */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-3">
@@ -418,6 +405,10 @@ export default function GroupsPage() {
               <List className="h-4 w-4" />
             </Button>
           </div>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={filteredGroups.length === 0}>
+            <FileDown className="h-4 w-4 mr-1" />
+            Exportar PDF
+          </Button>
         </div>
 
         {/* Content */}
