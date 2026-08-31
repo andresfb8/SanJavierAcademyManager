@@ -215,14 +215,23 @@ Patrón idéntico en las 4 (mismo que `PlayersPage`/`UsersPage` en Personas):
 
 Esta página tiene 3 `return` distintos según `pageView` (`'selector'`,
 `'sheet'`, `'calendar'`), cada uno con su propio `<Header>` (o sin ninguno,
-en el caso de `'sheet'`, la vista de tomar asistencia a pantalla completa).
-Solo se toca el `<Header>` de la vista `'selector'` (la que corresponde a
-"entrar a la pestaña Asistencia" desde `ClasesLayout`) — las vistas
-`'sheet'`/`'calendar'` son navegación interna dentro del mismo componente
-(no rutas propias) y se quedan exactamente como están, incluida su falta de
-integración con el topbar compartido. Esto es aceptado conscientemente: la
-vista de tomar asistencia es una tarea enfocada de pantalla completa, meter
-ahí el topbar de Clases encima sería ruido, no una mejora.
+en el caso de `'sheet'`). Solo se toca el `<Header>` de la vista
+`'selector'` (la que corresponde a "entrar a la pestaña Asistencia" desde
+`ClasesLayout`) — las vistas `'sheet'`/`'calendar'` son navegación interna
+dentro del mismo componente (no rutas propias) y se quedan exactamente
+como están.
+
+**Corrección tras verificar en navegador**: `pageView` es estado interno
+de este componente, no un cambio de ruta — así que el topbar+pestañas de
+`ClasesLayout` (que se decide por routing, no por este estado) **sigue
+visible** encima de las 3 vistas, incluida `'sheet'`, aunque esta última no
+tenga su propio `<Header>`. No es posible "esconder" el layout padre desde
+un estado interno del hijo sin reestructurar las rutas (convertir
+`'sheet'`/`'calendar'` en rutas propias), algo fuera de alcance de esta
+fase. En la práctica el resultado es aceptable — la barra ocupa algo de
+espacio vertical pero no rompe la tarea de pasar lista — así que se deja
+así; la afirmación anterior de que estas vistas "se quedan sin el topbar
+compartido" era incorrecta y se corrige aquí.
 
 ### Caso especial: `EventsActivitiesPage`
 
