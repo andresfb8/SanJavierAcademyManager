@@ -20,10 +20,13 @@ export type PersonasPrimaryAction =
   | { label: string; icon?: LucideIcon; onClick: () => void }
   | { label: string; icon?: LucideIcon; items: { label: string; icon?: LucideIcon; onClick: () => void }[] }
 
-// Solo lectura: ninguna página necesita escribir en `search` hoy (el propio
-// input del topbar ya vive en este layout), así que no se expone `setSearch`.
 export interface PersonasOutletContext {
   search: string
+  // `UsersPage` lo necesita para limpiar el buscador al cambiar entre sus 3
+  // sub-pestañas internas (Invitaciones/Personal/Portal) — igual que ya hace
+  // al cambiar de pestaña principal de Personas, pero eso lo gestiona este
+  // layout solo por pathname, no por estado interno de una página hija.
+  setSearch: (value: string) => void
   setPrimaryAction: (action: PersonasPrimaryAction | null) => void
 }
 
@@ -100,8 +103,8 @@ export function PersonasLayout() {
   }, [location.pathname, players, coaches, users, invitations])
 
   const outletContext = useMemo(
-    () => ({ search, setPrimaryAction } satisfies PersonasOutletContext),
-    [search, setPrimaryAction]
+    () => ({ search, setSearch, setPrimaryAction } satisfies PersonasOutletContext),
+    [search, setSearch, setPrimaryAction]
   )
 
   return (

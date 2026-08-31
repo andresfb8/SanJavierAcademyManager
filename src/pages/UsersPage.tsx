@@ -70,7 +70,7 @@ export default function UsersPage() {
   const [addingEditingPlayerId, setAddingEditingPlayerId] = useState('')
 
   // --- Filter state ---
-  const { search: searchTerm, setPrimaryAction } = useOutletContext<PersonasOutletContext>()
+  const { search: searchTerm, setSearch, setPrimaryAction } = useOutletContext<PersonasOutletContext>()
   const [filterRole, setFilterRole] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
@@ -434,7 +434,7 @@ export default function UsersPage() {
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
-              onClick={() => { setActiveTab(tab.id); setFilterRole(''); setFilterStatus('') }}
+              onClick={() => { setActiveTab(tab.id); setSearch(''); setFilterRole(''); setFilterStatus('') }}
             >
               {tab.id === 'staff' && <Users className="h-3.5 w-3.5" />}
               {tab.id === 'portal' && <Gamepad2 className="h-3.5 w-3.5" />}
