@@ -883,9 +883,20 @@ Justo antes de `return (` (hoy en torno a la línea 540), añadir:
       ],
     })
     return () => setPrimaryAction(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setPrimaryAction])
+  }, [setPrimaryAction, activeCourts, activeCoaches])
 ```
+
+**Importante (misma clase de bug que se encontró y corrigió en la Task 4
+de `AgendaPage`)**: `openNewLessonDialog` lee `activeCourts`/`activeCoaches`
+(ambos `useMemo`, ya declarados en este archivo) de su closure para
+preseleccionar pista/entrenador. Si el efecto no depende de ellos, el
+botón del topbar se queda con una closure vieja que precarga pista/
+entrenador vacíos si esos datos aún no habían llegado de Firestore en el
+primer render. Por eso el array de dependencias incluye `activeCourts` y
+`activeCoaches` (ambos memoizados — no se recalculan en cada render, así
+que esto no causa un bucle ni recálculos excesivos). `openNewEventDialog`
+no lee ningún estado de render (usa `new Date()` directamente), así que no
+aporta ninguna dependencia adicional.
 
 (`CalendarPlus` y `Plus` ya están importados. Sin distinción por
 `isEntrenador` aquí — a diferencia de `AgendaPage`, `EventsActivitiesPage`
