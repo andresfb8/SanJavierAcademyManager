@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useOutletContext } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
+import type { ClasesOutletContext } from '@/components/layout/ClasesLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -59,6 +60,7 @@ export default function AttendancePage() {
   const { user } = useAuthStore()
   const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches, attendanceNotices } = useDataStore()
   const { data: attendance = [] } = useAttendanceQuery()
+  const clasesContext = useOutletContext<ClasesOutletContext | undefined>()
 
   // ── Vista: 'selector' | 'sheet' | 'calendar' ────────────────────────────
   type PageView = 'selector' | 'sheet' | 'calendar'
@@ -528,6 +530,16 @@ export default function AttendancePage() {
     [groups, selectedGroupId]
   )
 
+  // Asistencia no tiene accion primaria propia (ver spec de diseño). Este
+  // efecto se declara antes de los `return` condicionales de abajo (vistas
+  // jugador/tutor, sheet, calendar) para no violar las Rules of Hooks: como
+  // `pageView` cambia durante la vida del componente, colocarlo despues de
+  // esos returns haria que se dejase de invocar en algunos renders.
+  useEffect(() => {
+    clasesContext?.setPrimaryAction(null)
+    return () => clasesContext?.setPrimaryAction(null)
+  }, [clasesContext])
+
   // Jugador/tutor: solo lectura de su propio historial, sin acceso al
   // editor de gestión (no deben poder ver ni marcar la asistencia de otros).
   if (isPlayerOrTutor) {
@@ -575,18 +587,13 @@ export default function AttendancePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header
-        title="Asistencia"
-        subtitle="Registro de asistencia de los grupos"
-        actions={
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6">
+        <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={handleOpenExportDialog}>
             <Download className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">Exportar</span>
           </Button>
-        }
-      />
-
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6">
+        </div>
         {/* Auto-detect banner */}
         {nextClass && pageView === 'selector' && (
           <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in slide-in-from-top-3 duration-300">
