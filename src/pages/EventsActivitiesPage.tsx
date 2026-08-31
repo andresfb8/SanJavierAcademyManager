@@ -51,7 +51,11 @@ interface UnifiedItem {
   paymentMethod?: PaymentMethod | null
 }
 
-export default function EventsActivitiesPage() {
+interface EventsActivitiesPageProps {
+  initialTab?: 'all' | 'events' | 'private'
+}
+
+export default function EventsActivitiesPage({ initialTab = 'all' }: EventsActivitiesPageProps) {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const {
@@ -80,7 +84,7 @@ export default function EventsActivitiesPage() {
     [coaches, user?.id]
   )
 
-  const [activeTab, setActiveTab] = useState<TabValue>('all')
+  const [activeTab, setActiveTab] = useState<TabValue>(initialTab)
   const [search, setSearch] = useState('')
   const [coachFilter, setCoachFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
