@@ -586,8 +586,13 @@ export default function AgendaPage() {
         : { label: items[0].label, icon: items[0].icon, onClick: items[0].onClick }
     )
     return () => setPrimaryAction(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEntrenador, setPrimaryAction])
+    // `openNewLessonDialog`/`openNewEventDialog` son funciones normales
+    // (no useCallback) que leen selectedDate/activeCourts/activeCoaches/
+    // currentCoachId en cada render — hay que re-registrar la accion cada
+    // vez que cambien, o el topbar se queda con una closure vieja que
+    // precarga la fecha/pista/entrenador del momento en que se monto la
+    // pagina en vez de los valores actuales.
+  }, [isEntrenador, setPrimaryAction, selectedDate, activeCourts, activeCoaches, currentCoachId])
 
   return (
     <div>
