@@ -425,11 +425,11 @@ export default function UsersPage() {
     <div>
       {/* Sub-pestañas */}
       <div className="border-b border-border bg-card px-6">
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2.5 font-medium text-sm transition-colors relative flex items-center gap-2 ${
+              className={`shrink-0 px-4 py-2.5 font-medium text-sm transition-colors relative flex items-center gap-2 ${
                 activeTab === tab.id
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
@@ -475,8 +475,8 @@ export default function UsersPage() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          {activeTab !== 'portal' && (
+        {activeTab !== 'portal' && (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="w-full sm:w-48">
               <Select
                 options={roleFilterOptions}
@@ -484,17 +484,17 @@ export default function UsersPage() {
                 onChange={(e) => setFilterRole(e.target.value)}
               />
             </div>
-          )}
-          {activeTab === 'invitations' && (
-            <div className="w-full sm:w-48">
-              <Select
-                options={statusFilterOptions}
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
+            {activeTab === 'invitations' && (
+              <div className="w-full sm:w-48">
+                <Select
+                  options={statusFilterOptions}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Tab: Invitaciones ── */}
         {activeTab === 'invitations' && (
