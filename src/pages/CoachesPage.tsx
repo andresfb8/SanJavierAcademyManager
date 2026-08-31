@@ -1,6 +1,5 @@
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,34 +15,34 @@ import {
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useDataStore } from '@/stores/dataStore'
 import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  flexRender,
+  type ColumnDef,
+  type SortingState,
+  type PaginationState,
+} from '@tanstack/react-table'
+import {
   Plus,
-  Mail,
-  Phone,
-  Calendar,
-  Award,
-  Users,
-  Search,
-  Edit2,
-  Trash2,
-  LayoutGrid,
-  List,
   Euro,
   Eye,
+  Edit2,
+  Trash2,
   UserPlus,
+  Users,
+  MoreHorizontal,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
-import { formatDate, formatCurrency, normalizeText } from '@/lib/utils'
+import { cn, formatCurrency, normalizeText } from '@/lib/utils'
 import { STAFF_ROLES } from '@/constants'
 import type { Coach, StaffRole } from '@/types'
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore'
@@ -53,11 +52,7 @@ import { createInvitation } from '@/lib/invitations'
 import { sendInvitationEmail } from '@/lib/emailService'
 import { useEventPaymentsQuery } from '@/hooks/useQueries'
 import { calculateEventSalary } from '@/lib/salary-utils'
-
-
-// ==========================================
-// CoachesPage - Gestion de personal (entrenadores y coordinadores)
-// ==========================================
+import type { PersonasOutletContext } from '@/components/layout/PersonasLayout'
 
 interface CoachForm {
   firstName: string
@@ -117,13 +112,12 @@ export default function CoachesPage() {
   } = useDataStore()
 
   const { data: eventPayments = [] } = useEventPaymentsQuery()
+  const { search, setPrimaryAction } = useOutletContext<PersonasOutletContext>()
 
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<string>('active')
   const [roleFilter, setRoleFilter] = useState<string>('')
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
@@ -134,8 +128,30 @@ export default function CoachesPage() {
   const [inviteEmailStatus, setInviteEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ fixed: number; message: string } | null>(null)
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 12 })
 
   const resetForm = () => setForm({ ...emptyForm })
+
+  const openCreateDialog = () => {
+    resetForm()
+    setEditingCoach(null)
+    setShowCreateDialog(true)
+  }
+
+  useEffect(() => {
+    setPrimaryAction({
+      label: 'Nuevo entrenador',
+      icon: Plus,
+      onClick: openCreateDialog,
+    })
+    return () => setPrimaryAction(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setPrimaryAction])
+
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }))
+  }, [search, activeFilter, roleFilter])
 
   const filteredCoaches = useMemo(() => {
     const q = normalizeText(search)
@@ -166,12 +182,10 @@ export default function CoachesPage() {
     const adultGroupsCount = coachGroups.filter(g => g.level !== 'menores').length
     const minorsGroupsCount = coachGroups.filter(g => g.level === 'menores').length
 
-    // Salary from groups
     const groupsSalary = (adultGroupsCount * (config.ratePerGroupAdults || 0)) + (minorsGroupsCount * (config.ratePerGroupMinors || 0))
 
     const now = new Date()
 
-    // Salary from private lessons (current month)
     const monthLessons = privateLessons.filter(
       (pl) =>
         pl.coachId === coachId &&
@@ -187,7 +201,6 @@ export default function CoachesPage() {
       }
     }, 0)
 
-    // Salary from events (current month) — based on net profit
     const monthEvents = events.filter(
       (ev) =>
         ev.coachIds.includes(coachId) &&
@@ -222,7 +235,6 @@ export default function CoachesPage() {
 
     if (editingCoach) {
       updateCoach(editingCoach.id, coachData)
-      // Update salary config
       updateCoachSalaryConfig(editingCoach.id, {
         coachId: editingCoach.id,
         ratePerGroupAdults: parseFloat(form.ratePerGroupAdults) || 0,
@@ -237,7 +249,6 @@ export default function CoachesPage() {
       setEditingCoach(null)
     } else {
       const newCoachId = addCoach(coachData)
-      // Save initial salary config
       updateCoachSalaryConfig(newCoachId, {
         coachId: newCoachId,
         ratePerGroupAdults: parseFloat(form.ratePerGroupAdults) || 0,
@@ -282,12 +293,6 @@ export default function CoachesPage() {
     setShowCreateDialog(true)
   }
 
-  const openCreateDialog = () => {
-    resetForm()
-    setEditingCoach(null)
-    setShowCreateDialog(true)
-  }
-
   const getStaffRoleLabel = (role?: StaffRole) =>
     STAFF_ROLES.find((r) => r.value === (role ?? 'entrenador'))?.label ?? 'Entrenador'
 
@@ -308,9 +313,6 @@ export default function CoachesPage() {
 
     let activationUrl: string
     try {
-      // createInvitation persiste en Firestore (la ruta /activar/{token} la lee de
-      // ahí); addInvitation solo escribía el store local, así que el enlace nunca
-      // se podía activar. Mismo mecanismo que jugadores y tutores.
       const result = await createInvitation({
         email: coach.email,
         role,
@@ -343,15 +345,11 @@ export default function CoachesPage() {
     }
   }
 
-  const activeCount = coaches.filter((c) => c.isActive).length
-
-  // Repair: match existing user accounts to coach records that are missing a userId
   const handleSyncAccounts = async () => {
     const clubId = user?.clubId
     if (!clubId) return
     setIsSyncing(true)
     try {
-      // 1. Load all coach/coordinador users from Firestore
       const usersSnap = await getDocs(
         query(
           collection(db, 'users'),
@@ -361,7 +359,6 @@ export default function CoachesPage() {
       )
       const staffUsers = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() as { email: string } }))
 
-      // 2. Load coaches missing a userId
       const coachesSnap = await getDocs(
         query(collection(db, 'coaches'), where('clubId', '==', clubId))
       )
@@ -369,7 +366,7 @@ export default function CoachesPage() {
       let fixed = 0
       for (const coachDoc of coachesSnap.docs) {
         const coachData = coachDoc.data()
-        if (coachData.userId) continue // Already linked
+        if (coachData.userId) continue
 
         const matchingUser = staffUsers.find(
           (u) => u.email?.toLowerCase() === coachData.email?.toLowerCase()
@@ -395,334 +392,243 @@ export default function CoachesPage() {
     }
   }
 
-  return (
-    <div>
-      <Header
-        title="Personal"
-        subtitle={`${activeCount} activos · ${coaches.length} total`}
-        actions={
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSyncAccounts}
-              disabled={isSyncing}
-            >
-              {isSyncing ? (
-                <>
-                  <span className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Sincronizando...
-                </>
-              ) : (
-                <>
-                  <UserPlus className="h-4 w-4 mr-1" />
-                  Reparar vinculaciones
-                </>
+  const columns = useMemo<ColumnDef<Coach>[]>(() => [
+    {
+      accessorKey: 'firstName',
+      header: 'Entrenador',
+      cell: ({ row }) => {
+        const coach = row.original
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                {coach.firstName[0]}{coach.lastName[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium text-sm">{coach.firstName} {coach.lastName}</p>
+              {coach.specialization && (
+                <p className="text-xs text-muted-foreground">{coach.specialization}</p>
               )}
-            </Button>
-            <Button size="sm" onClick={openCreateDialog}>
-              <Plus className="h-4 w-4 mr-1" />
-              Nuevo miembro
-            </Button>
+            </div>
           </div>
-        }
-      />
+        )
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = `${rowA.original.firstName} ${rowA.original.lastName}`.toLowerCase()
+        const b = `${rowB.original.firstName} ${rowB.original.lastName}`.toLowerCase()
+        return a.localeCompare(b)
+      },
+    },
+    {
+      accessorKey: 'staffRole',
+      header: 'Rol',
+      cell: ({ row }) => (
+        <Badge variant={getStaffRoleBadgeVariant(row.original.staffRole)}>
+          {getStaffRoleLabel(row.original.staffRole)}
+        </Badge>
+      ),
+    },
+    {
+      id: 'groups',
+      header: 'Grupos',
+      cell: ({ row }) => (
+        <Badge variant="outline">{getCoachGroups(row.original.id).length}</Badge>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'salary',
+      header: 'Salario est.',
+      cell: ({ row }) => (
+        <span className="text-sm font-medium">{formatCurrency(getEstimatedSalary(row.original.id))}</span>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'account',
+      header: 'Cuenta',
+      cell: ({ row }) => (
+        <Badge variant={row.original.userId ? 'success' : 'secondary'}>
+          {row.original.userId ? 'Con cuenta' : 'Sin cuenta'}
+        </Badge>
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Estado',
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
+          {row.original.isActive ? 'Activo' : 'Inactivo'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const coach = row.original
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => navigate(`/entrenadores/${coach.id}`)}>
+                <Eye className="h-4 w-4 mr-2" /> Ver perfil
+              </DropdownMenuItem>
+              {!coach.userId && (
+                <DropdownMenuItem onClick={() => handleCreateAccount(coach)}>
+                  <UserPlus className="h-4 w-4 mr-2" /> Crear cuenta
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => openEditDialog(coach)}>
+                <Edit2 className="h-4 w-4 mr-2" /> Editar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowDeleteConfirm(coach.id)}>
+                <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                <span className="text-destructive">Eliminar</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      },
+      enableSorting: false,
+      size: 40,
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [groups, coachSalaryConfigs, privateLessons, events, eventPayments, navigate])
 
-      <div className="p-6 space-y-4">
-        {/* Filtros */}
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, email o telefono..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select
-            options={[
-              { value: '', label: 'Todos los roles' },
-              ...STAFF_ROLES.map((r) => ({ value: r.value, label: r.label })),
-            ]}
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="w-full sm:w-40"
-          />
-          <Select
-            options={[
-              { value: 'active', label: 'Solo activos' },
-              { value: 'all', label: 'Todos' },
-            ]}
-            value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value)}
-            className="w-full sm:w-40"
-          />
-          <div className="flex gap-1 border rounded-md p-1">
-            <Button
-              variant={viewMode === 'cards' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('cards')}
-              className="h-8 px-2"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="h-8 px-2"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+  const table = useReactTable({
+    data: filteredCoaches,
+    columns,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  })
 
-        {/* Contenido */}
-        {filteredCoaches.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No hay personal"
-            description="Anade tu primer miembro del equipo para empezar a gestionar el personal"
-            action={{ label: 'Anadir miembro', onClick: openCreateDialog }}
-          />
-        ) : viewMode === 'cards' ? (
-          /* ====== VISTA CARDS ====== */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCoaches.map((coach) => {
-              const coachGroups = getCoachGroups(coach.id)
-              const salary = getEstimatedSalary(coach.id)
-              const config = getSalaryConfig(coach.id)
-              return (
-                <Card key={coach.id} className="flex flex-col overflow-hidden border-border/60 shadow-[var(--shadow-card)] hover-lift">
-                  <CardContent className="flex flex-col flex-1 p-5">
-                    <div className="flex items-start gap-4 mb-4">
-                      <Avatar className="h-14 w-14">
-                        <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-                          {coach.firstName[0]}
-                          {coach.lastName[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-base truncate">
-                            {coach.firstName} {coach.lastName}
-                          </h3>
-                          <Badge variant={getStaffRoleBadgeVariant(coach.staffRole)} className="shrink-0">
-                            {getStaffRoleLabel(coach.staffRole)}
-                          </Badge>
-                          <Badge
-                            variant={coach.isActive ? 'success' : 'secondary'}
-                            className="shrink-0"
-                          >
-                            {coach.isActive ? 'Activo' : 'Inactivo'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {coach.specialization && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {coach.specialization}
-                            </p>
-                          )}
-                          <Badge variant={coach.userId ? 'success' : 'secondary'} className="text-[10px] shrink-0">
-                            {coach.userId ? 'Con cuenta' : 'Sin cuenta'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-4 flex-1">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{coach.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5 shrink-0" />
-                        <span>{coach.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5 shrink-0" />
-                        <span>Contratado: {formatDate(coach.hireDate)}</span>
-                      </div>
-                      {coach.certifications && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Award className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{coach.certifications}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-3.5 w-3.5 shrink-0" />
-                        <span>
-                          {coachGroups.length === 0
-                            ? 'Sin grupos asignados'
-                            : `${coachGroups.length} grupo${coachGroups.length > 1 ? 's' : ''}`}
-                        </span>
-                      </div>
-                      {config && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Euro className="h-3.5 w-3.5 shrink-0" />
-                          <span className="font-medium text-foreground">
-                            Salario est.: {formatCurrency(salary)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {coachGroups.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        {coachGroups.map((group) => (
-                          <Badge key={group.id} variant="outline" className="text-xs">
-                            {group.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 pt-3 border-t border-border/60 mt-auto">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/entrenadores/${coach.id}`)}
-                      >
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                        Ver perfil
-                      </Button>
-                      {!coach.userId && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCreateAccount(coach)}
-                        >
-                          <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                          Crear cuenta
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => openEditDialog(coach)}
-                      >
-                        <Edit2 className="h-3.5 w-3.5 mr-1.5" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => setShowDeleteConfirm(coach.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        ) : (
-          /* ====== VISTA LISTA ====== */
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead className="hidden md:table-cell">Email</TableHead>
-                    <TableHead className="hidden lg:table-cell">Especializacion</TableHead>
-                    <TableHead className="text-center">Grupos</TableHead>
-                    <TableHead className="text-right hidden md:table-cell">Salario est.</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCoaches.map((coach) => {
-                    const coachGroups = getCoachGroups(coach.id)
-                    const salary = getEstimatedSalary(coach.id)
-                    return (
-                      <TableRow key={coach.id}>
-                        <TableCell>
-                          <button
-                            className="flex items-center gap-3 text-left hover:underline"
-                            onClick={() => navigate(`/entrenadores/${coach.id}`)}
-                          >
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                                {coach.firstName[0]}{coach.lastName[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="font-medium text-sm">
-                                {coach.firstName} {coach.lastName}
-                              </span>
-                              <Badge variant={coach.userId ? 'success' : 'secondary'} className="text-[10px] w-fit mt-0.5">
-                                {coach.userId ? 'Con cuenta' : 'Sin cuenta'}
-                              </Badge>
-                            </div>
-                          </button>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStaffRoleBadgeVariant(coach.staffRole)}>
-                            {getStaffRoleLabel(coach.staffRole)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm hidden md:table-cell">{coach.email}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground hidden lg:table-cell">
-                          {coach.specialization || '-'}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline">{coachGroups.length}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium hidden md:table-cell">
-                          {formatCurrency(salary)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={coach.isActive ? 'success' : 'secondary'}>
-                            {coach.isActive ? 'Activo' : 'Inactivo'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {!coach.userId && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title="Crear cuenta de usuario"
-                                onClick={() => handleCreateAccount(coach)}
-                              >
-                                <UserPlus className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(coach)}
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setShowDeleteConfirm(coach.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
+        <Select
+          options={[
+            { value: '', label: 'Todos los roles' },
+            ...STAFF_ROLES.map((r) => ({ value: r.value, label: r.label })),
+          ]}
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="w-full sm:w-40"
+        />
+        <Select
+          options={[
+            { value: 'active', label: 'Solo activos' },
+            { value: 'all', label: 'Todos' },
+          ]}
+          value={activeFilter}
+          onChange={(e) => setActiveFilter(e.target.value)}
+          className="w-full sm:w-40"
+        />
+        <div className="flex-1" />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleSyncAccounts}
+          disabled={isSyncing}
+        >
+          {isSyncing ? (
+            <>
+              <span className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Sincronizando...
+            </>
+          ) : (
+            <>
+              <UserPlus className="h-4 w-4 mr-1" />
+              Reparar vinculaciones
+            </>
+          )}
+        </Button>
       </div>
 
-      {/* Dialogo de creacion/edicion */}
+      {filteredCoaches.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No hay entrenadores"
+          description="Anade tu primer entrenador para empezar a gestionar el personal"
+          action={{ label: 'Anadir entrenador', onClick: openCreateDialog }}
+        />
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id} className="border-b bg-muted/50">
+                      {headerGroup.headers.map((header) => (
+                        <th
+                          key={header.id}
+                          className={cn(
+                            'p-3 text-left text-sm font-medium text-muted-foreground',
+                            header.column.getCanSort() && 'cursor-pointer select-none hover:text-foreground'
+                          )}
+                          onClick={header.column.getToggleSortingHandler()}
+                          style={{ width: header.column.columnDef.size }}
+                        >
+                          <div className="flex items-center gap-1">
+                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getCanSort() && (
+                              header.column.getIsSorted() === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> :
+                                header.column.getIsSorted() === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> :
+                                  <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className="border-b hover:bg-muted/30 transition-colors">
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="p-3">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
+              <span>
+                Mostrando {pagination.pageIndex * pagination.pageSize + 1}
+                –{Math.min((pagination.pageIndex + 1) * pagination.pageSize, filteredCoaches.length)}{' '}
+                de {filteredCoaches.length} entrenadores
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
+                  Anterior
+                </Button>
+                <span className="text-xs font-medium">
+                  Página {pagination.pageIndex + 1} de {Math.max(table.getPageCount(), 1)}
+                </span>
+                <Button variant="outline" size="sm" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <DialogHeader>
@@ -832,7 +738,6 @@ export default function CoachesPage() {
               />
             </div>
 
-            {/* Seccion Salario */}
             {editingCoach && (
               <>
                 <div className="col-span-2 border-t pt-4 mt-2">
@@ -963,7 +868,6 @@ export default function CoachesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialogo de confirmacion de eliminacion */}
       <ConfirmDialog
         open={!!showDeleteConfirm}
         onOpenChange={() => setShowDeleteConfirm(null)}
@@ -977,7 +881,6 @@ export default function CoachesPage() {
         }}
       />
 
-      {/* Dialogo de cuenta creada */}
       <Dialog open={showInviteSuccess} onOpenChange={setShowInviteSuccess}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1013,7 +916,6 @@ export default function CoachesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Sync result dialog */}
       <Dialog open={!!syncResult} onOpenChange={() => setSyncResult(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
