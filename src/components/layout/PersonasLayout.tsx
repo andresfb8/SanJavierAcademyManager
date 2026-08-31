@@ -41,8 +41,16 @@ export function PersonasLayout() {
 
   useEffect(() => {
     setSearch('')
-    setPrimaryAction(null)
   }, [location.pathname])
+
+  // No se limpia `primaryAction` aquí a propósito. React ejecuta primero
+  // TODOS los cleanups del commit (incluido el de la página saliente, que ya
+  // llama a `setPrimaryAction(null)`) y solo después los nuevos efectos —
+  // y entre esos nuevos efectos, el de la página entrante (hijo) se ejecuta
+  // antes que el de este layout (padre). Si este efecto también limpiara
+  // `primaryAction`, se ejecutaría después de que la página entrante lo
+  // registrara, borrándolo — el botón nunca llegaba a verse (comprobado
+  // manualmente en las 4 pestañas antes de quitar esta línea).
 
   const tabs: PersonasTab[] = [
     { name: 'Jugadores', href: '/personas/jugadores', count: players.length },
