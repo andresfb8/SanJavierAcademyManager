@@ -138,7 +138,7 @@ export default function AuthenticatedApp() {
         <Route path="/clases" element={<ClasesLayout />}>
           <Route index element={<Navigate to="/clases/parrilla" replace />} />
           <Route path="parrilla" element={<AgendaPage />} />
-          <Route path="grupos" element={<GroupsPage />} />
+          <Route path="grupos" element={<GroupsRouter />} />
           <Route path="asistencia" element={<AttendancePage />} />
           <Route path="particulares" element={<EventsActivitiesPage initialTab="private" />} />
           <Route path="eventos" element={<EventsActivitiesPage initialTab="events" />} />
@@ -147,6 +147,9 @@ export default function AuthenticatedApp() {
         <Route path="/agenda" element={<Navigate to="/clases/parrilla" replace />} />
         <Route path="/eventos" element={<Navigate to="/clases/eventos" replace />} />
         <Route path="/methodology" element={<Navigate to="/clases/metodologia" replace />} />
+        {/* /grupos y /asistencia NO se redirigen a proposito: sirven contenido
+            distinto a jugador/tutor (PlayerGroupsPage, vista "Mi Asistencia")
+            que no debe quedar anidado bajo el topbar de ClasesLayout. */}
         <Route path="/grupos" element={<GroupsRouter />} />
         <Route path="/grupos/:id" element={<GroupDetailPage />} />
         <Route path="/asistencia" element={<AttendancePage />} />
