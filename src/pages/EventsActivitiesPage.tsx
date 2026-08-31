@@ -52,7 +52,7 @@ interface UnifiedItem {
 }
 
 interface EventsActivitiesPageProps {
-  initialTab?: 'all' | 'events' | 'private'
+  initialTab?: TabValue
 }
 
 export default function EventsActivitiesPage({ initialTab = 'all' }: EventsActivitiesPageProps) {
