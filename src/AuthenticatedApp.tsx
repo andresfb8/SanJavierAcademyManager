@@ -92,6 +92,14 @@ function GroupsRouter() {
   return <GroupsPage />
 }
 
+// Compartido solo por los dos wrappers de abajo, para no repetir la misma
+// comprobacion dos veces mas en este archivo (ya aparece, cada una a su
+// manera, en PaymentsRouter/GroupsRouter/PlayersRouter — no se tocan esos,
+// fuera de alcance de este cambio).
+function isPortalRole(role: UserRole | undefined) {
+  return role === 'jugador' || role === 'tutor'
+}
+
 // Usado SOLO en la ruta antigua "/grupos" (fuera de ClasesLayout). Desde
 // que GroupsPage perdio su <Header> propio (ahora vive en el topbar de
 // ClasesLayout), quedarse aqui para personal del club dejaria la pagina
@@ -101,7 +109,7 @@ function GroupsRouter() {
 function GroupsLegacyRedirect() {
   const { user } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
-  if (activeRole === 'jugador' || activeRole === 'tutor') {
+  if (isPortalRole(activeRole)) {
     return <PlayerGroupsPage />
   }
   return <Navigate to="/clases/grupos" replace />
@@ -115,7 +123,7 @@ function GroupsLegacyRedirect() {
 function AttendanceLegacyRedirect() {
   const { user } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
-  if (activeRole === 'jugador' || activeRole === 'tutor') {
+  if (isPortalRole(activeRole)) {
     return <AttendancePage />
   }
   return <Navigate to="/clases/asistencia" replace />

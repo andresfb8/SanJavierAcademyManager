@@ -328,7 +328,10 @@ export default function GroupsPage() {
     }
     clasesContext.setPrimaryAction({ label: 'Nuevo grupo', icon: Plus, onClick: openCreateDialog })
     return () => clasesContext.setPrimaryAction(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // openCreateDialog/resetForm solo tocan setState y la constante
+    // emptyForm — nada de lo que leen cambia entre renders, asi que no
+    // hace falta incluirlos en las dependencias (a diferencia del bug de
+    // closure obsoleta que hubo que arreglar en AgendaPage).
   }, [isEntrenador, clasesContext])
 
   return (
