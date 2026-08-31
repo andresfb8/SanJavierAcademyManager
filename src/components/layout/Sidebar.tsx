@@ -42,8 +42,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: 'Hoy', href: '/', icon: Home },
   { name: 'Personas', href: '/personas/jugadores', icon: Users },
-  { name: 'Clases', href: '/agenda', icon: GraduationCap },
-  { name: 'Calendario', href: '/agenda', icon: CalendarDays },
+  { name: 'Clases', href: '/clases/parrilla', icon: GraduationCap },
+  { name: 'Calendario', href: '/clases/parrilla', icon: CalendarDays },
   { name: 'Finanzas', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
   { name: 'Deportivo', href: '/informes-mensuales', icon: Trophy, requiredModule: 'informes_mensuales' },
 ]
@@ -56,8 +56,8 @@ const settingsItems: NavItem[] = [
 ]
 
 const coachSettingsItems: NavItem[] = [
-  { name: 'Grupos', href: '/grupos', icon: GraduationCap },
-  { name: 'Asistencia', href: '/asistencia', icon: ClipboardCheck },
+  { name: 'Grupos', href: '/clases/grupos', icon: GraduationCap },
+  { name: 'Asistencia', href: '/clases/asistencia', icon: ClipboardCheck },
 ]
 
 const ROLE_COLORS: Record<string, string> = {
@@ -95,7 +95,11 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
 
     // Entrenador: módulos permitidos explícitamente
     if (activeRole === 'entrenador') {
-      const coachAllowedPaths = ['/', '/personas/jugadores', '/agenda', '/grupos', '/asistencia']
+      const coachAllowedPaths = [
+        '/', '/personas/jugadores',
+        '/clases/parrilla', '/clases/grupos', '/clases/asistencia',
+        '/clases/particulares', '/clases/eventos', '/clases/metodologia',
+      ]
       if (!coachAllowedPaths.includes(item.href)) return false
     }
 

@@ -5,6 +5,7 @@ import { useEffectiveStudent } from '@/hooks/usePlayerData'
 import type { UserRole, PlayerStatus } from '@/types'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PersonasLayout } from '@/components/layout/PersonasLayout'
+import { ClasesLayout } from '@/components/layout/ClasesLayout'
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const PlayersPage = lazy(() => import('@/pages/PlayersPage'))
@@ -134,12 +135,22 @@ export default function AuthenticatedApp() {
           <Route path="entrenadores" element={<RoleRoute module="coaches"><CoachesPage /></RoleRoute>} />
           <Route path="usuarios" element={<RoleRoute module="users"><UsersPage /></RoleRoute>} />
         </Route>
+        <Route path="/clases" element={<ClasesLayout />}>
+          <Route index element={<Navigate to="/clases/parrilla" replace />} />
+          <Route path="parrilla" element={<AgendaPage />} />
+          <Route path="grupos" element={<GroupsPage />} />
+          <Route path="asistencia" element={<AttendancePage />} />
+          <Route path="particulares" element={<EventsActivitiesPage initialTab="private" />} />
+          <Route path="eventos" element={<EventsActivitiesPage initialTab="events" />} />
+          <Route path="metodologia" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
+        </Route>
+        <Route path="/agenda" element={<Navigate to="/clases/parrilla" replace />} />
+        <Route path="/eventos" element={<Navigate to="/clases/eventos" replace />} />
+        <Route path="/methodology" element={<Navigate to="/clases/metodologia" replace />} />
         <Route path="/grupos" element={<GroupsRouter />} />
         <Route path="/grupos/:id" element={<GroupDetailPage />} />
         <Route path="/asistencia" element={<AttendancePage />} />
         <Route path="/huecos" element={<FreeSlotsPage />} />
-        <Route path="/agenda" element={<AgendaPage />} />
-        <Route path="/eventos" element={<EventsActivitiesPage />} />
         <Route path="/eventos/:id" element={<EventDetailPage />} />
         <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
         <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
@@ -157,7 +168,6 @@ export default function AuthenticatedApp() {
         <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
         <Route path="/temporadas" element={<RoleRoute module="settings"><SeasonsPage /></RoleRoute>} />
         <Route path="/planificacion" element={<RoleRoute module="settings"><PlanningPage /></RoleRoute>} />
-        <Route path="/methodology" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
         <Route path="/analitica" element={<RoleRoute module="settings"><AnalyticsPage /></RoleRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
