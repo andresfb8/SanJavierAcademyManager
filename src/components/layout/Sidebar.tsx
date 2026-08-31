@@ -192,8 +192,8 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
       ]
     : [
         { href: '/', label: 'Inicio', icon: LayoutDashboard },
-        { href: '/grupos', label: 'Clases', icon: GraduationCap },
-        { href: '/asistencia', label: 'Asistencia', icon: ClipboardCheck },
+        { href: '/clases/grupos', label: 'Clases', icon: GraduationCap },
+        { href: '/clases/asistencia', label: 'Asistencia', icon: ClipboardCheck },
       ]
 
   const renderSidebarContent = (isCollapsed: boolean) => (
