@@ -83,19 +83,10 @@ function PaymentsRouter() {
   return <PaymentsPage />
 }
 
-function GroupsRouter() {
-  const { user } = useAuthStore()
-  const activeRole = user?.activeRole ?? user?.role
-  if (activeRole === 'jugador' || activeRole === 'tutor') {
-    return <PlayerGroupsPage />
-  }
-  return <GroupsPage />
-}
-
-// Compartido solo por los dos wrappers de abajo, para no repetir la misma
-// comprobacion dos veces mas en este archivo (ya aparece, cada una a su
-// manera, en PaymentsRouter/GroupsRouter/PlayersRouter — no se tocan esos,
-// fuera de alcance de este cambio).
+// Compartido por los cuatro wrappers de abajo, para no repetir la misma
+// comprobacion cuatro veces mas en este archivo (ya aparece, cada una a su
+// manera, en PaymentsRouter/PlayersRouter — no se tocan esos, fuera de
+// alcance de este cambio).
 function isPortalRole(role: UserRole | undefined) {
   return role === 'jugador' || role === 'tutor'
 }
@@ -127,6 +118,31 @@ function AttendanceLegacyRedirect() {
     return <AttendancePage />
   }
   return <Navigate to="/clases/asistencia" replace />
+}
+
+// Simetrico a GroupsLegacyRedirect/AttendanceLegacyRedirect, pero en la
+// direccion contraria: si jugador/tutor llega a /clases/grupos o
+// /clases/asistencia (URL escrita a mano, marcador viejo — ningun enlace
+// propio de su portal apunta aqui), se le devuelve a su ruta antigua en
+// vez de mostrarle su vista correcta anidada bajo el topbar y las 6
+// pestanas de personal del club (Parrilla/Eventos/Particulares no tienen
+// proteccion de rol propia, asi que quedarian ahi mismo un clic).
+function GroupsInClasesLayout() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (isPortalRole(activeRole)) {
+    return <Navigate to="/grupos" replace />
+  }
+  return <GroupsPage />
+}
+
+function AttendanceInClasesLayout() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (isPortalRole(activeRole)) {
+    return <Navigate to="/asistencia" replace />
+  }
+  return <AttendancePage />
 }
 
 function PlayersRouter({ initialStatusFilter }: { initialStatusFilter?: PlayerStatus }) {
@@ -175,8 +191,8 @@ export default function AuthenticatedApp() {
         <Route path="/clases" element={<ClasesLayout />}>
           <Route index element={<Navigate to="/clases/parrilla" replace />} />
           <Route path="parrilla" element={<AgendaPage />} />
-          <Route path="grupos" element={<GroupsRouter />} />
-          <Route path="asistencia" element={<AttendancePage />} />
+          <Route path="grupos" element={<GroupsInClasesLayout />} />
+          <Route path="asistencia" element={<AttendanceInClasesLayout />} />
           <Route path="particulares" element={<EventsActivitiesPage initialTab="private" />} />
           <Route path="eventos" element={<EventsActivitiesPage initialTab="events" />} />
           <Route path="metodologia" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
