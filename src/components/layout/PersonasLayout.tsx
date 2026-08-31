@@ -74,13 +74,17 @@ export function PersonasLayout() {
       }
     }
     if (location.pathname === '/personas/usuarios') {
+      // Algunos documentos de usuario en Firestore no tienen `roles` (datos
+      // antiguos o incompletos) aunque el tipo AppUser lo declare obligatorio
+      // — mismo fallback que ya usan isStaffUser/isPortalUser en UsersPage.
+      const rolesOf = (u: typeof users[number]) => u.roles && u.roles.length > 0 ? u.roles : [u.role]
       const staffCount = users.filter((u) =>
-        u.roles.some((r) => STAFF_ROLES_FOR_SUBTITLE.includes(r)) &&
-        !u.roles.some((r) => PORTAL_ROLES_FOR_SUBTITLE.includes(r))
+        rolesOf(u).some((r) => STAFF_ROLES_FOR_SUBTITLE.includes(r)) &&
+        !rolesOf(u).some((r) => PORTAL_ROLES_FOR_SUBTITLE.includes(r))
       ).length
       const withPortal = new Set(
         users
-          .filter((u) => u.isActive && u.roles.some((r) => PORTAL_ROLES_FOR_SUBTITLE.includes(r)))
+          .filter((u) => u.isActive && rolesOf(u).some((r) => PORTAL_ROLES_FOR_SUBTITLE.includes(r)))
           .flatMap((u) => [...(u.linkedPlayerIds || []), ...(u.linkedPlayerId ? [u.linkedPlayerId] : [])])
       ).size
       const pending = invitations.filter((inv) => inv.status === 'pendiente').length
