@@ -16,12 +16,9 @@ interface PersonasTab {
   requiredModule?: string
 }
 
-export interface PersonasPrimaryAction {
-  label: string
-  icon?: LucideIcon
-  onClick?: () => void
-  items?: { label: string; icon?: LucideIcon; onClick: () => void }[]
-}
+export type PersonasPrimaryAction =
+  | { label: string; icon?: LucideIcon; onClick: () => void }
+  | { label: string; icon?: LucideIcon; items: { label: string; icon?: LucideIcon; onClick: () => void }[] }
 
 // Solo lectura: ninguna página necesita escribir en `search` hoy (el propio
 // input del topbar ya vive en este layout), así que no se expone `setSearch`.
@@ -44,6 +41,7 @@ export function PersonasLayout() {
 
   useEffect(() => {
     setSearch('')
+    setPrimaryAction(null)
   }, [location.pathname])
 
   const tabs: PersonasTab[] = [
@@ -89,6 +87,11 @@ export function PersonasLayout() {
     }
   }, [location.pathname, players, coaches, users, invitations])
 
+  const outletContext = useMemo(
+    () => ({ search, setPrimaryAction } satisfies PersonasOutletContext),
+    [search, setPrimaryAction]
+  )
+
   return (
     <div>
       <div className="border-b border-border bg-card">
@@ -108,7 +111,7 @@ export function PersonasLayout() {
               />
             </div>
             {primaryAction && (
-              primaryAction.items ? (
+              'items' in primaryAction ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button>
@@ -162,7 +165,7 @@ export function PersonasLayout() {
           )
         })}
       </div>
-      <Outlet context={{ search, setPrimaryAction } satisfies PersonasOutletContext} />
+      <Outlet context={outletContext} />
     </div>
   )
 }
