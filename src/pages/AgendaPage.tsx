@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import type { ClasesOutletContext } from '@/components/layout/ClasesLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,6 +107,7 @@ export default function AgendaPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const isEntrenador = user?.role === 'entrenador'
+  const { setPrimaryAction } = useOutletContext<ClasesOutletContext>()
   const {
     club,
     groups,
@@ -574,27 +575,22 @@ export default function AgendaPage() {
   )
   const isToday = isSameDay(selectedDate, new Date())
 
+  useEffect(() => {
+    const items = [
+      ...(!isEntrenador ? [{ label: 'Nuevo evento', icon: CalendarPlus, onClick: openNewEventDialog }] : []),
+      { label: 'Nueva clase particular', icon: Plus, onClick: openNewLessonDialog },
+    ]
+    setPrimaryAction(
+      items.length > 1
+        ? { label: 'Nueva clase', icon: Plus, items }
+        : { label: items[0].label, icon: items[0].icon, onClick: items[0].onClick }
+    )
+    return () => setPrimaryAction(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEntrenador, setPrimaryAction])
+
   return (
     <div>
-      <Header
-        title="Agenda"
-        subtitle="Vista diaria de pistas y horarios"
-        actions={
-          <div className="flex items-center gap-2">
-            {!isEntrenador && (
-              <Button variant="outline" onClick={openNewEventDialog} className="gap-1" size="sm">
-                <CalendarPlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Nuevo evento</span>
-              </Button>
-            )}
-            <Button onClick={openNewLessonDialog} className="gap-1" size="sm">
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Nueva clase particular</span>
-            </Button>
-          </div>
-        }
-      />
-
       <div className="p-3 sm:p-6 space-y-4">
         {/* Navegacion de fecha */}
         <Card>
