@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -7,11 +7,11 @@ import { CancelPlayerDialog } from '@/components/shared/CancelPlayerDialog'
 import { PlayerFormDialog, type PlayerFormData } from '@/components/shared/PlayerFormDialog'
 import { ImportPlayersDialog, type ImportedPlayer } from '@/components/shared/ImportPlayersDialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import type { PersonasOutletContext } from '@/components/layout/PersonasLayout'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { getPlayerPortalStatus } from '@/lib/player-portal-status'
@@ -32,7 +32,7 @@ import { downloadXlsx } from '@/lib/excel'
 import { useAllPendingNormalizedPaymentsQuery } from '@/hooks/useQueries'
 import type { Player, PlayerLevel, PlayerStatus } from '@/types'
 import {
-  Plus, Search, Upload, Download, Users, Mail,
+  Plus, Upload, Download, Users, Mail,
   MoreHorizontal, Eye, Edit, Trash2, UserX, CheckCircle2,
   Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Gamepad2,
 } from 'lucide-react'
@@ -56,7 +56,7 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
   // Además, con rol de BD entrenador no se sincronizan `invitations` ni `users`,
   // así que el estado derivado no sería fiable para ellos.
   const isAdmin = activeRole === 'director' || activeRole === 'coordinador'
-  const [search, setSearch] = useState('')
+  const { search, setPrimaryAction } = useOutletContext<PersonasOutletContext>()
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter)
   const [groupFilter, setGroupFilter] = useState<string>('')
@@ -80,6 +80,15 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }))
   }, [search, levelFilter, statusFilter, groupFilter, paymentFilter, portalFilter])
+
+  useEffect(() => {
+    setPrimaryAction({
+      label: 'Nuevo jugador',
+      icon: Plus,
+      onClick: () => { setEditingPlayer(null); setShowCreateDialog(true) },
+    })
+    return () => setPrimaryAction(null)
+  }, [setPrimaryAction])
 
   const { data: allPendingPayments = [] } = useAllPendingNormalizedPaymentsQuery()
 
@@ -455,34 +464,6 @@ export default function PlayersPage({ initialStatusFilter = '' }: PlayersPagePro
 
   return (
     <div>
-      <div className="border-b border-border bg-card">
-        <div className="flex flex-wrap items-center gap-4 px-5 py-5 lg:px-8">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">PERSONAS</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {players.filter((p) => p.status === 'activo').length} activos ·{' '}
-              {players.filter((p) => p.status === 'lista_espera').length} en lista de espera ·{' '}
-              {players.length} fichas totales
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Nombre, email o teléfono…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-64 pl-9"
-              />
-            </div>
-            <Button onClick={() => { setEditingPlayer(null); setShowCreateDialog(true) }}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              Nuevo jugador
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <div className="p-6 space-y-4">
         {/* Filters */}
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
