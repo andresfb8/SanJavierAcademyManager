@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { useDataStore } from '@/stores/dataStore'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
@@ -17,9 +18,10 @@ import { createInvitation } from '@/lib/invitations'
 import { sendInvitationEmail } from '@/lib/emailService'
 import { buildActivationUrl, isInvitationLive } from '@/lib/invitation-utils'
 import type { UserRole, InvitationStatus } from '@/types'
-import { UserPlus, Copy, Check, Trash2, ShieldCheck, Search, UserX, UserCog, UserCheck, Users, Gamepad2 } from 'lucide-react'
+import { UserPlus, Copy, Check, Trash2, UserX, UserCog, UserCheck, Users, Gamepad2 } from 'lucide-react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import type { PersonasOutletContext } from '@/components/layout/PersonasLayout'
 
 interface FirestoreUser {
   id: string
@@ -68,7 +70,7 @@ export default function UsersPage() {
   const [addingEditingPlayerId, setAddingEditingPlayerId] = useState('')
 
   // --- Filter state ---
-  const [searchTerm, setSearchTerm] = useState('')
+  const { search: searchTerm, setPrimaryAction } = useOutletContext<PersonasOutletContext>()
   const [filterRole, setFilterRole] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
@@ -400,6 +402,19 @@ export default function UsersPage() {
     setShowRolesDialog(true)
   }
 
+  useEffect(() => {
+    setPrimaryAction({
+      label: 'Invitar',
+      icon: UserPlus,
+      items: [
+        { label: 'Invitar usuario', icon: UserPlus, onClick: handleOpenDialog },
+        { label: 'Invitar tutores', icon: Users, onClick: () => setShowBulkTutorDialog(true) },
+        { label: 'Invitar jugadores', icon: Gamepad2, onClick: () => setShowInvitePlayersDialog(true) },
+      ],
+    })
+    return () => setPrimaryAction(null)
+  }, [setPrimaryAction])
+
   const tabs = [
     { id: 'invitations' as const, label: 'Invitaciones', count: invitations.filter(i => i.status === 'pendiente').length },
     { id: 'staff' as const, label: 'Personal del club', count: filteredStaffUsers.length },
@@ -408,45 +423,18 @@ export default function UsersPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-6 pt-6 pb-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ShieldCheck className="h-7 w-7" />
-            Gestion de Usuarios
-          </h1>
-          <p className="text-muted-foreground">
-            Administra el acceso al sistema y el portal de jugadores
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowBulkTutorDialog(true)}>
-            <Users className="h-4 w-4 mr-2" />
-            Invitar tutores
-          </Button>
-          <Button variant="outline" onClick={() => setShowInvitePlayersDialog(true)}>
-            <Gamepad2 className="h-4 w-4 mr-2" />
-            Invitar jugadores
-          </Button>
-          <Button onClick={handleOpenDialog}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Invitar usuario
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="px-6 pt-4">
-        <div className="flex gap-1 border-b">
+      {/* Sub-pestañas */}
+      <div className="border-b border-border bg-card px-6">
+        <div className="flex gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2 font-medium text-sm transition-colors relative flex items-center gap-2 ${
+              className={`px-4 py-2.5 font-medium text-sm transition-colors relative flex items-center gap-2 ${
                 activeTab === tab.id
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
-              onClick={() => { setActiveTab(tab.id); setSearchTerm(''); setFilterRole(''); setFilterStatus('') }}
+              onClick={() => { setActiveTab(tab.id); setFilterRole(''); setFilterStatus('') }}
             >
               {tab.id === 'staff' && <Users className="h-3.5 w-3.5" />}
               {tab.id === 'portal' && <Gamepad2 className="h-3.5 w-3.5" />}
@@ -488,21 +476,6 @@ export default function UsersPage() {
 
         {/* Filters */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={
-                  activeTab === 'invitations' ? 'Buscar por email...' :
-                  activeTab === 'portal' ? 'Buscar por email o jugador...' :
-                  'Buscar por email o nombre...'
-                }
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
           {activeTab !== 'portal' && (
             <div className="w-full sm:w-48">
               <Select
