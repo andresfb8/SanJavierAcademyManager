@@ -157,15 +157,20 @@ export default function GroupDetailPage() {
 
     const tariffPeriodPrice = tariff.price
     let finalCustomPrice: number | undefined
-    if (discountMode === 'percentage') {
-      const pct = parseFloat(discountPercentage)
-      if (!isNaN(pct) && pct > 0 && pct <= 100) {
-        finalCustomPrice = Math.round(tariffPeriodPrice * (1 - pct / 100) * 100) / 100
-      }
-    } else if (discountMode === 'fixed_price') {
-      const parsed = parseFloat(customPrice)
-      if (!isNaN(parsed) && parsed >= 0) {
-        finalCustomPrice = parsed
+    // Cuotas se facturan por el calendario del grupo (group.installmentPrices),
+    // nunca por un precio individual — tariff.price ahí es el total de la
+    // temporada, no un importe recurrente que tenga sentido guardar aquí.
+    if (tariff.billingFrequency !== 'installments') {
+      if (discountMode === 'percentage') {
+        const pct = parseFloat(discountPercentage)
+        if (!isNaN(pct) && pct > 0 && pct <= 100) {
+          finalCustomPrice = Math.round(tariffPeriodPrice * (1 - pct / 100) * 100) / 100
+        }
+      } else if (discountMode === 'fixed_price') {
+        const parsed = parseFloat(customPrice)
+        if (!isNaN(parsed) && parsed >= 0) {
+          finalCustomPrice = parsed
+        }
       }
     }
 
@@ -724,10 +729,12 @@ export default function GroupDetailPage() {
             <div className="space-y-2">
               <Label>Tarifa *</Label>
               <Select
-                options={tariffs.filter((t) => t.isActive && t.billingFrequency !== 'installments').map((t) => ({
-                  value: t.id,
-                  label: `${t.name} (${formatCurrency(t.price)})`,
-                }))}
+                options={tariffs
+                  .filter((t) => t.isActive && (t.billingFrequency !== 'installments' || group?.billingFrequency === 'installments'))
+                  .map((t) => ({
+                    value: t.id,
+                    label: `${t.name} (${formatCurrency(t.price)})`,
+                  }))}
                 placeholder="Seleccionar tarifa"
                 value={selectedTariffId}
                 onChange={(e) => {
@@ -742,7 +749,12 @@ export default function GroupDetailPage() {
             </div>
 
             {/* Discount mode */}
-            {selectedTariffId && (
+            {selectedTariffId && selectedBillingFrequency === 'installments' ? (
+              <div className="space-y-1">
+                <Label>Precio</Label>
+                <p className="text-xs text-muted-foreground">Según cuotas del grupo.</p>
+              </div>
+            ) : selectedTariffId && (
               <div className="space-y-3">
                 <Label>Precio</Label>
                 <p className="text-xs text-muted-foreground">
