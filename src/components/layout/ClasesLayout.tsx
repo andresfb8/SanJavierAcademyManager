@@ -54,7 +54,7 @@ export function ClasesLayout() {
       const activeGroups = groups.filter((g) => g.isActive)
       const active = activeGroups.length
       if (active === 0) return '0 grupos activos'
-      const totalInscritos = activeGroups.reduce((sum, g) => sum + g.currentEnrollment, 0)
+      const totalInscritos = activeGroups.reduce((sum, g) => sum + (g.currentEnrollment || 0), 0)
       const promedio = (totalInscritos / active).toLocaleString('es-ES', { maximumFractionDigits: 1 })
       return `${active} activos · ${totalInscritos} alumnos inscritos · ${promedio} alumnos por grupo`
     }
