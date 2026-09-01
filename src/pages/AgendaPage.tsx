@@ -18,9 +18,8 @@ import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/con
 import { formatCurrency } from '@/lib/utils'
 import {
   START_HOUR, END_HOUR, SLOT_HEIGHT, TIME_SLOTS, LEVEL_COLORS,
-  isSameDay, timeToSlotIndex, computeBlocksByCourtForDate,
+  isSameDay, computeBlocksByCourtForDate,
   getWeekStart, addDays, formatWeekLabel,
-  type GridBlock,
 } from '@/lib/agenda-utils'
 import { WeekGrid } from '@/components/agenda/WeekGrid'
 import { StatCard } from '@/components/shared/StatCard'
@@ -189,10 +188,12 @@ export default function AgendaPage() {
     )
   }, [weekDays, renderedCourts, groups, privateLessons, events, attendance, effectiveCoachFilter, levelFilter])
 
-  // `selectedDate` siempre cae dentro de `weekDays` (weekStart se deriva de
-  // selectedDate), asi que reutilizamos el bloque ya calculado para ese dia
-  // en vez de invocar `computeBlocksByCourtForDate` una septima vez. Se
-  // mantiene el fallback por defensividad, no por necesidad real.
+  // `weekDays` solo cubre Lunes-Sabado (la vista Semana no incluye Domingo,
+  // ver spec de Fase C). Si `selectedDate` cae en Domingo (navegando la
+  // vista Dia), no hay match en `weekDays` y el fallback de abajo SI se
+  // ejecuta de verdad — no es solo defensivo. El resto de dias reutiliza el
+  // bloque ya calculado en `blocksByCourtByDay` en vez de invocar
+  // `computeBlocksByCourtForDate` una septima vez.
   const blocksByCourt = useMemo(() => {
     const idx = weekDays.findIndex((d) => isSameDay(d, selectedDate))
     return idx >= 0 ? blocksByCourtByDay[idx] : computeBlocksByCourtForDate({

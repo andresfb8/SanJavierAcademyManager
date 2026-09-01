@@ -54,18 +54,11 @@ export interface WeekGridProps {
   onSelectDay: (date: Date) => void
 }
 
+// `AgendaPage` ya filtra el caso de cero pistas activas antes de montar este
+// componente (con el mensaje correcto segun si es "sin pistas" o "filtro sin
+// resultados"), asi que `activeCourts` aqui siempre tiene al menos una pista.
 export function WeekGrid({ weekDays, activeCourts, blocksByCourtByDay, onSelectDay }: WeekGridProps) {
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
-
-  if (activeCourts.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-muted-foreground">No hay pistas activas configuradas.</p>
-        </CardContent>
-      </Card>
-    )
-  }
 
   return (
     <Card>
