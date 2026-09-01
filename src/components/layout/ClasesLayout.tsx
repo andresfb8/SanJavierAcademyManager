@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useDataStore } from '@/stores/dataStore'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { SeasonSwitcher } from '@/components/layout/SeasonSwitcher'
-import { ChevronDown, type LucideIcon } from 'lucide-react'
+import { ChevronDown, Search, type LucideIcon } from 'lucide-react'
 
 interface ClasesTab {
   name: string
@@ -18,6 +19,8 @@ export type ClasesPrimaryAction =
   | { label: string; icon?: LucideIcon; items: { label: string; icon?: LucideIcon; onClick: () => void }[] }
 
 export interface ClasesOutletContext {
+  search: string
+  setSearch: (value: string) => void
   setPrimaryAction: (action: ClasesPrimaryAction | null) => void
 }
 
@@ -25,7 +28,12 @@ export function ClasesLayout() {
   const location = useLocation()
   const { groups, events, privateLessons } = useDataStore()
 
+  const [search, setSearch] = useState('')
   const [primaryAction, setPrimaryAction] = useState<ClasesPrimaryAction | null>(null)
+
+  useEffect(() => {
+    setSearch('')
+  }, [location.pathname])
 
   // No se limpia `primaryAction` aquí a propósito — mismo motivo que en
   // PersonasLayout: el cleanup de la página saliente ya lo hace, y limpiarlo
@@ -43,8 +51,12 @@ export function ClasesLayout() {
 
   const subtitle = useMemo(() => {
     if (location.pathname === '/clases/grupos') {
-      const active = groups.filter((g) => g.isActive).length
-      return `${active} activos · ${groups.length} total`
+      const activeGroups = groups.filter((g) => g.isActive)
+      const active = activeGroups.length
+      if (active === 0) return '0 grupos activos'
+      const totalInscritos = activeGroups.reduce((sum, g) => sum + g.currentEnrollment, 0)
+      const promedio = (totalInscritos / active).toLocaleString('es-ES', { maximumFractionDigits: 1 })
+      return `${active} activos · ${totalInscritos} alumnos inscritos · ${promedio} alumnos por grupo`
     }
     if (location.pathname === '/clases/particulares') {
       return `${privateLessons.length} clases particulares`
@@ -62,9 +74,11 @@ export function ClasesLayout() {
     return undefined
   }, [location.pathname, groups, events, privateLessons])
 
+  const showSearch = location.pathname === '/clases/grupos'
+
   const outletContext = useMemo(
-    () => ({ setPrimaryAction } satisfies ClasesOutletContext),
-    [setPrimaryAction]
+    () => ({ search, setSearch, setPrimaryAction } satisfies ClasesOutletContext),
+    [search, setSearch, setPrimaryAction]
   )
 
   return (
@@ -76,6 +90,17 @@ export function ClasesLayout() {
             {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
           </div>
           <div className="flex items-center gap-2">
+            {showSearch && (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-64 pl-9"
+                />
+              </div>
+            )}
             <SeasonSwitcher />
             {primaryAction && (
               'items' in primaryAction ? (
