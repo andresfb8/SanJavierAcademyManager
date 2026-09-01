@@ -19,8 +19,11 @@ import { formatCurrency } from '@/lib/utils'
 import {
   START_HOUR, END_HOUR, SLOT_HEIGHT, TIME_SLOTS, LEVEL_COLORS,
   isSameDay, timeToSlotIndex, computeBlocksByCourtForDate,
+  getWeekStart, addDays, formatWeekLabel,
   type GridBlock,
 } from '@/lib/agenda-utils'
+import { WeekGrid } from '@/components/agenda/WeekGrid'
+import { StatCard } from '@/components/shared/StatCard'
 import type { PrivateLesson, EventType } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
@@ -76,6 +79,10 @@ export default function AgendaPage() {
   }, [isEntrenador, user?.id, coaches])
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [viewMode, setViewMode] = useState<'semana' | 'dia'>('semana')
+  const [coachFilter, setCoachFilter] = useState('')
+  const [courtFilter, setCourtFilter] = useState('')
+  const [levelFilter, setLevelFilter] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
 
   // Modal de asistencia
@@ -150,20 +157,60 @@ export default function AgendaPage() {
   }, [courts])
   const selectedDayOfWeek = selectedDate.getDay()
 
+  // Pistas realmente renderizadas en la grilla (Día y Semana) — respeta el
+  // filtro de Pista. Los dialogos de crear clase/evento siguen usando
+  // `activeCourts` sin filtrar, porque ahi se puede elegir cualquier pista.
+  const renderedCourts = useMemo(
+    () => (courtFilter ? activeCourts.filter((c) => c.id === courtFilter) : activeCourts),
+    [activeCourts, courtFilter]
+  )
+
+  const effectiveCoachFilter = isEntrenador ? (currentCoachId ?? '') : coachFilter
+
   const blocksByCourt = useMemo(() => {
     return computeBlocksByCourtForDate({
       date: selectedDate,
-      courts: activeCourts,
+      courts: renderedCourts,
       groups,
       privateLessons,
       events,
       attendance,
+      coachFilter: effectiveCoachFilter,
+      levelFilter,
     })
-  }, [groups, privateLessons, events, activeCourts, selectedDate, attendance])
+  }, [groups, privateLessons, events, renderedCourts, selectedDate, attendance, effectiveCoachFilter, levelFilter])
+
+  const weekStart = useMemo(() => getWeekStart(selectedDate), [selectedDate])
+  const weekEnd = useMemo(() => addDays(weekStart, 5), [weekStart])
+  const weekDays = useMemo(
+    () => Array.from({ length: 6 }, (_, i) => addDays(weekStart, i)),
+    [weekStart]
+  )
+
+  const blocksByCourtByDay = useMemo(() => {
+    return weekDays.map((day) =>
+      computeBlocksByCourtForDate({
+        date: day,
+        courts: renderedCourts,
+        groups,
+        privateLessons,
+        events,
+        attendance,
+        coachFilter: effectiveCoachFilter,
+        levelFilter,
+      })
+    )
+  }, [weekDays, renderedCourts, groups, privateLessons, events, attendance, effectiveCoachFilter, levelFilter])
 
   function goToPreviousDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d }) }
   function goToNextDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d }) }
   function goToToday() { setSelectedDate(new Date()) }
+  function goToPreviousWeek() { setSelectedDate((prev) => addDays(prev, -7)) }
+  function goToNextWeek() { setSelectedDate((prev) => addDays(prev, 7)) }
+  function jumpToDay(date: Date) {
+    setSelectedDate(date)
+    setViewMode('dia')
+  }
 
   const dayLabel = useMemo(() => {
     const info = DAYS_OF_WEEK.find((d) => d.value === selectedDayOfWeek)
@@ -459,6 +506,18 @@ export default function AgendaPage() {
     () => coaches.filter((c) => c.isActive).sort((a, b) => a.lastName.localeCompare(b.lastName)),
     [coaches]
   )
+  const weekGroupCount = blocksByCourtByDay.reduce(
+    (acc, byCourt) => acc + Object.values(byCourt).reduce((a, blocks) => a + blocks.filter((b) => b.type === 'group').length, 0),
+    0
+  )
+  const weekPrivateCount = blocksByCourtByDay.reduce(
+    (acc, byCourt) => acc + Object.values(byCourt).reduce((a, blocks) => a + blocks.filter((b) => b.type === 'private').length, 0),
+    0
+  )
+  const weekEventCount = blocksByCourtByDay.reduce(
+    (acc, byCourt) => acc + Object.values(byCourt).reduce((a, blocks) => a + blocks.filter((b) => b.type === 'event').length, 0),
+    0
+  )
   const isToday = isSameDay(selectedDate, new Date())
 
   useEffect(() => {
@@ -483,56 +542,148 @@ export default function AgendaPage() {
   return (
     <div>
       <div className="p-3 sm:p-6 space-y-4">
-        {/* Navegacion de fecha */}
+        {/* Controles: toggle de vista, navegacion, filtros y leyenda */}
         <Card>
-          <CardContent className="py-3">
+          <CardContent className="py-3 space-y-3">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={goToPreviousDay}><ChevronLeft className="h-4 w-4" /></Button>
-
-                <div className="relative flex items-center">
-                  <CalendarIcon className="absolute left-3 text-muted-foreground h-4 w-4 pointer-events-none" />
-                  <Input
-                    type="date"
-                    className="pl-9 h-9 w-[150px] sm:w-[170px] text-sm cursor-pointer"
-                    value={toInputDate(selectedDate)}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        const newDate = new Date(e.target.value + 'T00:00:00')
-                        setSelectedDate(newDate)
-                      }
-                    }}
-                  />
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center border rounded-md overflow-hidden shrink-0">
+                  <Button
+                    type="button"
+                    variant={viewMode === 'semana' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="rounded-none"
+                    onClick={() => setViewMode('semana')}
+                  >
+                    Semana
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={viewMode === 'dia' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="rounded-none"
+                    onClick={() => setViewMode('dia')}
+                  >
+                    Día
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-none"
+                    disabled
+                    title="Próximamente"
+                  >
+                    Mes
+                  </Button>
                 </div>
 
-                <Button variant="outline" size="icon" onClick={goToNextDay}><ChevronRight className="h-4 w-4" /></Button>
+                {viewMode === 'dia' ? (
+                  <>
+                    <Button variant="outline" size="icon" onClick={goToPreviousDay}><ChevronLeft className="h-4 w-4" /></Button>
+                    <div className="relative flex items-center">
+                      <CalendarIcon className="absolute left-3 text-muted-foreground h-4 w-4 pointer-events-none" />
+                      <Input
+                        type="date"
+                        className="pl-9 h-9 w-[150px] sm:w-[170px] text-sm cursor-pointer"
+                        value={toInputDate(selectedDate)}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const newDate = new Date(e.target.value + 'T00:00:00')
+                            setSelectedDate(newDate)
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={goToNextDay}><ChevronRight className="h-4 w-4" /></Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="icon" onClick={goToPreviousWeek}><ChevronLeft className="h-4 w-4" /></Button>
+                    <span className="text-sm font-semibold px-2 min-w-[120px] text-center">{formatWeekLabel(weekStart, weekEnd)}</span>
+                    <Button variant="outline" size="icon" onClick={goToNextWeek}><ChevronRight className="h-4 w-4" /></Button>
+                  </>
+                )}
                 {!isToday && <Button variant="outline" size="sm" onClick={goToToday}>Hoy</Button>}
               </div>
               <div className="hidden sm:block text-center">
-                <h2 className="text-base sm:text-lg font-semibold capitalize">{formatDateLong(selectedDate)}</h2>
-                <p className="text-sm text-muted-foreground">{dayLabel}</p>
+                {viewMode === 'dia' ? (
+                  <>
+                    <h2 className="text-base sm:text-lg font-semibold capitalize">{formatDateLong(selectedDate)}</h2>
+                    <p className="text-sm text-muted-foreground">{dayLabel}</p>
+                  </>
+                ) : (
+                  <h2 className="text-base sm:text-lg font-semibold">Semana del {formatWeekLabel(weekStart, weekEnd)}</h2>
+                )}
               </div>
-              <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-blue-100 border border-blue-300" />Grupo</div>
-                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" />Particular</div>
-                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-teal-100 border border-teal-300" />Evento</div>
+              <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground flex-wrap justify-end">
+                {PLAYER_LEVELS.map((level) => {
+                  const colors = LEVEL_COLORS[level.value] ?? LEVEL_COLORS.iniciacion
+                  return (
+                    <div key={level.value} className="flex items-center gap-1">
+                      <div className={`h-3 w-3 rounded-sm ${colors.bg} border ${colors.border}`} />
+                      {level.label}
+                    </div>
+                  )
+                })}
+                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-amber-50 border border-amber-300" />Particular</div>
+                <div className="flex items-center gap-1"><div className="h-3 w-3 rounded-sm bg-teal-50 border border-teal-400" />Evento</div>
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+              {!isEntrenador && (
+                <Select
+                  options={[
+                    { value: '', label: 'Todos los entrenadores' },
+                    ...activeCoaches.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName}` })),
+                  ]}
+                  value={coachFilter}
+                  onChange={(e) => setCoachFilter(e.target.value)}
+                  className="w-full sm:w-48"
+                />
+              )}
+              <Select
+                options={[
+                  { value: '', label: 'Todas las pistas' },
+                  ...activeCourts.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                value={courtFilter}
+                onChange={(e) => setCourtFilter(e.target.value)}
+                className="w-full sm:w-48"
+              />
+              <Select
+                options={[
+                  { value: '', label: 'Todos los niveles' },
+                  ...PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label })),
+                ]}
+                value={levelFilter}
+                onChange={(e) => setLevelFilter(e.target.value)}
+                className="w-full sm:w-48"
+              />
             </div>
           </CardContent>
         </Card>
 
         {/* Grilla horaria */}
-        {activeCourts.length === 0 ? (
+        {viewMode === 'semana' ? (
+          <WeekGrid
+            weekDays={weekDays}
+            activeCourts={renderedCourts}
+            blocksByCourtByDay={blocksByCourtByDay}
+            onSelectDay={jumpToDay}
+          />
+        ) : renderedCourts.length === 0 ? (
           <Card><CardContent className="py-12 text-center"><MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-3" /><p className="text-muted-foreground">No hay pistas activas configuradas.</p></CardContent></Card>
         ) : (
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <div className="grid min-w-[800px]" style={{ gridTemplateColumns: `80px repeat(${activeCourts.length}, 1fr)` }}>
+                <div className="grid min-w-[800px]" style={{ gridTemplateColumns: `80px repeat(${renderedCourts.length}, 1fr)` }}>
                   <div className="sticky top-0 z-10 border-b border-r bg-muted/50 px-2 py-3 text-xs font-medium text-muted-foreground flex items-center justify-center">
                     <Clock className="h-3.5 w-3.5 mr-1" />Hora
                   </div>
-                  {activeCourts.map((court) => (
+                  {renderedCourts.map((court) => (
                     <div key={court.id} className="sticky top-0 z-10 border-b bg-muted/50 px-3 py-3 text-center">
                       <p className="text-sm font-semibold truncate">{court.name}</p>
                       <p className="text-xs text-muted-foreground capitalize">{court.type === 'indoor' ? 'Cubierta' : 'Exterior'} &middot; {court.surface}</p>
@@ -546,7 +697,7 @@ export default function AgendaPage() {
                         <div className={`border-r px-2 flex items-start justify-end pt-1 text-xs font-mono text-muted-foreground ${isFullHour ? 'border-t' : 'border-t border-dashed'}`} style={{ height: SLOT_HEIGHT }}>
                           {isFullHour ? time : ''}
                         </div>
-                        {activeCourts.map((court) => {
+                        {renderedCourts.map((court) => {
                           const blocks = blocksByCourt[court.id] ?? []
                           const startingBlock = blocks.find((b) => b.startSlot === slotIdx)
                           const coveredByBlock = blocks.find((b) => b.startSlot < slotIdx && b.endSlot > slotIdx)
@@ -663,12 +814,44 @@ export default function AgendaPage() {
         )}
 
         {/* Resumen del dia */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100"><Users className="h-5 w-5 text-blue-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'group').length, 0)}</p><p className="text-sm text-muted-foreground">Grupos con clase</p></div></div></CardContent></Card>
-          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100"><Clock className="h-5 w-5 text-amber-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'private').length, 0)}</p><p className="text-sm text-muted-foreground">Clases particulares</p></div></div></CardContent></Card>
-          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100"><Star className="h-5 w-5 text-teal-600" /></div><div><p className="text-2xl font-bold">{Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'event').length, 0)}</p><p className="text-sm text-muted-foreground">Eventos</p></div></div></CardContent></Card>
-          <Card><CardContent className="py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100"><MapPin className="h-5 w-5 text-green-600" /></div><div><p className="text-2xl font-bold">{activeCourts.length}</p><p className="text-sm text-muted-foreground">Pistas activas</p></div></div></CardContent></Card>
-        </div>
+        {viewMode === 'dia' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <StatCard
+              title="Grupos con clase"
+              value={Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'group').length, 0)}
+              icon={Users}
+              iconClassName="bg-blue-500/10 text-blue-600"
+            />
+            <StatCard
+              title="Clases particulares"
+              value={Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'private').length, 0)}
+              icon={Clock}
+              iconClassName="bg-amber-500/10 text-amber-600"
+            />
+            <StatCard
+              title="Eventos"
+              value={Object.values(blocksByCourt).reduce((acc, blocks) => acc + blocks.filter((b) => b.type === 'event').length, 0)}
+              icon={Star}
+              iconClassName="bg-teal-500/10 text-teal-600"
+            />
+            <StatCard
+              title="Pistas activas"
+              value={activeCourts.length}
+              icon={MapPin}
+              iconClassName="bg-emerald-500/10 text-emerald-600"
+            />
+          </div>
+        )}
+
+        {/* Resumen de la semana */}
+        {viewMode === 'semana' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <StatCard title="Grupos con clase (semana)" value={weekGroupCount} icon={Users} iconClassName="bg-blue-500/10 text-blue-600" />
+            <StatCard title="Clases particulares (semana)" value={weekPrivateCount} icon={Clock} iconClassName="bg-amber-500/10 text-amber-600" />
+            <StatCard title="Eventos (semana)" value={weekEventCount} icon={Star} iconClassName="bg-teal-500/10 text-teal-600" />
+            <StatCard title="Pistas activas" value={activeCourts.length} icon={MapPin} iconClassName="bg-emerald-500/10 text-emerald-600" />
+          </div>
+        )}
       </div>
 
       {/* Dialogo: Nueva clase particular */}
