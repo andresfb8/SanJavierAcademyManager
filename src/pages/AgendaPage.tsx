@@ -167,19 +167,6 @@ export default function AgendaPage() {
 
   const effectiveCoachFilter = isEntrenador ? (currentCoachId ?? '') : coachFilter
 
-  const blocksByCourt = useMemo(() => {
-    return computeBlocksByCourtForDate({
-      date: selectedDate,
-      courts: renderedCourts,
-      groups,
-      privateLessons,
-      events,
-      attendance,
-      coachFilter: effectiveCoachFilter,
-      levelFilter,
-    })
-  }, [groups, privateLessons, events, renderedCourts, selectedDate, attendance, effectiveCoachFilter, levelFilter])
-
   const weekStart = useMemo(() => getWeekStart(selectedDate), [selectedDate])
   const weekEnd = useMemo(() => addDays(weekStart, 5), [weekStart])
   const weekDays = useMemo(
@@ -201,6 +188,24 @@ export default function AgendaPage() {
       })
     )
   }, [weekDays, renderedCourts, groups, privateLessons, events, attendance, effectiveCoachFilter, levelFilter])
+
+  // `selectedDate` siempre cae dentro de `weekDays` (weekStart se deriva de
+  // selectedDate), asi que reutilizamos el bloque ya calculado para ese dia
+  // en vez de invocar `computeBlocksByCourtForDate` una septima vez. Se
+  // mantiene el fallback por defensividad, no por necesidad real.
+  const blocksByCourt = useMemo(() => {
+    const idx = weekDays.findIndex((d) => isSameDay(d, selectedDate))
+    return idx >= 0 ? blocksByCourtByDay[idx] : computeBlocksByCourtForDate({
+      date: selectedDate,
+      courts: renderedCourts,
+      groups,
+      privateLessons,
+      events,
+      attendance,
+      coachFilter: effectiveCoachFilter,
+      levelFilter,
+    })
+  }, [weekDays, selectedDate, blocksByCourtByDay, renderedCourts, groups, privateLessons, events, attendance, effectiveCoachFilter, levelFilter])
 
   function goToPreviousDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d }) }
   function goToNextDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d }) }
@@ -666,15 +671,29 @@ export default function AgendaPage() {
         </Card>
 
         {/* Grilla horaria */}
-        {viewMode === 'semana' ? (
+        {renderedCourts.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              {activeCourts.length === 0 ? (
+                <p className="text-muted-foreground">No hay pistas activas configuradas.</p>
+              ) : (
+                <>
+                  <p className="text-muted-foreground">Ninguna pista activa coincide con el filtro seleccionado.</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => setCourtFilter('')}>
+                    Quitar filtro de pista
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ) : viewMode === 'semana' ? (
           <WeekGrid
             weekDays={weekDays}
             activeCourts={renderedCourts}
             blocksByCourtByDay={blocksByCourtByDay}
             onSelectDay={jumpToDay}
           />
-        ) : renderedCourts.length === 0 ? (
-          <Card><CardContent className="py-12 text-center"><MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-3" /><p className="text-muted-foreground">No hay pistas activas configuradas.</p></CardContent></Card>
         ) : (
           <Card>
             <CardContent className="p-0">
