@@ -60,6 +60,12 @@ export interface DaySession {
   level?: string
   currentEnrollment?: number
   maxCapacity?: number
+  /**
+   * Si un grupo tiene varias franjas el mismo día (p.ej. doble sesión),
+   * `hasRecord` se calcula igual en todas ellas: refleja un único
+   * `AttendanceRecord` por grupo+fecha, no uno por franja — es el
+   * comportamiento correcto, no un bug.
+   */
   hasRecord: boolean
 }
 

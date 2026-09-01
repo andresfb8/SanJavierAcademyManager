@@ -142,6 +142,23 @@ describe('getSessionsForDate', () => {
     const result = getSessionsForDate(monday, [tuesdayGroup], [], [])
     expect(result).toHaveLength(0)
   })
+
+  it('un grupo con dos franjas el mismo dia produce dos sesiones, con el mismo hasRecord', () => {
+    const doubleSlotGroup = makeGroup({
+      schedule: [
+        { dayOfWeek: 1, startTime: '09:00', endTime: '10:00' },
+        { dayOfWeek: 1, startTime: '18:00', endTime: '19:00' },
+      ],
+    })
+    const attendance = [{
+      id: 'att-1', groupId: 'group-1', groupName: 'Grupo Test', date: monday,
+      records: [], coachId: 'coach-1', createdAt: monday,
+    }] as any
+    const result = getSessionsForDate(monday, [doubleSlotGroup], [], attendance)
+    expect(result).toHaveLength(2)
+    expect(result.map((s) => s.startTime)).toEqual(['09:00', '18:00'])
+    expect(result.every((s) => s.hasRecord === true)).toBe(true)
+  })
 })
 
 describe('isSessionHappeningNow', () => {
