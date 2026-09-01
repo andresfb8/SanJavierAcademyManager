@@ -47,7 +47,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { isSameDay } from '@/lib/agenda-utils'
-import { getSessionsForDate, getGroupAttendanceByWeek } from '@/lib/attendance-utils'
+import { getSessionsForDate, getGroupAttendanceByWeek, isSessionHappeningNow } from '@/lib/attendance-utils'
 
 // ==========================================
 // AttendancePage - Registro de Asistencia
@@ -257,18 +257,6 @@ export default function AttendancePage() {
       }) ?? null
     )
   }, [selectedGroupId, selectedDate, attendance])
-
-  // Historial: ultimos 5 registros de asistencia del grupo
-  const recentRecords = useMemo(() => {
-    if (!selectedGroupId) return []
-    return attendance
-      .filter((a) => a.groupId === selectedGroupId)
-      .sort(
-        (a, b) =>
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-      )
-      .slice(0, 5)
-  }, [selectedGroupId, attendance])
 
   // Opciones de jugadores para el filtro de exportacion
   const allPlayerOptions = useMemo(() => {
@@ -525,22 +513,8 @@ export default function AttendancePage() {
   }
 
   // ===================
-  // CONTADORES RESUMEN
-  // ===================
-
-  const presentCount = entries.filter((e) => e.status === 'presente').length
-  const absentCount = entries.filter((e) => e.status === 'ausente').length
-  const justifiedCount = entries.filter((e) => e.status === 'justificado').length
-  const recoveryCount = entries.filter((e) => e.isRecovery).length
-
-  // ===================
   // OPCIONES DE SELECT
   // ===================
-
-  const groupOptions = activeGroups.map((g) => ({
-    value: g.id,
-    label: `${g.name} (${g.coachName})`,
-  }))
 
   const recoveryPlayerOptions = recoveryEligiblePlayers.map((p) => ({
     value: p.id,
@@ -554,11 +528,6 @@ export default function AttendancePage() {
       label: `${p.firstName} ${p.lastName}`,
     }))
     .sort((a, b) => a.label.localeCompare(b.label))
-
-  // ===================
-  // RENDER
-  // ===================
-
 
   // ===================
   // RENDER
@@ -672,7 +641,8 @@ export default function AttendancePage() {
                         <CardTitle className="text-base">{selectedGroup.name}</CardTitle>
                         {selectedSession.hasRecord ? (
                           <Badge className="bg-slate-100 text-slate-600 border-none text-[10px]">Cerrada</Badge>
-                        ) : isSameDay(new Date(selectedDate + 'T00:00:00'), new Date()) ? (
+                        ) : isSameDay(new Date(selectedDate + 'T00:00:00'), new Date()) &&
+                          isSessionHappeningNow(selectedSession.startTime, selectedSession.endTime) ? (
                           <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px]">En curso</Badge>
                         ) : (
                           <Badge className="bg-amber-100 text-amber-700 border-none text-[10px]">Pendiente</Badge>
