@@ -291,6 +291,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (invitation.linkedPlayerIds && invitation.linkedPlayerIds.length > 0) {
         userData.linkedPlayerIds = invitation.linkedPlayerIds
       }
+      // El propio invitado no tiene permiso para escribir en coaches/{coachId}
+      // (las reglas exigen isAdmin() ahi) — se deja la marca aqui, en un
+      // documento que si puede crear el mismo, para que la Cloud Function
+      // onUserCreated haga el enlace coaches/{coachId}.userId con privilegios
+      // de administrador.
+      if (invitation.coachId) userData.coachId = invitation.coachId
       await setDoc(doc(db, 'users', firebaseUser.uid), userData)
 
       // Marcar la invitación como aceptada (las reglas lo permiten al propio invitado)
