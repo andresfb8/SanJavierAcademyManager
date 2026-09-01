@@ -395,16 +395,16 @@ export default function GroupsPage() {
   return (
     <div>
       <div className="p-6 space-y-4">
-        {/* Filters and view toggle */}
+        {/* Filtros: fila principal (igual al mock) */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-3">
           <Select
             options={[
-              { value: 'schedule', label: 'Ordenar: Horario' },
-              { value: 'name', label: 'Ordenar: Nombre' },
+              { value: '', label: 'Todos los niveles' },
+              ...PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label })),
             ]}
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'schedule' | 'name')}
-            className="w-full sm:w-40"
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className="w-full sm:w-48"
           />
           {!isEntrenador && (
             <Select
@@ -420,15 +420,6 @@ export default function GroupsPage() {
               className="w-full sm:w-48"
             />
           )}
-          <Select
-            options={[
-              { value: '', label: 'Todos los niveles' },
-              ...PLAYER_LEVELS.map((l) => ({ value: l.value, label: l.label })),
-            ]}
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value)}
-            className="w-full sm:w-48"
-          />
           <Select
             options={[
               { value: '', label: 'Todos los días' },
@@ -448,6 +439,39 @@ export default function GroupsPage() {
             onChange={(e) => setCapacityFilter(e.target.value)}
             className="w-full sm:w-36"
           />
+          <div className="flex items-center border rounded-md shrink-0">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-r-none"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1.5" />
+              Tarjetas
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-l-none"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4 mr-1.5" />
+              Tabla
+            </Button>
+          </div>
+        </div>
+
+        {/* Filtros: fila secundaria (sin equivalente en el mock, funcionalidad existente) */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-sm text-muted-foreground">
+          <Select
+            options={[
+              { value: 'schedule', label: 'Ordenar: Horario' },
+              { value: 'name', label: 'Ordenar: Nombre' },
+            ]}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'schedule' | 'name')}
+            className="h-8 w-full text-xs sm:w-36"
+          />
           <Select
             options={[
               { value: '', label: activeSeasonForEmptyState ? `Temporada actual: ${activeSeasonForEmptyState.name}` : 'Temporada actual' },
@@ -456,26 +480,8 @@ export default function GroupsPage() {
             ]}
             value={seasonFilter}
             onChange={(e) => setSeasonFilter(e.target.value)}
-            className="w-full sm:w-56"
+            className="h-8 w-full text-xs sm:w-52"
           />
-          <div className="flex items-center border rounded-md shrink-0">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="icon"
-              className="h-10 w-10 rounded-r-none"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="icon"
-              className="h-10 w-10 rounded-l-none"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
           <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={filteredGroups.length === 0}>
             <FileDown className="h-4 w-4 mr-1" />
             Exportar PDF
@@ -500,14 +506,6 @@ export default function GroupsPage() {
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredGroups.map((group) => {
-              const activeEnrollments = enrollments.filter(e => e.groupId === group.id && e.isActive)
-              const groupPlayers = activeEnrollments
-                .map(e => players.find(p => p.id === e.playerId))
-                .filter(Boolean) as any[]
-
-              const displayPlayers = groupPlayers.slice(0, 4)
-              const remainingPlayers = groupPlayers.length - 4
-
               return (
                 <Card
                   key={group.id}
@@ -547,7 +545,7 @@ export default function GroupsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4 flex-1 flex flex-col">
-                    <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground bg-muted/30 p-2 rounded-lg">
+                    <div className="space-y-1.5 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1.5 truncate">
                         <User className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate" title={group.coachName || 'Sin entrenador'}>{group.coachName || 'Sin entrenador'}</span>
@@ -556,39 +554,10 @@ export default function GroupsPage() {
                         <MapPin className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate" title={group.courtName || 'Sin pista'}>{group.courtName || 'Sin pista'}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 col-span-2 truncate">
+                      <div className="flex items-center gap-1.5 truncate">
                         <Clock className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate" title={formatSchedule(group.schedule)}>{formatSchedule(group.schedule)}</span>
                       </div>
-                    </div>
-
-                    <div className="flex-1 min-h-[100px]">
-                      {groupPlayers.length > 0 ? (
-                        <div className="space-y-2">
-                          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                            Alumnos ({group.currentEnrollment})
-                          </div>
-                          <div className="space-y-1.5">
-                            {displayPlayers.map(p => (
-                              <div key={p.id} className="flex items-center gap-2 text-sm">
-                                <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0">
-                                  {p.firstName?.charAt(0)}{p.lastName?.charAt(0)}
-                                </div>
-                                <span className="truncate font-medium text-foreground/90">{p.firstName}</span>
-                              </div>
-                            ))}
-                            {remainingPlayers > 0 && (
-                              <div className="text-xs text-muted-foreground pl-8 pt-0.5">
-                                + {remainingPlayers} alumno{remainingPlayers !== 1 ? 's' : ''} más
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-full flex items-center justify-center border-2 border-dashed rounded-lg p-4 bg-muted/20">
-                          <span className="text-sm text-muted-foreground">Sin alumnos inscritos</span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t mt-auto">
