@@ -16,42 +16,17 @@ import { useAuthStore } from '@/stores/authStore'
 import { ChevronLeft, ChevronRight, Plus, Clock, Users, MapPin, CalendarPlus, Star, X, Edit2, Trash2, Euro, Calendar as CalendarIcon } from 'lucide-react'
 import { DAYS_OF_WEEK, PLAYER_LEVELS, EVENT_TYPES, PAYMENT_METHODS } from '@/constants'
 import { formatCurrency } from '@/lib/utils'
-import { isGroupCurrentlyActive } from '@/lib/group-utils'
+import {
+  START_HOUR, END_HOUR, SLOT_HEIGHT, TIME_SLOTS, LEVEL_COLORS,
+  isSameDay, timeToSlotIndex, computeBlocksByCourtForDate,
+  type GridBlock,
+} from '@/lib/agenda-utils'
 import type { PrivateLesson, EventType } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
-
 // ==========================================
-// Constantes de la agenda
+// Utilidades locales de esta pagina
 // ==========================================
-
-const START_HOUR = 8
-const END_HOUR = 22
-const SLOT_HEIGHT = 48
-
-function generateTimeSlots(): string[] {
-  const slots: string[] = []
-  for (let h = START_HOUR; h < END_HOUR; h++) {
-    slots.push(`${String(h).padStart(2, '0')}:00`)
-    slots.push(`${String(h).padStart(2, '0')}:30`)
-  }
-  return slots
-}
-
-const TIME_SLOTS = generateTimeSlots()
-
-const LEVEL_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  iniciacion: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-800' },
-  intermedio: { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-800' },
-  avanzado: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-800' },
-  competicion: { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-800' },
-  menores: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-800' },
-}
-
-function timeToSlotIndex(time: string): number {
-  const [h, m] = time.split(':').map(Number)
-  return (h - START_HOUR) * 2 + (m >= 30 ? 1 : 0)
-}
 
 function formatDateLong(date: Date): string {
   return new Intl.DateTimeFormat('es-ES', {
@@ -64,39 +39,6 @@ function toInputDate(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
-
-// ==========================================
-// Tipo interno para bloques en la grilla
-// ==========================================
-
-interface GridBlock {
-  type: 'group' | 'private' | 'event'
-  id: string
-  startSlot: number
-  endSlot: number
-  groupName?: string
-  level?: string
-  levelLabel?: string
-  coachName?: string
-  enrollment?: number
-  maxCapacity?: number
-  playerNames?: string[]
-  price?: number
-  notes?: string
-  eventName?: string
-  eventType?: string
-  eventTypeLabel?: string
-  attendanceStats?: {
-    present: number
-    absent: number
-    justified: number
-  } | null
-  coachId?: string
 }
 
 // ==========================================
@@ -209,71 +151,15 @@ export default function AgendaPage() {
   const selectedDayOfWeek = selectedDate.getDay()
 
   const blocksByCourt = useMemo(() => {
-    const map: Record<string, GridBlock[]> = {}
-    for (const court of activeCourts) { map[court.id] = [] }
-
-    // 1. Grupos
-    for (const group of groups) {
-      if (!isGroupCurrentlyActive(group, selectedDate)) continue
-      for (const slot of group.schedule) {
-        if (slot.dayOfWeek !== selectedDayOfWeek) continue
-        if (!map[group.courtId]) continue
-        const levelInfo = PLAYER_LEVELS.find((l) => l.value === group.level)
-
-        // Calcular estadísticas de asistencia para esta fecha
-        const attendanceForDate = attendance.find(a => {
-          return a.groupId === group.id && isSameDay(new Date(a.date), selectedDate)
-        })
-
-        const attendanceStats = attendanceForDate ? {
-          present: attendanceForDate.records.filter(r => r.status === 'presente').length,
-          absent: attendanceForDate.records.filter(r => r.status === 'ausente').length,
-          justified: attendanceForDate.records.filter(r => r.status === 'justificado').length,
-        } : null
-
-        map[group.courtId].push({
-          type: 'group', id: group.id,
-          startSlot: timeToSlotIndex(slot.startTime), endSlot: timeToSlotIndex(slot.endTime),
-          groupName: group.name, level: group.level, levelLabel: levelInfo?.label ?? group.level,
-          coachName: group.coachName, enrollment: group.currentEnrollment, maxCapacity: group.maxCapacity,
-          attendanceStats,
-          coachId: group.coachId,
-        })
-      }
-    }
-
-    // 2. Clases particulares
-    for (const lesson of privateLessons) {
-      const lessonDate = lesson.date instanceof Date ? lesson.date : new Date(lesson.date)
-      if (!isSameDay(lessonDate, selectedDate)) continue
-      if (!map[lesson.courtId]) continue
-      map[lesson.courtId].push({
-        type: 'private', id: lesson.id,
-        startSlot: timeToSlotIndex(lesson.startTime), endSlot: timeToSlotIndex(lesson.endTime),
-        coachName: lesson.coachName, playerNames: lesson.playerNames, price: lesson.price, notes: lesson.notes,
-        coachId: lesson.coachId,
-      })
-    }
-
-    // 3. Eventos
-    for (const event of events) {
-      if (!event.isActive) continue
-      const eventDate = event.date instanceof Date ? event.date : new Date(event.date)
-      if (!isSameDay(eventDate, selectedDate)) continue
-      const typeInfo = EVENT_TYPES.find((t) => t.value === event.type)
-      for (const courtId of event.courtIds) {
-        if (!map[courtId]) continue
-        map[courtId].push({
-          type: 'event', id: event.id,
-          startSlot: timeToSlotIndex(event.startTime), endSlot: timeToSlotIndex(event.endTime),
-          eventName: event.name, eventType: event.type, eventTypeLabel: typeInfo?.label ?? event.type,
-          coachName: event.coachNames.join(', '), playerNames: event.attendeePlayerNames, price: event.price,
-        })
-      }
-    }
-
-    return map
-  }, [groups, privateLessons, events, activeCourts, selectedDate, selectedDayOfWeek])
+    return computeBlocksByCourtForDate({
+      date: selectedDate,
+      courts: activeCourts,
+      groups,
+      privateLessons,
+      events,
+      attendance,
+    })
+  }, [groups, privateLessons, events, activeCourts, selectedDate, attendance])
 
   function goToPreviousDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d }) }
   function goToNextDay() { setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d }) }
