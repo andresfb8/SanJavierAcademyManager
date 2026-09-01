@@ -22,7 +22,8 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const PlanningPage = lazy(() => import('@/pages/PlanningPage'))
 const MethodologyPage = lazy(() => import('@/pages/MethodologyPage'))
 const UsersPage = lazy(() => import('@/pages/UsersPage'))
-const EventsActivitiesPage = lazy(() => import('@/pages/EventsActivitiesPage'))
+const PrivateLessonsPage = lazy(() => import('@/pages/PrivateLessonsPage'))
+const EventsPage = lazy(() => import('@/pages/EventsPage'))
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage'))
 const PrivateLessonDetailPage = lazy(() => import('@/pages/PrivateLessonDetailPage'))
 const ClassDetailPage = lazy(() => import('@/pages/ClassDetailPage'))
@@ -193,8 +194,8 @@ export default function AuthenticatedApp() {
           <Route path="parrilla" element={<AgendaPage />} />
           <Route path="grupos" element={<GroupsInClasesLayout />} />
           <Route path="asistencia" element={<AttendanceInClasesLayout />} />
-          <Route path="particulares" element={<EventsActivitiesPage initialTab="private" />} />
-          <Route path="eventos" element={<EventsActivitiesPage initialTab="events" />} />
+          <Route path="particulares" element={<PrivateLessonsPage />} />
+          <Route path="eventos" element={<EventsPage />} />
           <Route path="metodologia" element={<RoleRoute module="settings"><MethodologyPage /></RoleRoute>} />
         </Route>
         <Route path="/agenda" element={<Navigate to="/clases/parrilla" replace />} />
