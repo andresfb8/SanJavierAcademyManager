@@ -609,7 +609,15 @@ export default function AttendancePage() {
   if (pageView === 'calendar' && sheetGroup) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Historial de Asistencia" subtitle={sheetGroup.name} />
+        <Header
+          title="Historial de Asistencia"
+          subtitle={sheetGroup.name}
+          actions={
+            <Button variant="outline" size="sm" onClick={() => setPageView('selector')}>
+              Volver
+            </Button>
+          }
+        />
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <AttendanceCalendar
             group={sheetGroup}
