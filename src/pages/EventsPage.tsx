@@ -27,7 +27,6 @@ import type { EventType } from '@/types'
 import { checkEventConflicts, formatConflictMessage } from '@/lib/schedule-conflicts'
 import { isSameDay } from '@/lib/agenda-utils'
 import { EventsMiniCalendar } from '@/components/agenda/EventsMiniCalendar'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
 export default function EventsPage() {
   const navigate = useNavigate()
@@ -145,6 +144,10 @@ export default function EventsPage() {
         if (selectedCalendarDate && !isSameDay(evDateValue, selectedCalendarDate)) return false
         return true
       })
+      // Ascendente (el mas proximo primero) -- es una lista de "que viene",
+      // no un historial. Deliberadamente al reves que PrivateLessonsPage,
+      // cuya tabla es un registro de clases ya dadas y por eso ordena
+      // descendente (la mas reciente primero).
       .sort((a, b) => {
         const da = a.date instanceof Date ? a.date : new Date(a.date)
         const db = b.date instanceof Date ? b.date : new Date(b.date)

@@ -24,7 +24,6 @@ import {
 import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { PLAYER_LEVELS } from '@/constants'
 import type { PrivateLesson, PrivateLessonPayment } from '@/types'
-import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
 
 type LessonStatus = 'pagada' | 'pendiente' | 'cancelada'
 
@@ -136,6 +135,9 @@ export default function PrivateLessonsPage() {
         }
         return true
       })
+      // Descendente (la mas reciente primero) -- es un registro de clases ya
+      // dadas. Deliberadamente al reves que EventsPage, cuya lista es de
+      // proximos eventos y por eso ordena ascendente (el mas cercano primero).
       .sort((a, b) => {
         const da = a.date instanceof Date ? a.date : new Date(a.date)
         const db = b.date instanceof Date ? b.date : new Date(b.date)
