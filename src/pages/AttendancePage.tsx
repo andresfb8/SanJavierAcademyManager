@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useSearchParams, useOutletContext } from 'react-router-dom'
+import { useSearchParams, useOutletContext, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import type { ClasesOutletContext } from '@/components/layout/ClasesLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,18 +23,17 @@ import {
   XCircle,
   AlertCircle,
   UserPlus,
-  Calendar,
   Users,
-  ClipboardList,
   Save,
   Download,
   RotateCcw,
   Phone,
   Share2,
-  CalendarDays,
-  Zap,
+  MoreHorizontal,
+  History,
+  Smartphone,
 } from 'lucide-react'
-import { formatDate, generateId } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { downloadXlsx } from '@/lib/excel'
 import type { AttendanceEntry, AttendanceStatus } from '@/types'
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useAttendanceQuery, useActivitiesQuery, useEvaluationsQuery, useMatchReportsQuery, useInvoicesQuery } from '@/hooks/useQueries'
@@ -42,6 +41,13 @@ import { QuickAttendanceSheet } from '@/components/attendance/QuickAttendanceShe
 import { AttendanceCalendar } from '@/components/attendance/AttendanceCalendar'
 import { useNextClass } from '@/hooks/useNextClass'
 import { MyAttendanceView } from '@/components/attendance/MyAttendanceView'
+import { DaySessionList } from '@/components/agenda/DaySessionList'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
+import { isSameDay } from '@/lib/agenda-utils'
+import { getSessionsForDate, getGroupAttendanceByWeek } from '@/lib/attendance-utils'
 
 // ==========================================
 // AttendancePage - Registro de Asistencia
@@ -58,9 +64,10 @@ function toISODate(date: Date | string): string {
 
 export default function AttendancePage() {
   const { user } = useAuthStore()
-  const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches, attendanceNotices } = useDataStore()
+  const { groups, players, enrollments, addAttendanceRecord, updateAttendanceRecord, coaches, attendanceNotices, privateLessons } = useDataStore()
   const { data: attendance = [] } = useAttendanceQuery()
   const clasesContext = useOutletContext<ClasesOutletContext | undefined>()
+  const navigate = useNavigate()
 
   // ── Vista: 'selector' | 'sheet' | 'calendar' ────────────────────────────
   type PageView = 'selector' | 'sheet' | 'calendar'
@@ -125,24 +132,73 @@ export default function AttendancePage() {
     return allActive
   }, [groups, isEntrenador, isAdmin, currentCoach])
 
+  // Mismo criterio que `activeGroups`: un entrenador solo ve sus propias
+  // clases particulares en la lista del dia, no las de otros companeros.
+  const visiblePrivateLessons = useMemo(() => {
+    if (isEntrenador && currentCoach) {
+      return privateLessons.filter((l) => l.coachId === currentCoach.id)
+    }
+    return privateLessons
+  }, [privateLessons, isEntrenador, currentCoach])
+
+  const daySessions = useMemo(
+    () => getSessionsForDate(new Date(selectedDate + 'T00:00:00'), activeGroups, visiblePrivateLessons, attendance),
+    [selectedDate, activeGroups, visiblePrivateLessons, attendance]
+  )
+
+  const selectedSession = useMemo(
+    () => daySessions.find((s) => s.type === 'group' && s.id === selectedGroupId) ?? null,
+    [daySessions, selectedGroupId]
+  )
+
+  const dayAttendanceSummary = useMemo(() => {
+    const groupSessions = daySessions.filter((s) => s.type === 'group')
+    const closedSessions = groupSessions.filter((s) => s.hasRecord)
+    if (closedSessions.length === 0) return { average: null, closedCount: 0 }
+
+    let present = 0
+    let total = 0
+    for (const session of closedSessions) {
+      const record = attendance.find(
+        (a) => a.groupId === session.id && isSameDay(new Date(a.date), new Date(selectedDate + 'T00:00:00'))
+      )
+      if (!record) continue
+      for (const entry of record.records) {
+        total++
+        if (entry.status === 'presente') present++
+      }
+    }
+    return {
+      average: total > 0 ? Math.round((present / total) * 100) : null,
+      closedCount: closedSessions.length,
+    }
+  }, [daySessions, attendance, selectedDate])
+
+  const weeklyAttendance = useMemo(() => {
+    if (!selectedGroupId) return []
+    return getGroupAttendanceByWeek(attendance, selectedGroupId, new Date(selectedDate + 'T00:00:00'))
+  }, [attendance, selectedGroupId, selectedDate])
+
   // ── Auto-navegación por URL params ──────────────────────────────────────
+  // Ya no salta a pageView 'sheet' — el layout maestro-detalle muestra la
+  // sesion seleccionada directamente en la pantalla principal.
   useEffect(() => {
     if (urlGroupId) {
       setSelectedGroupId(urlGroupId)
       if (urlDate) setSelectedDate(urlDate)
-      setPageView('sheet')
     }
   }, [urlGroupId, urlDate])
 
-  // ── Auto-detección de clase próxima (entrenador, 2h ventana) ───────────
+  // ── Auto-deteccion de clase proxima (entrenador, 2h ventana) ────────────
+  // Sustituye al antiguo banner "Clase proxima" — la sesion se auto-
+  // selecciona y aparece resaltada con el badge "Ahora" en DaySessionList.
   useEffect(() => {
-    if (nextClass && !urlGroupId && pageView === 'selector') {
+    if (nextClass && !urlGroupId && !selectedGroupId) {
       const todayISO = new Date().toISOString().split('T')[0]
       setSelectedGroupId(nextClass.group.id)
       setSelectedDate(todayISO)
-      setPageView('sheet')
     }
-  }, [nextClass, urlGroupId])
+  }, [nextClass, urlGroupId, selectedGroupId])
 
   const selectedGroup = useMemo(
     () => groups.find((g) => g.id === selectedGroupId) ?? null,
@@ -225,55 +281,35 @@ export default function AttendancePage() {
   // HANDLERS
   // ===================
 
-  // Cuando cambia el grupo o la fecha, reinicializar las entries
-  const initializeEntries = () => {
+  // Al seleccionar una sesion (cambia selectedGroupId o selectedDate), se
+  // carga su hoja de asistencia automaticamente — ya no hace falta un boton
+  // "Cargar hoja" manual. Deliberadamente NO se incluyen `existingRecord`/
+  // `enrolledPlayers` en las dependencias (mismo patron ya usado en
+  // QuickAttendanceSheet.tsx): solo debe re-inicializar cuando cambia la
+  // sesion elegida, no cada vez que las entries en curso provocan un
+  // recalculo de esos memos.
+  useEffect(() => {
     if (!selectedGroupId) {
       setEntries([])
       setEntriesInitialized(false)
       return
     }
-
-    const newEntries: AttendanceEntry[] = enrolledPlayers.map((p) => ({
-      playerId: p.id,
-      playerName: p.name,
-      status: 'presente' as AttendanceStatus,
-      isRecovery: false,
-    }))
-
-    setEntries(newEntries)
+    if (existingRecord) {
+      setEntries(existingRecord.records)
+    } else {
+      setEntries(
+        enrolledPlayers.map((p) => ({
+          playerId: p.id,
+          playerName: p.name,
+          status: 'presente' as AttendanceStatus,
+          isRecovery: false,
+        }))
+      )
+    }
     setEntriesInitialized(true)
     setSaved(false)
-  }
-
-  // Cambiar grupo
-  const handleGroupChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const groupId = e.target.value
-    setSelectedGroupId(groupId)
-    setEntriesInitialized(false)
-    setSaved(false)
-  }
-
-  // Cambiar fecha
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedDate(e.target.value)
-    setEntriesInitialized(false)
-    setSaved(false)
-  }
-
-  // Cargar hoja de asistencia
-  const handleLoadSheet = () => {
-    if (!selectedGroupId) return
-
-    if (existingRecord) {
-      // Pre-load existing entries for editing
-      setEntries(existingRecord.records)
-      setEntriesInitialized(true)
-      setSaved(false)
-      return
-    }
-
-    initializeEntries()
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId, selectedDate])
 
   // Cambiar estado de asistencia de un jugador
   const handleStatusChange = (playerId: string, status: AttendanceStatus) => {
@@ -587,466 +623,264 @@ export default function AttendancePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6">
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={handleOpenExportDialog}>
-            <Download className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">Exportar</span>
-          </Button>
-        </div>
-        {/* Auto-detect banner */}
-        {nextClass && pageView === 'selector' && (
-          <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 animate-in slide-in-from-top-3 duration-300">
-            <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-              <Zap className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-emerald-800">
-                Clase próxima: <span className="font-black">{nextClass.group.name}</span>
-              </p>
-              <p className="text-xs text-emerald-600">
-                {nextClass.startTime} · Abre el pase de lista en un tap
-              </p>
-            </div>
-            <Button
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shrink-0"
-              onClick={() => {
-                const today = new Date().toISOString().split('T')[0]
-                setSelectedGroupId(nextClass.group.id)
-                setSelectedDate(today)
-                setPageView('sheet')
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Columna izquierda: navegacion de dia + lista de sesiones */}
+          <div className="lg:w-80 shrink-0">
+            <DaySessionList
+              sessions={daySessions}
+              selectedDate={selectedDate}
+              selectedGroupId={selectedGroupId}
+              dayAverageAttendance={dayAttendanceSummary.average}
+              closedSessionsCount={dayAttendanceSummary.closedCount}
+              onSelectGroup={(groupId) => setSelectedGroupId(groupId)}
+              onSelectPrivate={(privateLessonId) => navigate(`/clases-particulares/${privateLessonId}`)}
+              onPreviousDay={() => {
+                const d = new Date(selectedDate + 'T00:00:00')
+                d.setDate(d.getDate() - 1)
+                setSelectedDate(d.toISOString().split('T')[0])
               }}
-            >
-              Pasar lista →
-            </Button>
+              onNextDay={() => {
+                const d = new Date(selectedDate + 'T00:00:00')
+                d.setDate(d.getDate() + 1)
+                setSelectedDate(d.toISOString().split('T')[0])
+              }}
+              onDateChange={(value) => setSelectedDate(value)}
+            />
           </div>
-        )}
 
-        {/* ============================== */}
-        {/* SELECTOR DE GRUPO Y FECHA      */}
-        {/* ============================== */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5" />
-              Pasar lista
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div className="space-y-2">
-                <Label>Grupo</Label>
-                <Select
-                  options={groupOptions}
-                  placeholder="Seleccionar grupo..."
-                  value={selectedGroupId}
-                  onChange={handleGroupChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Fecha</Label>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={handleDateChange}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    if (selectedGroupId && selectedDate) {
-                      setPageView('sheet')
-                    }
-                  }}
-                  disabled={!selectedGroupId || !selectedDate}
-                  className="flex-1"
-                >
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  Pasar Lista
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (selectedGroupId) setPageView('calendar')
-                  }}
-                  disabled={!selectedGroupId}
-                >
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Aviso si ya existe registro */}
-            {existingRecord && (
-              <div className="mt-4 flex items-center gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
-                <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                <span>
-                  Ya existe un registro para este grupo en esta fecha. Al cargar la hoja podrás editarlo y al guardar se actualizará el registro existente.
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ============================== */}
-        {/* HOJA DE ASISTENCIA             */}
-        {/* ============================== */}
-        {entriesInitialized && selectedGroup && (
-          <>
-            {/* Info del grupo */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Badge variant="secondary" className="text-xs sm:text-sm px-2 sm:px-3 py-1">
-                <Users className="h-4 w-4 mr-1" />
-                {selectedGroup.name}
-              </Badge>
-              <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1">
-                <Calendar className="h-4 w-4 mr-1" />
-                {formatDate(new Date(selectedDate + 'T00:00:00'))}
-              </Badge>
-              <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1 hidden sm:inline-flex">
-                Entrenador: {selectedGroup.coachName}
-              </Badge>
-            </div>
-
-            <Card>
-              <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary/80" />
-                    Jugadores ({entries.length})
-                  </CardTitle>
-                  <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleMarkAllPresent}
-                      className="text-green-600 border-green-200 hover:bg-green-50 rounded-full"
-                    >
-                      <CheckCircle className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Todos presentes</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowRecoveryDialog(true)}
-                      className="rounded-full"
-                    >
-                      <RotateCcw className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Recuperación</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowOneOffDialog(true)}
-                      className="rounded-full"
-                    >
-                      <UserPlus className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Clase Suelta</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleNotifyFreeSlots}
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50 rounded-full"
-                      title="Notificar huecos libres por WhatsApp"
-                    >
-                      <Share2 className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Notificar Hueco</span>
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Resumen Visual de Asistencia (Bloques) */}
-                {entries.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-                    <div className="rounded-xl bg-green-50 p-3 text-center border border-green-100 shadow-sm">
-                      <div className="text-2xl font-black text-green-700">{presentCount}</div>
-                      <div className="text-[10px] font-bold uppercase text-green-600/70 tracking-wider">Presentes</div>
-                    </div>
-                    <div className="rounded-xl bg-red-50 p-3 text-center border border-red-100 shadow-sm">
-                      <div className="text-2xl font-black text-red-700">{absentCount}</div>
-                      <div className="text-[10px] font-bold uppercase text-red-600/70 tracking-wider">Ausentes</div>
-                    </div>
-                    <div className="rounded-xl bg-yellow-50 p-3 text-center border border-yellow-100 shadow-sm">
-                      <div className="text-2xl font-black text-yellow-700">{justifiedCount}</div>
-                      <div className="text-[10px] font-bold uppercase text-yellow-600/70 tracking-wider">Justificados</div>
-                    </div>
-                    <div className="rounded-xl bg-blue-50 p-3 text-center border border-blue-100 shadow-sm">
-                      <div className="text-2xl font-black text-blue-700">{recoveryCount}</div>
-                      <div className="text-[10px] font-bold uppercase text-blue-600/70 tracking-wider">Recuperaciones</div>
-                    </div>
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent className="pt-4">
-                {entries.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No hay jugadores inscritos en este grupo.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Cabecera */}
-                    <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-                      <div className="col-span-4">Jugador</div>
-                      <div className="col-span-5">Estado</div>
-                      <div className="col-span-3">Notas</div>
-                    </div>
-
-                    {/* Filas de jugadores */}
-                    {entries.map((entry) => (
-                      <div
-                        key={`${entry.playerId}-${entry.isRecovery ? 'rec' : 'reg'}`}
-                        className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center px-4 py-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
-                      >
-                        {/* Nombre */}
-                        <div className="col-span-4 flex items-center justify-between md:justify-start gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">
-                              {entry.playerName}
-                            </span>
-                            {entry.isRecovery && (
-                              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 border-blue-200">
-                                Rec.
-                              </Badge>
-                            )}
-                            {entry.isOneOff && (
-                              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-orange-100 text-orange-700 border-orange-200">
-                                Suelta
-                              </Badge>
-                            )}
-                            {(() => {
-                              const notice = attendanceNotices.find(n => 
-                                n.playerId === entry.playerId && 
-                                n.groupId === selectedGroupId && 
-                                toISODate(n.date) === selectedDate
-                              )
-                              if (!notice) return null
-                              return (
-                                <Badge 
-                                  variant={notice.type === 'absent' ? 'destructive' : 'secondary'} 
-                                  className="text-[10px] px-1.5 py-0 animate-pulse"
-                                  title={notice.notes}
-                                >
-                                  {notice.type === 'absent' ? 'No viene' : 'Viene'}
-                                </Badge>
-                              )
-                            })()}
-                          </div>
-                          
-                          {/* Quick Actions & Info */}
-                          <div className="flex items-center gap-1.5 ml-auto md:ml-2">
-                            {(() => {
-                              const player = players.find(p => p.id === entry.playerId)
-                              if (!player) return null
-                              return (
-                                <>
-                                  {player.medicalNotes && (
-                                    <Badge variant="destructive" className="h-5 w-5 p-0 flex items-center justify-center rounded-full" title={player.medicalNotes}>
-                                      <AlertCircle className="h-3 w-3" />
-                                    </Badge>
-                                  )}
-                                  <a 
-                                    href={`https://wa.me/${player.phone.replace(/\s+/g, '')}`} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="p-1 hover:bg-green-100 rounded text-green-600 transition-colors"
-                                    title="Enviar WhatsApp"
-                                  >
-                                    <Phone className="h-3.5 w-3.5" />
-                                  </a>
-                                </>
-                              )
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* Botones de estado */}
-                        <div className="col-span-5 flex gap-1.5 sm:gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleStatusChange(entry.playerId, 'presente')
-                            }
-                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'presente'
-                              ? 'bg-green-100 text-green-700 border-green-300 shadow-sm'
-                              : 'bg-background text-muted-foreground border-border hover:bg-green-50 hover:text-green-600'
-                              }`}
-                          >
-                            <CheckCircle className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Presente</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleStatusChange(entry.playerId, 'ausente')
-                            }
-                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'ausente'
-                              ? 'bg-red-100 text-red-700 border-red-300 shadow-sm'
-                              : 'bg-background text-muted-foreground border-border hover:bg-red-50 hover:text-red-600'
-                              }`}
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Ausente</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleStatusChange(entry.playerId, 'justificado')
-                            }
-                            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${entry.status === 'justificado'
-                              ? 'bg-yellow-100 text-yellow-700 border-yellow-300 shadow-sm'
-                              : 'bg-background text-muted-foreground border-border hover:bg-yellow-50 hover:text-yellow-600'
-                              }`}
-                          >
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Justificado</span>
-                          </button>
-                        </div>
-
-                        {/* Notas + boton quitar recuperacion */}
-                        <div className="col-span-3 flex items-center gap-2">
-                          <Input
-                            placeholder="Notas..."
-                            value={entry.notes ?? ''}
-                            onChange={(e) =>
-                              handleNoteChange(entry.playerId, e.target.value)
-                            }
-                            className="h-8 text-xs"
-                          />
-                          {entry.isRecovery && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRecovery(entry.playerId)}
-                              className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                              title="Quitar recuperacion"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Boton guardar */}
-                {entries.length > 0 && (
-                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t pt-4">
-                    <div className="text-sm text-muted-foreground">
-                      {presentCount} presentes, {absentCount} ausentes,{' '}
-                      {justifiedCount} justificados
-                      {recoveryCount > 0 && ` (${recoveryCount} recuperaciones)`}
-                    </div>
-                    <Button
-                      onClick={handleSave}
-                      disabled={saved}
-                      className="min-w-[160px]"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {saved ? 'Guardado' : 'Guardar asistencia'}
-                    </Button>
-                  </div>
-                )}
-
-                {saved && (
-                  <div className="mt-3 flex items-center gap-2 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
-                    <CheckCircle className="h-5 w-5 flex-shrink-0" />
-                    <span>
-                      Asistencia guardada correctamente. Los creditos de
-                      recuperacion se han actualizado automaticamente.
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* ============================== */}
-            {/* HISTORIAL DE ASISTENCIAS       */}
-            {/* ============================== */}
-            {recentRecords.length > 0 && (
+          {/* Columna derecha: panel de detalle de la sesion seleccionada */}
+          <div className="flex-1 min-w-0">
+            {entriesInitialized && selectedGroup && selectedSession ? (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Ultimos registros de asistencia
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <div className="space-y-2 min-w-[400px]">
-                      {/* Cabecera */}
-                      <div className="grid grid-cols-5 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b">
-                        <div>Fecha</div>
-                        <div className="text-center">Presentes</div>
-                        <div className="text-center">Ausentes</div>
-                        <div className="text-center">Justificados</div>
-                        <div className="text-center">Total</div>
+                <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-base">{selectedGroup.name}</CardTitle>
+                        {selectedSession.hasRecord ? (
+                          <Badge className="bg-slate-100 text-slate-600 border-none text-[10px]">Cerrada</Badge>
+                        ) : isSameDay(new Date(selectedDate + 'T00:00:00'), new Date()) ? (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-none text-[10px]">En curso</Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-700 border-none text-[10px]">Pendiente</Badge>
+                        )}
+                        <StatusBadge status={selectedGroup.level} />
                       </div>
-
-                      {recentRecords.map((record) => {
-                        const rPresent = record.records.filter(
-                          (r) => r.status === 'presente'
-                        ).length
-                        const rAbsent = record.records.filter(
-                          (r) => r.status === 'ausente'
-                        ).length
-                        const rJustified = record.records.filter(
-                          (r) => r.status === 'justificado'
-                        ).length
-                        const rTotal = record.records.length
-
+                      <p className="text-xs text-muted-foreground">
+                        {selectedSession.startTime} - {selectedSession.endTime} · {selectedGroup.courtName} · {selectedGroup.coachName}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedGroup.currentEnrollment}/{selectedGroup.maxCapacity}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleMarkAllPresent}
+                        className="text-green-600 border-green-200 hover:bg-green-50 rounded-full"
+                      >
+                        <CheckCircle className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Todos presentes</span>
+                      </Button>
+                      <Button onClick={handleSave} disabled={saved} className="min-w-[130px]">
+                        <Save className="h-4 w-4 mr-2" />
+                        {saved ? 'Guardado' : 'Guardar'}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-9 w-9">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setShowRecoveryDialog(true)}>
+                            <RotateCcw className="h-4 w-4 mr-2" /> Añadir recuperación
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setShowOneOffDialog(true)}>
+                            <UserPlus className="h-4 w-4 mr-2" /> Añadir clase suelta
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleNotifyFreeSlots}>
+                            <Share2 className="h-4 w-4 mr-2" /> Notificar hueco libre
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setPageView('calendar')}>
+                            <History className="h-4 w-4 mr-2" /> Ver historial completo
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setPageView('sheet')}>
+                            <Smartphone className="h-4 w-4 mr-2" /> Vista de pase rápido
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={handleOpenExportDialog}>
+                            <Download className="h-4 w-4 mr-2" /> Exportar a Excel
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-6">
+                  {entries.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      No hay jugadores inscritos en este grupo.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {entries.map((entry) => {
+                        const player = players.find((p) => p.id === entry.playerId)
+                        const notice = attendanceNotices.find(
+                          (n) =>
+                            n.playerId === entry.playerId &&
+                            n.groupId === selectedGroupId &&
+                            toISODate(n.date) === selectedDate
+                        )
                         return (
                           <div
-                            key={record.id}
-                            className="grid grid-cols-5 gap-4 items-center px-4 py-2.5 rounded-md border hover:bg-accent/30 transition-colors"
+                            key={`${entry.playerId}-${entry.isRecovery ? 'rec' : 'reg'}`}
+                            className="relative rounded-xl border bg-card p-3 space-y-2"
                           >
-                            <div className="text-sm font-medium">
-                              {formatDate(new Date(record.date))}
+                            {(entry.isRecovery || entry.isOneOff || notice || player?.medicalNotes) && (
+                              <div className="absolute -top-2 -right-2 flex gap-1">
+                                {entry.isRecovery && (
+                                  <span className="h-5 px-1.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold flex items-center" title="Recuperación">R</span>
+                                )}
+                                {entry.isOneOff && (
+                                  <span className="h-5 px-1.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold flex items-center" title="Clase suelta">S</span>
+                                )}
+                                {notice && (
+                                  <span
+                                    className={`h-5 px-1.5 rounded-full text-[9px] font-bold flex items-center animate-pulse ${notice.type === 'absent' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}
+                                    title={notice.notes}
+                                  >
+                                    {notice.type === 'absent' ? '!' : '✓'}
+                                  </span>
+                                )}
+                                {player?.medicalNotes && (
+                                  <span className="h-5 w-5 rounded-full bg-red-100 text-red-700 flex items-center justify-center" title={player.medicalNotes}>
+                                    <AlertCircle className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  entry.status === 'presente'
+                                    ? 'bg-green-100 text-green-700'
+                                    : entry.status === 'ausente'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-yellow-100 text-yellow-700'
+                                }`}
+                              >
+                                {entry.playerName.charAt(0)}
+                              </div>
+                              <span className="text-sm font-medium truncate">{entry.playerName}</span>
                             </div>
-                            <div className="text-center">
-                              <Badge variant="success">{rPresent}</Badge>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(entry.playerId, 'presente')}
+                                className={`flex-1 flex items-center justify-center py-1.5 rounded-md border ${
+                                  entry.status === 'presente'
+                                    ? 'bg-green-100 text-green-700 border-green-300'
+                                    : 'bg-background text-muted-foreground border-border hover:bg-green-50'
+                                }`}
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(entry.playerId, 'ausente')}
+                                className={`flex-1 flex items-center justify-center py-1.5 rounded-md border ${
+                                  entry.status === 'ausente'
+                                    ? 'bg-red-100 text-red-700 border-red-300'
+                                    : 'bg-background text-muted-foreground border-border hover:bg-red-50'
+                                }`}
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(entry.playerId, 'justificado')}
+                                className={`flex-1 flex items-center justify-center py-1.5 rounded-md border ${
+                                  entry.status === 'justificado'
+                                    ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                                    : 'bg-background text-muted-foreground border-border hover:bg-yellow-50'
+                                }`}
+                              >
+                                <AlertCircle className="h-3.5 w-3.5" />
+                              </button>
+                              {player?.phone && (
+                                <a
+                                  href={`https://wa.me/${player.phone.replace(/\s+/g, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center justify-center px-1.5 rounded-md text-green-600 hover:bg-green-50 shrink-0"
+                                  title="WhatsApp"
+                                >
+                                  <Phone className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                              {entry.isRecovery && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRecovery(entry.playerId)}
+                                  className="text-muted-foreground hover:text-destructive shrink-0 px-1"
+                                  title="Quitar recuperación"
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
-                            <div className="text-center">
-                              <Badge variant="destructive">{rAbsent}</Badge>
-                            </div>
-                            <div className="text-center">
-                              <Badge variant="warning">{rJustified}</Badge>
-                            </div>
-                            <div className="text-center text-sm text-muted-foreground">
-                              {rTotal}
-                            </div>
+                            <Input
+                              placeholder="Notas..."
+                              value={entry.notes ?? ''}
+                              onChange={(e) => handleNoteChange(entry.playerId, e.target.value)}
+                              className="h-7 text-[11px]"
+                            />
                           </div>
                         )
                       })}
                     </div>
-                  </div>
+                  )}
+
+                  {saved && (
+                    <div className="flex items-center gap-2 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
+                      <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                      <span>
+                        Asistencia guardada correctamente. Los créditos de recuperación se han actualizado automáticamente.
+                      </span>
+                    </div>
+                  )}
+
+                  {weeklyAttendance.some((p) => p.rate !== null) && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2">Asistencia del grupo — últimas 8 semanas</h3>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={weeklyAttendance}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="weekLabel" tick={{ fontSize: 11 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} width={32} />
+                          <Tooltip
+                            formatter={(value: any) => (value == null ? 'Sin datos' : `${value}%`)}
+                          />
+                          <Bar dataKey="rate" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+            ) : (
+              <EmptyState
+                icon={Users}
+                title="Selecciona una sesión"
+                description="Elige una sesión de la lista para pasar o revisar su asistencia."
+              />
             )}
-          </>
-        )}
-
-        {/* Estado vacio: cuando no se ha cargado la hoja aun */}
-        {!entriesInitialized && selectedGroupId && (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <ClipboardList className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">Pulsa "Cargar hoja" para comenzar</p>
-            <p className="text-sm mt-1">
-              Selecciona un grupo y fecha y luego carga la hoja de asistencia
-            </p>
           </div>
-        )}
-
-        {!selectedGroupId && (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <Users className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">Selecciona un grupo</p>
-            <p className="text-sm mt-1">
-              Elige un grupo del desplegable para registrar la asistencia
-            </p>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* ============================== */}
