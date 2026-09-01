@@ -9,12 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { useDataStore } from '@/stores/dataStore'
-import { Plus, Search, Users, Clock, MapPin, User, Trash2, Edit2, LayoutGrid, List, FileDown } from 'lucide-react'
-import { generateId, normalizeText } from '@/lib/utils'
+import { Plus, Users, Clock, MapPin, User, Trash2, Edit2, LayoutGrid, List, FileDown, MoreHorizontal, Activity, Hourglass } from 'lucide-react'
+import { normalizeText } from '@/lib/utils'
 import { PLAYER_LEVELS, DAYS_OF_WEEK } from '@/constants'
 import type { Group, PlayerLevel, ScheduleSlot } from '@/types'
 import { generateGroupsListReport } from '@/lib/pdf-reports'
@@ -71,14 +72,16 @@ function formatSchedule(schedule: ScheduleSlot[]): string {
 
 export default function GroupsPage() {
   const navigate = useNavigate()
-  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments, club, seasons } = useDataStore()
+  const { groups, coaches, courts, tariffs, addGroup, updateGroup, deleteGroup, players, enrollments, club, seasons, attendance } = useDataStore()
   const { user } = useAuthStore()
   const clasesContext = useOutletContext<ClasesOutletContext | undefined>()
+  const search = clasesContext?.search ?? ''
 
-  const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
   const [coachFilter, setCoachFilter] = useState<string>('')
   const [seasonFilter, setSeasonFilter] = useState<string>('')
+  const [dayFilter, setDayFilter] = useState<string>('')
+  const [capacityFilter, setCapacityFilter] = useState<string>('')
   const [sortBy, setSortBy] = useState<'schedule' | 'name'>('schedule')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [showDialog, setShowDialog] = useState(false)
@@ -103,12 +106,45 @@ export default function GroupsPage() {
       })
   }, [courts])
   const activeTariffs = useMemo(() => tariffs.filter((t) => t.isActive), [tariffs])
+  const activeSeason = club ? seasons.find((s) => s.id === club.activeSeasonId) : undefined
 
   const isEntrenador = user?.role === 'entrenador'
   const currentCoach = useMemo(
     () => coaches.find((c) => c.userId === user?.id),
     [coaches, user?.id]
   )
+
+  const attendanceRateByGroup = useMemo(() => {
+    const rates: Record<string, number | null> = {}
+    for (const group of groups) {
+      const records = attendance.filter((r) => {
+        if (r.groupId !== group.id) return false
+        const d = r.date instanceof Date ? r.date : new Date(r.date)
+        if (activeSeason && (d < activeSeason.startDate || d > activeSeason.endDate)) return false
+        return true
+      })
+      let present = 0
+      let total = 0
+      for (const record of records) {
+        for (const entry of record.records) {
+          total++
+          if (entry.status === 'presente') present++
+        }
+      }
+      rates[group.id] = total > 0 ? Math.round((present / total) * 100) : null
+    }
+    return rates
+  }, [groups, attendance, activeSeason])
+
+  const waitlistCountByGroup = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const group of groups) {
+      counts[group.id] = enrollments.filter(
+        (e) => e.groupId === group.id && e.isWaitlist && !e.isActive
+      ).length
+    }
+    return counts
+  }, [groups, enrollments])
 
   const filteredGroups = useMemo(() => {
     const effectiveSeasonFilter = seasonFilter === '' ? (club?.activeSeasonId ?? '') : seasonFilter
@@ -124,7 +160,13 @@ export default function GroupsPage() {
         effectiveSeasonFilter === ALL_SEASONS ||
         effectiveSeasonFilter === '' ||
         g.seasonId === effectiveSeasonFilter
-      return matchesSearch && matchesLevel && matchesCoach && matchesSeason
+      const matchesDay =
+        dayFilter === '' || g.schedule.some((s) => s.dayOfWeek === Number(dayFilter))
+      const matchesCapacity =
+        capacityFilter === '' ||
+        (capacityFilter === 'hueco' && g.currentEnrollment < g.maxCapacity) ||
+        (capacityFilter === 'completo' && g.currentEnrollment >= g.maxCapacity)
+      return matchesSearch && matchesLevel && matchesCoach && matchesSeason && matchesDay && matchesCapacity
     })
 
     return filtered.sort((a, b) => {
@@ -143,10 +185,9 @@ export default function GroupsPage() {
       }
       return aSlot.startTime.localeCompare(bSlot.startTime)
     })
-  }, [groups, search, levelFilter, coachFilter, seasonFilter, sortBy, isEntrenador, currentCoach, club?.activeSeasonId])
+  }, [groups, search, levelFilter, coachFilter, seasonFilter, dayFilter, capacityFilter, sortBy, isEntrenador, currentCoach, club?.activeSeasonId])
 
-  const activeGroupsCount = groups.filter((g) => g.isActive).length
-  const activeSeason = club ? seasons.find((s) => s.id === club.activeSeasonId) : undefined
+  const activeSeasonForEmptyState = club ? seasons.find((s) => s.id === club.activeSeasonId) : undefined
 
   const handleExportPDF = async () => {
     const clubName = user?.clubId || 'San Javier Academy'
@@ -334,20 +375,28 @@ export default function GroupsPage() {
     // closure obsoleta que hubo que arreglar en AgendaPage).
   }, [isEntrenador, clasesContext])
 
+  const renderMetricsFooter = (groupId: string) => {
+    const rate = attendanceRateByGroup[groupId]
+    const waitlist = waitlistCountByGroup[groupId]
+    return (
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Activity className="h-3.5 w-3.5" />
+          <span>{rate === null ? 'Sin datos' : `${rate}%`}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Hourglass className="h-3.5 w-3.5" />
+          <span>{waitlist === 0 ? 'Sin lista de espera' : `${waitlist} en espera`}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="p-6 space-y-4">
         {/* Filters and view toggle */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre del grupo..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
           <Select
             options={[
               { value: 'schedule', label: 'Ordenar: Horario' },
@@ -382,7 +431,26 @@ export default function GroupsPage() {
           />
           <Select
             options={[
-              { value: '', label: activeSeason ? `Temporada actual: ${activeSeason.name}` : 'Temporada actual' },
+              { value: '', label: 'Todos los días' },
+              ...DAYS_OF_WEEK.map((d) => ({ value: String(d.value), label: d.label })),
+            ]}
+            value={dayFilter}
+            onChange={(e) => setDayFilter(e.target.value)}
+            className="w-full sm:w-40"
+          />
+          <Select
+            options={[
+              { value: '', label: 'Todos' },
+              { value: 'hueco', label: 'Con hueco' },
+              { value: 'completo', label: 'Completo' },
+            ]}
+            value={capacityFilter}
+            onChange={(e) => setCapacityFilter(e.target.value)}
+            className="w-full sm:w-36"
+          />
+          <Select
+            options={[
+              { value: '', label: activeSeasonForEmptyState ? `Temporada actual: ${activeSeasonForEmptyState.name}` : 'Temporada actual' },
               { value: ALL_SEASONS, label: 'Todas las temporadas' },
               ...seasons.map((s) => ({ value: s.id, label: s.name })),
             ]}
@@ -422,7 +490,7 @@ export default function GroupsPage() {
             description={
               isEntrenador
                 ? "Actualmente no tienes ningún grupo asignado a tu perfil."
-                : (!search && !levelFilter && !coachFilter && seasonFilter !== ALL_SEASONS && (seasonFilter !== '' || club?.activeSeasonId))
+                : (!search && !levelFilter && !coachFilter && !dayFilter && !capacityFilter && seasonFilter !== ALL_SEASONS && (seasonFilter !== '' || club?.activeSeasonId))
                   ? "No hay grupos en esta temporada. Prueba a seleccionar 'Todas las temporadas' en el filtro, o crea un grupo nuevo."
                   : "Crea tu primer grupo para empezar a organizar las clases de la escuela"
             }
@@ -432,15 +500,11 @@ export default function GroupsPage() {
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredGroups.map((group) => {
-              const occupancyPct = group.maxCapacity > 0
-                ? (group.currentEnrollment / group.maxCapacity) * 100
-                : 0
-
               const activeEnrollments = enrollments.filter(e => e.groupId === group.id && e.isActive)
               const groupPlayers = activeEnrollments
                 .map(e => players.find(p => p.id === e.playerId))
                 .filter(Boolean) as any[]
-              
+
               const displayPlayers = groupPlayers.slice(0, 4)
               const remainingPlayers = groupPlayers.length - 4
 
@@ -461,23 +525,24 @@ export default function GroupsPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEditDialog(group)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setShowDeleteConfirm(group.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(group)}>
+                              <Edit2 className="h-4 w-4 mr-2" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setShowDeleteConfirm(group.id)}>
+                              <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                              <span className="text-destructive">Eliminar</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardHeader>
@@ -540,6 +605,10 @@ export default function GroupsPage() {
                         indicatorClassName={getOccupancyColor(group.currentEnrollment, group.maxCapacity)}
                       />
                     </div>
+
+                    <div className="pt-2 border-t">
+                      {renderMetricsFooter(group.id)}
+                    </div>
                   </CardContent>
                 </Card>
               )
@@ -558,14 +627,15 @@ export default function GroupsPage() {
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Detalles</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Alumnos</th>
                       <th className="p-3 text-left text-sm font-medium text-muted-foreground">Ocupación</th>
+                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Asistencia</th>
+                      <th className="p-3 text-left text-sm font-medium text-muted-foreground hidden md:table-cell">Lista de espera</th>
                       {!isEntrenador && <th className="p-3 text-right text-sm font-medium text-muted-foreground w-24">Acciones</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredGroups.map((group) => {
-                      const occupancyPct = group.maxCapacity > 0
-                        ? (group.currentEnrollment / group.maxCapacity) * 100
-                        : 0
+                      const rate = attendanceRateByGroup[group.id]
+                      const waitlist = waitlistCountByGroup[group.id]
 
                       return (
                         <tr
@@ -630,26 +700,35 @@ export default function GroupsPage() {
                               </span>
                             </div>
                           </td>
+                          <td className="p-3 hidden md:table-cell align-top">
+                            <span className="text-sm text-muted-foreground">
+                              {rate === null ? 'Sin datos' : `${rate}%`}
+                            </span>
+                          </td>
+                          <td className="p-3 hidden md:table-cell align-top">
+                            <span className="text-sm text-muted-foreground">
+                              {waitlist === 0 ? 'Sin lista de espera' : `${waitlist} en espera`}
+                            </span>
+                          </td>
                           {!isEntrenador && (
                             <td className="p-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => openEditDialog(group)}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  onClick={() => setShowDeleteConfirm(group.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditDialog(group)}>
+                                    <Edit2 className="h-4 w-4 mr-2" /> Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setShowDeleteConfirm(group.id)}>
+                                    <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                                    <span className="text-destructive">Eliminar</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </td>
                           )}
                         </tr>
