@@ -78,7 +78,7 @@ export function DaySessionList({
 
                 return (
                   <button
-                    key={`group-${session.id}`}
+                    key={`group-${session.id}-${session.startTime}`}
                     type="button"
                     onClick={() => onSelectGroup(session.id)}
                     className={`w-full text-left px-4 py-3 transition-colors ${isSelected ? 'bg-primary/10' : 'hover:bg-accent/30'}`}

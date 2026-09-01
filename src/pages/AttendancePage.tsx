@@ -146,6 +146,10 @@ export default function AttendancePage() {
     [selectedDate, activeGroups, visiblePrivateLessons, attendance]
   )
 
+  // LIMITACIÓN CONOCIDA: si un grupo tiene 2 franjas el mismo día, esto
+  // siempre coge la primera — el guardado de asistencia no se ve afectado
+  // (usa selectedGroupId+fecha, no el horario), solo el horario mostrado en
+  // la cabecera puede no corresponder a la franja pulsada.
   const selectedSession = useMemo(
     () => daySessions.find((s) => s.type === 'group' && s.id === selectedGroupId) ?? null,
     [daySessions, selectedGroupId]
