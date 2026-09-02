@@ -17,6 +17,7 @@ import {
   forecastNextMonth,
   activeMonthlyEnrollmentAmounts,
   pctChange,
+  dateToMonthKey,
 } from '@/lib/finance-analytics'
 import { AddManualPaymentDialog } from '@/components/payments/AddManualPaymentDialog'
 import type { FinanzasOutletContext } from '@/components/layout/FinanzasLayout'
@@ -35,7 +36,13 @@ export default function ResumenPage() {
     const start = new Date(selectedYear, selectedMonth - 1, 1)
     start.setMonth(start.getMonth() - 11)
     const set = new Set<number>()
-    for (let d = new Date(start); d <= new Date(selectedYear, selectedMonth - 1, 1); d.setMonth(d.getMonth() + 1)) {
+    // Recorre desde 11 meses atras hasta un mes por delante del seleccionado
+    // (inclusive) para que el mes siguiente (usado por el pronostico de
+    // "Previsto para...") tambien caiga dentro del rango de anos consultado
+    // — si no, en diciembre el ano del mes siguiente quedaria fuera y el
+    // pronostico perderia en silencio las transacciones pendientes de enero.
+    const end = new Date(selectedYear, selectedMonth, 1)
+    for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
       set.add(d.getFullYear())
     }
     return Array.from(set)
@@ -86,13 +93,12 @@ export default function ResumenPage() {
   const gastosDelta = gastosDeltaRaw !== null ? round1(gastosDeltaRaw) : null
 
   const composicion = useMemo(() => {
-    const monthKeys = new Set([monthKey])
-    const subvencion = transactions
-      .filter(t => t.type === 'ingreso' && t.category === 'subvencion' && (t.status ?? 'pagado') === 'pagado' && new Date(t.date).getFullYear() === selectedYear && new Date(t.date).getMonth() + 1 === selectedMonth)
-      .reduce((s, t) => s + t.amount, 0)
-    const material = transactions
-      .filter(t => t.type === 'ingreso' && t.category === 'material' && (t.status ?? 'pagado') === 'pagado' && new Date(t.date).getFullYear() === selectedYear && new Date(t.date).getMonth() + 1 === selectedMonth)
-      .reduce((s, t) => s + t.amount, 0)
+    const sumIngresoByCategory = (category: 'subvencion' | 'material') =>
+      transactions
+        .filter(t => t.type === 'ingreso' && t.category === category && (t.status ?? 'pagado') === 'pagado' && dateToMonthKey(t.date) === monthKey)
+        .reduce((s, t) => s + t.amount, 0)
+    const subvencion = sumIngresoByCategory('subvencion')
+    const material = sumIngresoByCategory('material')
     const rows = [
       { name: 'Cuotas mensuales', amount: origin.cuotas },
       { name: 'Subvención/Patrocinio', amount: subvencion },
@@ -102,7 +108,7 @@ export default function ResumenPage() {
     ]
     const total = rows.reduce((s, r) => s + r.amount, 0)
     return rows.map(r => ({ ...r, pct: total > 0 ? (r.amount / total) * 100 : 0 })).filter(r => r.amount > 0)
-  }, [transactions, origin, monthKey, selectedMonth, selectedYear])
+  }, [transactions, origin, monthKey])
 
   const evolucion = useMemo(() => {
     const points = []
