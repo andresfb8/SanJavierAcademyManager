@@ -4,6 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Refe
 import { usePaymentsQuery, useEventPaymentsQuery, usePrivateLessonPaymentsQuery, useClubTransactionsQuery } from '@/hooks/useQueries'
 import { useDataStore } from '@/stores/dataStore'
 import { formatCurrency } from '@/lib/utils'
+import { monthlyTotals } from '@/lib/finance-analytics'
+import { normalizeAllPayments } from '@/lib/payment-utils'
 
 interface AnnualFinancialSummaryProps {
   startMonth: number
@@ -27,9 +29,14 @@ export function AnnualFinancialSummary({ startMonth, startYear, endMonth, endYea
   const { data: privateLessonPayments = [] } = usePrivateLessonPaymentsQuery()
   const { data: transactions = [] } = useClubTransactionsQuery(years)
 
+  const normalizedPayments = useMemo(
+    () => normalizeAllPayments(payments, eventPayments, privateLessonPayments, events),
+    [payments, eventPayments, privateLessonPayments, events]
+  )
+
   const chartData = useMemo(() => {
     const data = []
-    
+
     const start = new Date(startYear, startMonth - 1, 1)
     const end = new Date(endYear, endMonth - 1, 1)
 
@@ -41,50 +48,20 @@ export function AnnualFinancialSummary({ startMonth, startYear, endMonth, endYea
     while (curr <= end) {
       const monthIdx = curr.getMonth() + 1
       const yearIdx = curr.getFullYear()
-
-      // 1. Ingresos Cuotas
-      const ingresosCuotas = payments
-        .filter(p => p.status === 'pagado' && p.billingMonth === monthIdx && p.billingYear === yearIdx)
-        .reduce((s, p) => s + p.amount, 0)
-
-      // 2. Eventos
-      const eventosMes = events.filter(ev => {
-        const d = ev.date instanceof Date ? ev.date : new Date(ev.date)
-        return (d.getMonth() + 1) === monthIdx && d.getFullYear() === yearIdx
-      })
-      const ingresosEventos = eventosMes.reduce((acc, ev) => acc + eventPayments.filter(ep => ep.eventId === ev.id && ep.status === 'pagado').reduce((s, ep) => s + ep.amount, 0), 0)
-      const gastosEventos = eventosMes.reduce((acc, ev) => acc + (ev.expenses ?? []).reduce((s, ex) => s + ex.amount, 0), 0)
-
-      // 3. Clases Particulares
-      const clasesMes = privateLessons.filter(pl => {
-        const d = pl.date instanceof Date ? pl.date : new Date(pl.date)
-        return (d.getMonth() + 1) === monthIdx && d.getFullYear() === yearIdx
-      })
-      const ingresosClases = clasesMes.reduce((acc, pl) => acc + privateLessonPayments.filter(lp => lp.lessonId === pl.id && lp.status === 'pagado').reduce((s, lp) => s + lp.amount, 0), 0)
-
-      // 4. Extras (clubTransactions)
-      const transMes = transactions.filter(t => {
-        const d = t.date instanceof Date ? t.date : new Date(t.date)
-        return (d.getMonth() + 1) === monthIdx && d.getFullYear() === yearIdx
-      })
-      const extrasIngresos = transMes.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0)
-      const extrasGastos = transMes.filter(t => t.type === 'gasto').reduce((s, t) => s + t.amount, 0)
-
-      const totalIngresos = ingresosCuotas + ingresosEventos + ingresosClases + extrasIngresos
-      const totalGastos = gastosEventos + extrasGastos
-      const beneficio = totalIngresos - totalGastos
+      const monthKey = `${yearIdx}-${monthIdx}`
+      const totals = monthlyTotals(monthKey, normalizedPayments, events, eventPayments, privateLessons, privateLessonPayments, transactions)
 
       data.push({
         name: `${monthNames[monthIdx - 1]} ${yearIdx}`,
-        Ingresos: totalIngresos,
-        Gastos: totalGastos,
-        Beneficio: beneficio
+        Ingresos: totals.ingresos,
+        Gastos: totals.gastos,
+        Beneficio: totals.beneficio
       })
 
       curr.setMonth(curr.getMonth() + 1)
     }
     return data
-  }, [startMonth, startYear, endMonth, endYear, payments, events, eventPayments, privateLessons, privateLessonPayments, transactions])
+  }, [startMonth, startYear, endMonth, endYear, normalizedPayments, events, eventPayments, privateLessons, privateLessonPayments, transactions])
 
   const totalAnual = useMemo(() => {
     return chartData.reduce((acc, curr) => ({
