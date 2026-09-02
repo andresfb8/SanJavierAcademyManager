@@ -46,9 +46,21 @@ export function FinanzasLayout() {
     return d >= activeSeason.startDate && d <= activeSeason.endDate
   }
 
+  // A diferencia de una fecha puntual (factura), un pago solo tiene mes/año
+  // de facturacion — comparar contra el dia 1 del mes rompe con temporadas
+  // que no empiezan el dia 1 (p. ej. 15 de septiembre): el mes de arranque
+  // quedaria fuera. Se comprueba en su lugar que el rango del mes entero
+  // (dia 1 a ultimo dia) solape con el rango de la temporada.
+  const billingMonthInActiveSeason = (year: number, month: number) => {
+    if (!activeSeason) return true
+    const monthStart = new Date(year, month - 1, 1)
+    const monthEnd = new Date(year, month, 0)
+    return monthEnd >= activeSeason.startDate && monthStart <= activeSeason.endDate
+  }
+
   const tabs: FinanzasTab[] = [
     { name: 'Resumen', href: '/finanzas/resumen' },
-    { name: 'Pagos', href: '/finanzas/pagos', count: payments.filter((p) => inActiveSeason(new Date(p.billingYear, p.billingMonth - 1, 1))).length },
+    { name: 'Pagos', href: '/finanzas/pagos', count: payments.filter((p) => billingMonthInActiveSeason(p.billingYear, p.billingMonth)).length },
     { name: 'Facturas', href: '/finanzas/facturas', count: invoices.filter((i) => i.status !== 'cancelled' && inActiveSeason(i.invoiceDate)).length },
     { name: 'Ingresos y gastos', href: '/finanzas/ingresos-gastos' },
     { name: 'Análisis', href: '/finanzas/analisis' },
