@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint, collectionStats } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint, collectionStats, monthlyTotals, collectionBreakdown, attentionItems, forecastNextMonth, activeMonthlyEnrollmentAmounts } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
-import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player, ClubTransaction } from '@/types'
+import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player, ClubTransaction, Invoice, Enrollment } from '@/types'
 
 function makePayment(overrides: Partial<NormalizedPayment> = {}): NormalizedPayment {
   return {
@@ -510,5 +510,174 @@ describe('reconciliacion revenueByOrigin <-> collectionStats', () => {
     const origin = revenueByOrigin(payments, monthKeys)
     const collection = collectionStats(payments, monthKeys)
     expect(origin.total).toBe(collection.paidAmount)
+  })
+})
+
+describe('monthlyTotals', () => {
+  it('suma ingresos y gastos de cuotas, eventos, clases y transacciones del mes', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'p1', source: 'cuota', playerId: 'pl1', playerName: 'A', concept: 'Cuota', amount: 100, status: 'pagado', billingMonth: 8, billingYear: 2026 },
+    ]
+    const events: AcademyEvent[] = []
+    const eventPayments: EventPayment[] = []
+    const privateLessons: PrivateLesson[] = []
+    const privateLessonPayments: PrivateLessonPayment[] = []
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ type: 'ingreso', category: 'subvencion', amount: 200, date: new Date(2026, 7, 5) }),
+      makeTransaction({ type: 'gasto', category: 'alquiler', amount: 50, date: new Date(2026, 7, 10) }),
+    ]
+    const result = monthlyTotals('2026-8', payments, events, eventPayments, privateLessons, privateLessonPayments, transactions)
+    expect(result.ingresos).toBe(300)
+    expect(result.gastos).toBe(50)
+    expect(result.beneficio).toBe(250)
+  })
+
+  it('ignora transacciones con status pendiente', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ type: 'gasto', category: 'otro', amount: 999, date: new Date(2026, 7, 15), status: 'pendiente' }),
+    ]
+    const result = monthlyTotals('2026-8', [], [], [], [], [], transactions)
+    expect(result.gastos).toBe(0)
+  })
+
+  it('ignora movimientos fuera del mes pedido', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ type: 'ingreso', category: 'otro', amount: 500, date: new Date(2026, 6, 30) }),
+    ]
+    const result = monthlyTotals('2026-8', [], [], [], [], [], transactions)
+    expect(result.ingresos).toBe(0)
+  })
+})
+
+describe('collectionBreakdown', () => {
+  const now = new Date(2026, 7, 28)
+
+  it('separa pagado, pendiente (futuro) y vencido (pasado)', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'cuota', playerId: 'p1', playerName: 'A', concept: 'Cuota', amount: 100, status: 'pagado', billingMonth: 8, billingYear: 2026 },
+      { id: 'b', source: 'manual', playerId: 'p2', playerName: 'B', concept: 'Manual', amount: 50, status: 'pendiente', billingMonth: 8, billingYear: 2026, dueDate: new Date(2026, 8, 5) },
+      { id: 'c', source: 'cuota', playerId: 'p3', playerName: 'C', concept: 'Cuota', amount: 30, status: 'pendiente', billingMonth: 8, billingYear: 2026, dueDate: new Date(2026, 7, 1) },
+    ]
+    const result = collectionBreakdown(payments, new Set(['2026-8']), now)
+    expect(result.paidAmount).toBe(100)
+    expect(result.pendingAmount).toBe(50)
+    expect(result.overdueAmount).toBe(30)
+    expect(result.total).toBe(180)
+  })
+
+  it('ignora pagos que no son de cuota/manual', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'evento', playerId: 'p1', playerName: 'A', concept: 'Evento', amount: 999, status: 'pagado', billingMonth: 8, billingYear: 2026 },
+    ]
+    const result = collectionBreakdown(payments, new Set(['2026-8']), now)
+    expect(result.total).toBe(0)
+  })
+})
+
+function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
+  return {
+    id: 'inv1',
+    invoiceNumber: 'FC-2026-001',
+    series: 'FC',
+    invoiceDate: new Date(2026, 7, 1),
+    playerId: 'p1',
+    playerName: 'Jugador Uno',
+    lineItems: [],
+    subtotal: 100,
+    totalVat: 10,
+    total: 110,
+    vatBreakdown: {},
+    status: 'issued',
+    paymentIds: [],
+    createdAt: new Date(2026, 7, 1),
+    createdBy: 'user1',
+    ...overrides,
+  }
+}
+
+describe('attentionItems', () => {
+  const now = new Date(2026, 7, 28)
+
+  it('incluye un aviso de recibos vencidos con el importe y los dias del mas antiguo', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'cuota', playerId: 'p1', playerName: 'A', concept: 'Cuota', amount: 100, status: 'pendiente', billingMonth: 7, billingYear: 2026, dueDate: new Date(2026, 6, 27) },
+    ]
+    const items = attentionItems(payments, [], [], now)
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('1 recibo vencido')
+    expect(items[0].subtitle).toContain('32 días')
+  })
+
+  it('incluye un aviso de facturas emitidas sin cobrar', () => {
+    const items = attentionItems([], [makeInvoice({ status: 'issued' })], [], now)
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('1 factura sin cobrar')
+  })
+
+  it('incluye un aviso por cada transaccion de gasto pendiente ya vencida', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ type: 'gasto', category: 'otro', concept: 'Seguro RC', amount: 410, date: new Date(2026, 7, 20), status: 'pendiente' }),
+    ]
+    const items = attentionItems([], [], transactions, now)
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('Seguro RC sin pagar')
+  })
+
+  it('no incluye nada cuando no hay avisos', () => {
+    expect(attentionItems([], [], [], now)).toHaveLength(0)
+  })
+})
+
+function makeEnrollment(overrides: Partial<Enrollment> = {}): Enrollment {
+  return {
+    id: 'e1',
+    playerId: 'p1',
+    playerName: 'Jugador Uno',
+    groupId: 'g1',
+    groupName: 'Grupo 1',
+    tariffId: 't1',
+    tariffName: 'Tarifa mensual',
+    enrollmentDate: new Date(2026, 0, 1),
+    isActive: true,
+    ...overrides,
+  }
+}
+
+describe('activeMonthlyEnrollmentAmounts', () => {
+  it('incluye matriculas activas mensuales, usando customPrice si existe', () => {
+    const groups = [makeGroup()]
+    const enrollments = [makeEnrollment(), makeEnrollment({ id: 'e2', customPrice: 40 })]
+    const result = activeMonthlyEnrollmentAmounts(enrollments, groups)
+    expect(result).toEqual([{ enrollmentId: 'e1', amount: 50 }, { enrollmentId: 'e2', amount: 40 }])
+  })
+
+  it('excluye matriculas inactivas, en lista de espera, o de frecuencia no mensual', () => {
+    const groups = [makeGroup(), makeGroup({ id: 'g2', billingFrequency: 'quarterly' })]
+    const enrollments = [
+      makeEnrollment({ id: 'e1', isActive: false }),
+      makeEnrollment({ id: 'e2', isWaitlist: true }),
+      makeEnrollment({ id: 'e3', groupId: 'g2', groupName: 'Grupo 2' }),
+    ]
+    expect(activeMonthlyEnrollmentAmounts(enrollments, groups)).toEqual([])
+  })
+})
+
+describe('forecastNextMonth', () => {
+  it('incluye el cobro de cuotas previsto y los movimientos pendientes del mes', () => {
+    const transactions: ClubTransaction[] = [
+      makeTransaction({ type: 'ingreso', category: 'subvencion', concept: 'Subvención deporte base', amount: 1200, date: new Date(2026, 8, 15), status: 'pendiente' }),
+      makeTransaction({ type: 'gasto', category: 'nomina', concept: 'Nóminas del equipo', amount: 2250, date: new Date(2026, 8, 5), status: 'pendiente' }),
+      makeTransaction({ type: 'gasto', category: 'otro', concept: 'Ya pagado', amount: 999, date: new Date(2026, 8, 5), status: 'pagado' }),
+    ]
+    const result = forecastNextMonth('2026-9', [{ enrollmentId: 'e1', amount: 11520 }], transactions)
+    expect(result.items).toHaveLength(3)
+    expect(result.items[0]).toEqual({ name: 'Cobro de cuotas', meta: '1 recibos previstos', amount: 11520 })
+    expect(result.total).toBe(11520 + 1200 - 2250)
+  })
+
+  it('omite la linea de cuotas cuando no hay matriculas activas mensuales', () => {
+    const result = forecastNextMonth('2026-9', [], [])
+    expect(result.items).toHaveLength(0)
+    expect(result.total).toBe(0)
   })
 })

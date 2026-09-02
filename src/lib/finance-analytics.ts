@@ -3,8 +3,10 @@ import type {
   AcademyEvent,
   ClubTransaction,
   CoachSalaryConfig,
+  Enrollment,
   EventPayment,
   Group,
+  Invoice,
   Player,
   PlayerLevel,
   PrivateLesson,
@@ -12,6 +14,7 @@ import type {
   TransactionCategory,
 } from '@/types'
 import { calculateEventSalary, calculatePrivateLessonSalary } from '@/lib/salary-utils'
+import { formatCurrency, formatDate, formatDateLong } from '@/lib/utils'
 
 /** Variacion porcentual de `current` respecto a `previous`. `null` si no es comparable (previo 0, actual > 0). */
 export function pctChange(current: number, previous: number): number | null {
@@ -146,7 +149,7 @@ function toMargin(revenue: number, cost: number): CategoryMargin {
   return { revenue, cost, margin, marginPct }
 }
 
-function dateToMonthKey(date: Date | string): string {
+export function dateToMonthKey(date: Date | string): string {
   const d = date instanceof Date ? date : new Date(date)
   return `${d.getFullYear()}-${d.getMonth() + 1}`
 }
@@ -304,6 +307,212 @@ export function breakEvenPoint(
     actualStudents: activeEnrollmentCount,
     marginStudents: activeEnrollmentCount - studentsNeeded,
   }
+}
+
+export interface MonthlyTotals {
+  ingresos: number
+  gastos: number
+  beneficio: number
+}
+
+/**
+ * Ingresos y gastos totales de `monthKey` ("YYYY-M"): cuotas+eventos+clases
+ * pagados (via revenueByOrigin) mas transacciones de club con status
+ * 'pagado' (o sin status, por compatibilidad), y gastos de eventos
+ * (`event.expenses`) mas transacciones de tipo gasto en el mismo estado.
+ * Extraida de la logica que antes vivia duplicada en
+ * AnnualFinancialSummary.tsx y FinancialsPage.tsx.
+ */
+export function monthlyTotals(
+  monthKey: string,
+  payments: NormalizedPayment[],
+  events: AcademyEvent[],
+  eventPayments: EventPayment[],
+  privateLessons: PrivateLesson[],
+  privateLessonPayments: PrivateLessonPayment[],
+  transactions: ClubTransaction[]
+): MonthlyTotals {
+  const monthKeys = new Set([monthKey])
+  const origin = revenueByOrigin(payments, monthKeys)
+
+  const gastosEventos = events
+    .filter(ev => dateToMonthKey(ev.date) === monthKey)
+    .reduce((s, ev) => s + (ev.expenses ?? []).reduce((s2, ex) => s2 + ex.amount, 0), 0)
+
+  const transMes = transactions.filter(t => (t.status ?? 'pagado') === 'pagado' && dateToMonthKey(t.date) === monthKey)
+  const extrasIngresos = transMes.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0)
+  const extrasGastos = transMes.filter(t => t.type === 'gasto').reduce((s, t) => s + t.amount, 0)
+
+  const ingresos = origin.cuotas + origin.eventos + origin.clases + extrasIngresos
+  const gastos = gastosEventos + extrasGastos
+  return { ingresos, gastos, beneficio: ingresos - gastos }
+}
+
+export interface CollectionBreakdown {
+  paidAmount: number
+  pendingAmount: number
+  overdueAmount: number
+  total: number
+}
+
+/**
+ * Como collectionStats, pero separa 'pendiente' en pendiente (dueDate en
+ * el futuro) y vencido (dueDate ya pasado), solo para pagos de cuota
+ * (source cuota/manual) — pensado para la tarjeta "Estado de cobros" del
+ * Resumen de Finanzas, que distingue ambos.
+ */
+export function collectionBreakdown(
+  payments: NormalizedPayment[],
+  monthKeys: Set<string>,
+  now: Date = new Date()
+): CollectionBreakdown {
+  let paidAmount = 0
+  let pendingAmount = 0
+  let overdueAmount = 0
+  for (const p of payments) {
+    if (p.source !== 'cuota' && p.source !== 'manual') continue
+    if (!monthKeys.has(monthKeyOf(p))) continue
+    if (p.status === 'pagado') {
+      paidAmount += p.amount
+    } else if (p.status === 'pendiente') {
+      if (p.dueDate && new Date(p.dueDate) < now) overdueAmount += p.amount
+      else pendingAmount += p.amount
+    }
+  }
+  return { paidAmount, pendingAmount, overdueAmount, total: paidAmount + pendingAmount + overdueAmount }
+}
+
+export interface AttentionItem {
+  id: string
+  title: string
+  subtitle: string
+  href: string
+}
+
+/**
+ * Avisos de "Requiere tu atencion" del Resumen de Finanzas: recibos
+ * vencidos, facturas emitidas sin cobrar, y transacciones de gasto
+ * marcadas como pendientes cuya fecha ya llego o paso.
+ */
+export function attentionItems(
+  payments: NormalizedPayment[],
+  invoices: Invoice[],
+  transactions: ClubTransaction[],
+  now: Date = new Date()
+): AttentionItem[] {
+  const items: AttentionItem[] = []
+
+  const overdue = payments.filter(p => p.status === 'pendiente' && p.dueDate && new Date(p.dueDate) < now)
+  if (overdue.length > 0) {
+    const amount = overdue.reduce((s, p) => s + p.amount, 0)
+    const oldestMs = Math.min(...overdue.map(p => new Date(p.dueDate as Date).getTime()))
+    const oldestDays = Math.floor((now.getTime() - oldestMs) / 86400000)
+    items.push({
+      id: 'overdue',
+      title: `${overdue.length} recibo${overdue.length === 1 ? '' : 's'} vencido${overdue.length === 1 ? '' : 's'}`,
+      subtitle: `${formatCurrency(amount)} · el más antiguo lleva ${oldestDays} días`,
+      href: '/finanzas/pagos',
+    })
+  }
+
+  const unpaidInvoices = invoices.filter(i => i.status === 'issued')
+  if (unpaidInvoices.length > 0) {
+    const oldest = unpaidInvoices.reduce((min, i) => new Date(i.invoiceDate) < new Date(min.invoiceDate) ? i : min)
+    items.push({
+      id: 'unpaid-invoices',
+      title: `${unpaidInvoices.length} factura${unpaidInvoices.length === 1 ? '' : 's'} sin cobrar`,
+      subtitle: `emitidas desde el ${formatDateLong(new Date(oldest.invoiceDate))}`,
+      href: '/finanzas/facturas',
+    })
+  }
+
+  const pendingExpenses = transactions.filter(
+    t => t.type === 'gasto' && t.status === 'pendiente' && new Date(t.date) <= now
+  )
+  for (const t of pendingExpenses) {
+    items.push({
+      id: t.id,
+      title: `${t.concept} sin pagar`,
+      subtitle: `${formatCurrency(t.amount)} · vence el ${formatDateLong(new Date(t.date))}`,
+      href: '/finanzas/ingresos-gastos',
+    })
+  }
+
+  return items
+}
+
+export interface ActiveEnrollmentAmount {
+  enrollmentId: string
+  amount: number
+}
+
+/**
+ * Importe mensual de cada matricula activa cuya frecuencia de facturacion
+ * (resuelta de enrollment.billingFrequency, o group.billingFrequency si
+ * no hay override) es 'monthly'. Las matriculas trimestrales/anuales/por
+ * plazos se excluyen a proposito: su mes exacto de cobro depende de
+ * billingAnchorMonth/installmentPrices, logica que hoy solo vive de forma
+ * fiable en la generacion de recibos server-side
+ * (generateMonthlyReceiptsAtomic) — reimplementarla aqui duplicaria una
+ * pieza de negocio con historial de bugs (ver notas de "tarifa unica
+ * precio/frecuencia"). Limitacion aceptada: la prevision de "Cobro de
+ * cuotas" en el Resumen solo cubre las matriculas mensuales.
+ */
+export function activeMonthlyEnrollmentAmounts(
+  enrollments: Enrollment[],
+  groups: Group[]
+): ActiveEnrollmentAmount[] {
+  const result: ActiveEnrollmentAmount[] = []
+  for (const e of enrollments) {
+    if (!e.isActive || e.isWaitlist) continue
+    const group = groups.find(g => g.id === e.groupId)
+    if (!group) continue
+    const frequency = e.billingFrequency ?? group.billingFrequency
+    if (frequency !== 'monthly') continue
+    result.push({ enrollmentId: e.id, amount: e.customPrice ?? group.defaultTariffPrice })
+  }
+  return result
+}
+
+export interface ForecastItem {
+  name: string
+  meta: string
+  amount: number // positivo = ingreso, negativo = gasto
+}
+
+export interface Forecast {
+  items: ForecastItem[]
+  total: number
+}
+
+/**
+ * Movimientos previstos para `nextMonthKey` ("YYYY-M"): el cobro de
+ * cuotas mensuales recurrentes (ver activeMonthlyEnrollmentAmounts) mas
+ * cualquier ClubTransaction con status 'pendiente' fechada ese mes
+ * (ingreso o gasto ya registrado como previsto).
+ */
+export function forecastNextMonth(
+  nextMonthKey: string,
+  activeEnrollments: ActiveEnrollmentAmount[],
+  transactions: ClubTransaction[]
+): Forecast {
+  const items: ForecastItem[] = []
+  if (activeEnrollments.length > 0) {
+    items.push({
+      name: 'Cobro de cuotas',
+      meta: `${activeEnrollments.length} recibos previstos`,
+      amount: activeEnrollments.reduce((s, e) => s + e.amount, 0),
+    })
+  }
+  const scheduled = transactions.filter(t => t.status === 'pendiente' && dateToMonthKey(t.date) === nextMonthKey)
+  for (const t of scheduled) {
+    items.push({
+      name: t.concept,
+      meta: t.type === 'ingreso' ? 'previsto, pendiente de cobro' : formatDate(new Date(t.date)),
+      amount: t.type === 'ingreso' ? t.amount : -t.amount,
+    })
+  }
+  return { items, total: items.reduce((s, i) => s + i.amount, 0) }
 }
 
 export interface DebtorSummary {

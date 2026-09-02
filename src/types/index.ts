@@ -674,7 +674,8 @@ export interface Invoice {
 
 // --- Transacciones Financieras del Club (P&L) ---
 export type TransactionType = 'ingreso' | 'gasto'
-export type TransactionCategory = 'alquiler' | 'suministros' | 'material' | 'reparaciones' | 'publicidad' | 'limpieza' | 'nomina' | 'otro'
+export type TransactionCategory = 'alquiler' | 'suministros' | 'material' | 'reparaciones' | 'publicidad' | 'limpieza' | 'nomina' | 'otro' | 'subvencion'
+export type TransactionStatus = 'pagado' | 'pendiente'
 
 export interface ClubTransaction {
   id: string
@@ -683,7 +684,8 @@ export interface ClubTransaction {
   category: TransactionCategory
   concept: string
   amount: number
-  date: Date
+  date: Date            // puede ser futura cuando status === 'pendiente'
+  status?: TransactionStatus // ausente == 'pagado' (compatibilidad con registros existentes)
   registeredBy?: string // userId del usuario que la registró
   relatedId?: string    // Ej: coachId para vincular la nómina a un entrenador
   notes?: string

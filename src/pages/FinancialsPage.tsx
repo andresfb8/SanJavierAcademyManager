@@ -72,7 +72,8 @@ const CATEGORY_LABELS: Record<TransactionCategory, string> = {
   publicidad: 'Publicidad',
   limpieza: 'Limpieza',
   nomina: 'Nómina',
-  otro: 'Otro'
+  otro: 'Otro',
+  subvencion: 'Subvención/Patrocinio',
 }
 
 function getDefaultMonth() {
