@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { SeasonSwitcher } from '@/components/layout/SeasonSwitcher'
-import { ChevronDown, Search, type LucideIcon } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
+import type { PrimaryAction } from '@/components/layout/topbar-types'
 
 interface ClasesTab {
   name: string
@@ -14,9 +15,7 @@ interface ClasesTab {
   count?: number
 }
 
-export type ClasesPrimaryAction =
-  | { label: string; icon?: LucideIcon; onClick: () => void }
-  | { label: string; icon?: LucideIcon; items: { label: string; icon?: LucideIcon; onClick: () => void }[] }
+export type ClasesPrimaryAction = PrimaryAction
 
 export interface ClasesOutletContext {
   search: string
