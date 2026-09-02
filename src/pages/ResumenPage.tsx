@@ -168,8 +168,8 @@ export default function ResumenPage() {
                 <BarChart data={evolucion}>
                   <XAxis dataKey="name" fontSize={12} />
                   <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-                  <Bar dataKey="Ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="Gastos" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

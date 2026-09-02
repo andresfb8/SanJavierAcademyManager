@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useDataStore } from '@/stores/dataStore'
@@ -70,9 +70,17 @@ export function FinanzasLayout() {
     ? `Resumen de ${MONTHS.find((m) => m.value === selectedMonth)?.label.toLowerCase()} ${selectedYear}${activeSeason ? ` · temporada ${activeSeason.name}` : ''}`
     : undefined
 
-  useEffect(() => {
-    setPrimaryAction(null)
-  }, [location.pathname])
+  // No se limpia `primaryAction` aquí a propósito — mismo motivo que en
+  // ClasesLayout/PersonasLayout: el cleanup de la página saliente ya lo
+  // hace, y limpiarlo aquí también lo borraría después de que la página
+  // entrante lo registre (el efecto del hijo se ejecuta antes que el del
+  // padre en el mismo commit). Antes de este arreglo, esto rompía el botón
+  // "Registrar cobro" del Resumen en una carga directa/en frío de
+  // /finanzas/resumen (donde FinanzasLayout y ResumenPage montan a la vez):
+  // el efecto de este layout podía ejecutarse despues del de ResumenPage y
+  // lo dejaba en null. En una navegación cliente-a-cliente ya montado no se
+  // notaba, lo que lo hacía facil de pasar por alto sin probar en el
+  // navegador con una carga en frío.
 
   const availableYears = useMemo(() => {
     const years = new Set<number>([now.getFullYear()])
