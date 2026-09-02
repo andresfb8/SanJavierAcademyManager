@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -36,6 +36,10 @@ export function AddManualPaymentDialog({ open, onOpenChange }: AddManualPaymentD
     setCategory('manual')
     setNotes('')
   }
+
+  useEffect(() => {
+    if (open) reset()
+  }, [open])
 
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen)
