@@ -41,11 +41,6 @@ export function AddManualPaymentDialog({ open, onOpenChange }: AddManualPaymentD
     if (open) reset()
   }, [open])
 
-  function handleOpenChange(nextOpen: boolean) {
-    onOpenChange(nextOpen)
-    if (!nextOpen) reset()
-  }
-
   function handleSave() {
     if (!playerId || !concept || !amount) return
     const player = players.find((p) => p.id === playerId)
@@ -62,7 +57,7 @@ export function AddManualPaymentDialog({ open, onOpenChange }: AddManualPaymentD
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nuevo pago manual</DialogTitle>
