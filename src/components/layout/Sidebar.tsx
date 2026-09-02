@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
   { name: 'Personas', href: '/personas/jugadores', icon: Users },
   { name: 'Clases', href: '/clases/parrilla', icon: GraduationCap },
   { name: 'Calendario', href: '/clases/parrilla', icon: CalendarDays },
-  { name: 'Finanzas', href: '/pagos', icon: CreditCard, requiredModule: 'payments' },
+  { name: 'Finanzas', href: '/finanzas', icon: CreditCard, requiredModule: 'payments' },
   { name: 'Deportivo', href: '/informes-mensuales', icon: Trophy, requiredModule: 'informes_mensuales' },
 ]
 

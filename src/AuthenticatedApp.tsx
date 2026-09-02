@@ -6,6 +6,7 @@ import type { UserRole, PlayerStatus } from '@/types'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { PersonasLayout } from '@/components/layout/PersonasLayout'
 import { ClasesLayout } from '@/components/layout/ClasesLayout'
+import { FinanzasLayout } from '@/components/layout/FinanzasLayout'
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const PlayersPage = lazy(() => import('@/pages/PlayersPage'))
@@ -38,6 +39,7 @@ const CoachDashboard = lazy(() => import('@/pages/CoachDashboard'))
 const FreeSlotsPage = lazy(() => import('@/pages/FreeSlotsPage'))
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
 const FinancialAnalyticsPage = lazy(() => import('@/pages/FinancialAnalyticsPage'))
+const ResumenPage = lazy(() => import('@/pages/ResumenPage'))
 const SeasonsPage = lazy(() => import('@/pages/SeasonsPage'))
 
 const PageLoader = () => (
@@ -75,19 +77,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function PaymentsRouter() {
+// Simetrico a GroupsLegacyRedirect/AttendanceLegacyRedirect: jugador/tutor
+// siguen viendo PlayerPaymentsPage tal cual en /pagos (su portal no tiene
+// seccion de Finanzas); el resto del personal se redirige a la nueva
+// ubicacion bajo FinanzasLayout.
+function PaymentsLegacyRedirect() {
   const { user } = useAuthStore()
   const activeRole = user?.activeRole ?? user?.role
-  if (activeRole === 'jugador' || activeRole === 'tutor') {
+  if (isPortalRole(activeRole)) {
     return <PlayerPaymentsPage />
   }
-  return <PaymentsPage />
+  return <Navigate to="/finanzas/pagos" replace />
 }
 
-// Compartido por los cuatro wrappers de abajo, para no repetir la misma
-// comprobacion cuatro veces mas en este archivo (ya aparece, cada una a su
-// manera, en PaymentsRouter/PlayersRouter — no se tocan esos, fuera de
-// alcance de este cambio).
+// Compartido por los cinco wrappers de abajo (incluido PaymentsLegacyRedirect),
+// para no repetir la misma comprobacion mas veces en este archivo. PlayersRouter
+// sigue con su propia comprobacion inline — no se toca, fuera de alcance de
+// este cambio.
 function isPortalRole(role: UserRole | undefined) {
   return role === 'jugador' || role === 'tutor'
 }
@@ -214,15 +220,27 @@ export default function AuthenticatedApp() {
         <Route path="/eventos/:id" element={<EventDetailPage />} />
         <Route path="/clases-particulares/:id" element={<PrivateLessonDetailPage />} />
         <Route path="/clases/:groupId/:date" element={<ClassDetailPage />} />
-        <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsRouter /></RoleRoute>} />
-        <Route path="/facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
+        {/* /pagos, /facturas y /finanzas-analitica ya no son la ubicacion
+            principal (ahora bajo /finanzas), pero se mantienen: /pagos
+            sigue sirviendo el portal de jugador/tutor (PlayerPaymentsPage,
+            ver PaymentsLegacyRedirect) y los otros dos evitan romper
+            marcadores/enlaces existentes (NotificationBell, DashboardPage). */}
+        <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsLegacyRedirect /></RoleRoute>} />
+        <Route path="/facturas" element={<Navigate to="/finanzas/facturas" replace />} />
         <Route path="/entrenadores" element={<Navigate to="/personas/entrenadores" replace />} />
         {/* Sin RoleRoute: los entrenadores pueden ver su propio perfil */}
         <Route path="/entrenadores/:id" element={<CoachProfilePage />} />
         <Route path="/informes" element={<RoleRoute module="settings"><EvaluacionesPage /></RoleRoute>} />
         <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
-        <Route path="/finanzas" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
-        <Route path="/finanzas-analitica" element={<RoleRoute module="informes_mensuales"><FinancialAnalyticsPage /></RoleRoute>} />
+        <Route path="/finanzas" element={<FinanzasLayout />}>
+          <Route index element={<Navigate to="/finanzas/resumen" replace />} />
+          <Route path="resumen" element={<RoleRoute module="payments"><ResumenPage /></RoleRoute>} />
+          <Route path="pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
+          <Route path="facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
+          <Route path="ingresos-gastos" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
+          <Route path="analisis" element={<RoleRoute module="informes_mensuales"><FinancialAnalyticsPage /></RoleRoute>} />
+        </Route>
+        <Route path="/finanzas-analitica" element={<Navigate to="/finanzas/analisis" replace />} />
         <Route path="/usuarios" element={<Navigate to="/personas/usuarios" replace />} />
         <Route path="/configuracion" element={<RoleRoute module="settings"><SettingsPage /></RoleRoute>} />
         <Route path="/actividad" element={<RoleRoute module="settings"><ActivityLogPage /></RoleRoute>} />
