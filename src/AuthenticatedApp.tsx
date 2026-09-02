@@ -90,7 +90,7 @@ function PaymentsLegacyRedirect() {
   return <Navigate to="/finanzas/pagos" replace />
 }
 
-// Compartido por los cinco wrappers de abajo (incluido PaymentsLegacyRedirect),
+// Compartido por los ocho wrappers de abajo (incluido PaymentsLegacyRedirect),
 // para no repetir la misma comprobacion mas veces en este archivo. PlayersRouter
 // sigue con su propia comprobacion inline — no se toca, fuera de alcance de
 // este cambio.
@@ -150,6 +150,39 @@ function AttendanceInClasesLayout() {
     return <Navigate to="/asistencia" replace />
   }
   return <AttendancePage />
+}
+
+// Simetrico a GroupsInClasesLayout/AttendanceInClasesLayout: jugador/tutor
+// tiene permiso de lectura sobre el modulo 'payments' (es lo que les deja
+// usar su propio /pagos), asi que RoleRoute por si solo no los bloquea en
+// estas rutas nuevas bajo /finanzas. Si llegan aqui (URL escrita a mano,
+// marcador viejo — ningun enlace de su portal apunta a /finanzas/*), se
+// les devuelve a /pagos en vez de mostrarles los datos de todo el club.
+function PagosInFinanzasLayout() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (isPortalRole(activeRole)) {
+    return <Navigate to="/pagos" replace />
+  }
+  return <PaymentsPage />
+}
+
+function ResumenInFinanzasLayout() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (isPortalRole(activeRole)) {
+    return <Navigate to="/pagos" replace />
+  }
+  return <ResumenPage />
+}
+
+function FacturasInFinanzasLayout() {
+  const { user } = useAuthStore()
+  const activeRole = user?.activeRole ?? user?.role
+  if (isPortalRole(activeRole)) {
+    return <Navigate to="/pagos" replace />
+  }
+  return <InvoicesPage />
 }
 
 function PlayersRouter({ initialStatusFilter }: { initialStatusFilter?: PlayerStatus }) {
@@ -223,8 +256,9 @@ export default function AuthenticatedApp() {
         {/* /pagos, /facturas y /finanzas-analitica ya no son la ubicacion
             principal (ahora bajo /finanzas), pero se mantienen: /pagos
             sigue sirviendo el portal de jugador/tutor (PlayerPaymentsPage,
-            ver PaymentsLegacyRedirect) y los otros dos evitan romper
-            marcadores/enlaces existentes (NotificationBell, DashboardPage). */}
+            ver PaymentsLegacyRedirect; tambien referenciado por
+            NotificationBell y DashboardPage) y los otros dos evitan romper
+            marcadores o enlaces externos guardados con la URL antigua. */}
         <Route path="/pagos" element={<RoleRoute module="payments"><PaymentsLegacyRedirect /></RoleRoute>} />
         <Route path="/facturas" element={<Navigate to="/finanzas/facturas" replace />} />
         <Route path="/entrenadores" element={<Navigate to="/personas/entrenadores" replace />} />
@@ -234,9 +268,9 @@ export default function AuthenticatedApp() {
         <Route path="/informes-mensuales" element={<RoleRoute module="informes_mensuales"><ReportsPage /></RoleRoute>} />
         <Route path="/finanzas" element={<FinanzasLayout />}>
           <Route index element={<Navigate to="/finanzas/resumen" replace />} />
-          <Route path="resumen" element={<RoleRoute module="payments"><ResumenPage /></RoleRoute>} />
-          <Route path="pagos" element={<RoleRoute module="payments"><PaymentsPage /></RoleRoute>} />
-          <Route path="facturas" element={<RoleRoute module="payments"><InvoicesPage /></RoleRoute>} />
+          <Route path="resumen" element={<RoleRoute module="payments"><ResumenInFinanzasLayout /></RoleRoute>} />
+          <Route path="pagos" element={<RoleRoute module="payments"><PagosInFinanzasLayout /></RoleRoute>} />
+          <Route path="facturas" element={<RoleRoute module="payments"><FacturasInFinanzasLayout /></RoleRoute>} />
           <Route path="ingresos-gastos" element={<RoleRoute module="informes_mensuales"><FinancialsPage /></RoleRoute>} />
           <Route path="analisis" element={<RoleRoute module="informes_mensuales"><FinancialAnalyticsPage /></RoleRoute>} />
         </Route>
