@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
-import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDialog'
+import { AddManualPaymentDialog } from '@/components/payments/AddManualPaymentDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { toast } from '@/hooks/use-toast'
 import {
@@ -42,7 +42,7 @@ import { normalizeAllPayments } from '@/lib/payment-utils'
 import { prepareSepaPayments, generateSepaXml } from '@/lib/sepa-utils'
 import type { SepaClubConfig } from '@/lib/sepa-utils'
 import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
-import type { PaymentMethod, PaymentCategory } from '@/types'
+import type { PaymentMethod } from '@/types'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
 import type { WhatsAppPayload } from '@/components/shared/WhatsAppNotificationDialog'
@@ -162,11 +162,6 @@ export default function PaymentsPage() {
 
   // Manual payment dialog
   const [manualDialogOpen, setManualDialogOpen] = useState(false)
-  const [manualPlayerId, setManualPlayerId] = useState('')
-  const [manualConcept, setManualConcept] = useState('')
-  const [manualAmount, setManualAmount] = useState('')
-  const [manualCategory, setManualCategory] = useState<PaymentCategory>('manual')
-  const [manualNotes, setManualNotes] = useState('')
 
   // TanStack Table sorting state
   const [sorting, setSorting] = useState<SortingState>([])
@@ -194,12 +189,6 @@ export default function PaymentsPage() {
       .map((g) => ({ value: g.id, label: g.name }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [groups])
-
-  // Active players for manual payment selector
-  const activePlayers = useMemo(
-    () => players.filter((p) => p.status === 'activo').sort((a, b) => a.lastName.localeCompare(b.lastName)),
-    [players]
-  )
 
   // Unificar todos los pagos para KPIs globales y tabla principal
   const allPayments = useMemo(
@@ -542,7 +531,7 @@ export default function PaymentsPage() {
 
           return (
             <Link
-              to="/facturas"
+              to="/finanzas/facturas"
               className="flex items-center gap-1 text-xs text-primary hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -830,30 +819,6 @@ export default function PaymentsPage() {
     }
   }
 
-  const openManualPaymentDialog = () => {
-    setManualPlayerId(activePlayers[0]?.id ?? '')
-    setManualConcept('')
-    setManualAmount('')
-    setManualCategory('manual')
-    setManualNotes('')
-    setManualDialogOpen(true)
-  }
-
-  const handleSaveManualPayment = () => {
-    if (!manualPlayerId || !manualConcept || !manualAmount) return
-    const player = players.find((p) => p.id === manualPlayerId)
-    if (!player) return
-    addManualPayment({
-      playerId: manualPlayerId,
-      playerName: `${player.firstName} ${player.lastName}`,
-      concept: manualConcept,
-      amount: parseFloat(manualAmount) || 0,
-      category: manualCategory,
-      notes: manualNotes || undefined,
-    })
-    setManualDialogOpen(false)
-  }
-
   const handleProcessConciliation = (paidIds: string[], returned: { paymentId: string; penaltyAmount: number }[]) => {
     // 1. Mark paid
     paidIds.forEach(id => {
@@ -958,7 +923,7 @@ export default function PaymentsPage() {
                   <MessageCircle className="h-4 w-4" />
                   <span className="hidden sm:inline">WhatsApp CSV</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={openManualPaymentDialog}>
+                <Button variant="outline" size="sm" onClick={() => setManualDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Nuevo pago</span>
                 </Button>
@@ -1505,66 +1470,7 @@ export default function PaymentsPage() {
       </Dialog>
 
       {/* Manual Payment Dialog */}
-      <Dialog open={manualDialogOpen} onOpenChange={(open) => {
-        setManualDialogOpen(open)
-        if (!open) {
-          // Reset form when dialog closes
-          setManualPlayerId('')
-          setManualConcept('')
-          setManualAmount('')
-          setManualCategory('manual')
-          setManualNotes('')
-        }
-      }}>
-        <DialogContent className="max-w-xl sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nuevo pago manual</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="player">Jugador *</Label>
-              <SearchableSelect
-                options={activePlayers.map((p) => ({
-                  value: p.id,
-                  label: `${p.lastName}, ${p.firstName}${p.dni ? ` - ${p.dni}` : ''}`
-                }))}
-                value={manualPlayerId}
-                onChange={setManualPlayerId}
-                placeholder="Seleccionar jugador..."
-                searchPlaceholder="Buscar por nombre, apellido o DNI..."
-                emptyMessage="No se encontraron jugadores"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Concepto</Label>
-              <Input value={manualConcept} onChange={(e) => setManualConcept(e.target.value)} placeholder="Ej: Material deportivo, Clinica especial..." />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Importe (&euro;)</Label>
-              <Input type="number" min="0" step="0.01" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} placeholder="0.00" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Categoria</Label>
-              <Select
-                options={PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
-                value={manualCategory}
-                onChange={(e) => setManualCategory(e.target.value as PaymentCategory)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Notas</Label>
-              <Input value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="Notas adicionales (opcional)" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setManualDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveManualPayment} disabled={!manualPlayerId || !manualConcept || !manualAmount}>
-              <Plus className="h-4 w-4 mr-1" />
-              Crear pago
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddManualPaymentDialog open={manualDialogOpen} onOpenChange={setManualDialogOpen} />
 
       {/* Generate Invoice Dialog */}
       <GenerateInvoiceDialog
