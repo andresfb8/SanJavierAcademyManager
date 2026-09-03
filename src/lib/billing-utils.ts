@@ -97,3 +97,31 @@ export function buildInstallmentMonthKeys(
   }
   return months
 }
+
+export interface EnrollmentAmountInput {
+  billingFrequency: BillingFrequency
+  customPrice?: number
+  tariffPrice?: number
+  tariffInstallmentPrices?: Record<string, number>
+}
+
+/**
+ * Importe a facturar a una matricula para `billingKey` ("YYYY-MM"),
+ * resuelto siempre a partir de SU PROPIA tarifa (nunca la del grupo).
+ * `null` significa "no se puede facturar este mes" (tarifa de cuotas sin
+ * precio para ese mes, o tarifa sin precio base en el resto de
+ * frecuencias) — el caller debe saltar la matricula, no caer de vuelta a
+ * ningun precio de grupo (ese era exactamente el bug que esta funcion
+ * sustituye: usar group.defaultTariffPrice/installmentPrices en vez de
+ * la tarifa individual de cada matricula).
+ */
+export function resolveEnrollmentAmount(
+  input: EnrollmentAmountInput,
+  billingKey: string
+): number | null {
+  if (input.customPrice !== undefined) return input.customPrice
+  if (input.billingFrequency === 'installments') {
+    return input.tariffInstallmentPrices?.[billingKey] ?? null
+  }
+  return input.tariffPrice ?? null
+}

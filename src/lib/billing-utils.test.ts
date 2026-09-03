@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys } from '@/lib/billing-utils'
+import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys, resolveEnrollmentAmount } from '@/lib/billing-utils'
 
 describe('cycleLength', () => {
   it('mensual cubre 1 mes', () => {
@@ -91,5 +91,43 @@ describe('buildInstallmentMonthKeys', () => {
     expect(months).toHaveLength(60)
     expect(months[0]).toBe('2024-01')
     expect(months[59]).toBe('2028-12')
+  })
+})
+
+describe('resolveEnrollmentAmount', () => {
+  it('devuelve el precio de la tarifa para frecuencias no-installments', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'monthly', tariffPrice: 45 }, '2026-09')).toBe(45)
+  })
+
+  it('devuelve el precio del mes concreto para installments', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'installments', tariffInstallmentPrices: { '2026-09': 90 } },
+      '2026-09'
+    )).toBe(90)
+  })
+
+  it('devuelve null si installments no tiene precio para ese mes', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'installments', tariffInstallmentPrices: { '2026-11': 120 } },
+      '2026-09'
+    )).toBeNull()
+  })
+
+  it('devuelve null si una frecuencia no-installments no tiene tariffPrice', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'monthly' }, '2026-09')).toBeNull()
+  })
+
+  it('customPrice gana siempre, incluso sobre installments', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'installments', customPrice: 70, tariffInstallmentPrices: { '2026-09': 90 } },
+      '2026-09'
+    )).toBe(70)
+  })
+
+  it('customPrice de 0 tambien gana (no se trata como falsy)', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'monthly', customPrice: 0, tariffPrice: 45 },
+      '2026-09'
+    )).toBe(0)
   })
 })
