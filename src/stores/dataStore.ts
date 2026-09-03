@@ -61,6 +61,7 @@ import {
 } from '@/lib/demo-data'
 import { generateId } from '@/lib/utils'
 import { findOrBuildMigrationSeason } from '@/lib/season-utils'
+import { resolveInstallmentTariff } from '@/lib/billing-utils'
 import { CANCELLATION_DEADLINE_DAY } from '@/constants'
 import { useAuthStore } from '@/stores/authStore'
 import {
@@ -1610,11 +1611,8 @@ export const useDataStore = create<DataState>()(
         if (!enrollment) return 0
         const group = state.groups.find((g) => g.id === enrollment.groupId)
         if (!group) return 0
-        const freq = enrollment.billingFrequency ?? group.billingFrequency
-        if (freq !== 'installments') return 0
-        // La tarifa de la matricula manda siempre sobre la del grupo.
-        const tariff = state.tariffs.find((t) => t.id === enrollment.tariffId)
-        if (!tariff || !tariff.installmentPrices) return 0
+        const tariff = resolveInstallmentTariff(enrollment, group, state.tariffs)
+        if (!tariff) return 0
 
         const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
         const { userName } = getCurrentUser()

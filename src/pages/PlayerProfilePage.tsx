@@ -14,6 +14,7 @@ import { SeasonPaymentDialog } from '@/components/shared/SeasonPaymentDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw, Send, CheckCircle2, CalendarRange } from 'lucide-react'
 import { cn, formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
+import { resolveInstallmentTariff } from '@/lib/billing-utils'
 import { toast } from '@/hooks/use-toast'
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
@@ -151,11 +152,8 @@ export default function PlayerProfilePage() {
     for (const enrollment of activeEnrollments) {
       const group = groups.find((g) => g.id === enrollment.groupId)
       if (!group) continue
-      const freq = enrollment.billingFrequency ?? group.billingFrequency
-      if (freq !== 'installments') continue
-      // La tarifa de la matricula manda siempre sobre la del grupo.
-      const tariff = tariffs.find((t) => t.id === enrollment.tariffId)
-      if (!tariff || !tariff.installmentPrices) continue
+      const tariff = resolveInstallmentTariff(enrollment, group, tariffs)
+      if (!tariff) continue
       Object.entries(tariff.installmentPrices)
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([key, amount]) => {

@@ -125,3 +125,30 @@ export function resolveEnrollmentAmount(
   }
   return input.tariffPrice ?? null
 }
+
+export interface InstallmentTariff {
+  id: string
+  installmentPrices: Record<string, number>
+}
+
+/**
+ * Resuelve la tarifa de cuotas de una matricula, o `null` si esta
+ * matricula no se factura por cuotas (frecuencia efectiva, con el mismo
+ * fallback al grupo que ya usa el resto de la facturacion) o si su
+ * tarifa no tiene calendario de precios. Comparte la misma regla que
+ * resolveEnrollmentAmount: la tarifa de la matricula manda siempre sobre
+ * la del grupo — usado tanto por la generacion de cuotas sueltas de un
+ * alumno (dataStore.ts) como por el calculo de que cuotas le faltan por
+ * generar (PlayerProfilePage.tsx), para que ambos no puedan desincronizarse.
+ */
+export function resolveInstallmentTariff(
+  enrollment: { tariffId: string; billingFrequency?: BillingFrequency },
+  group: { billingFrequency: BillingFrequency },
+  tariffs: { id: string; installmentPrices?: Record<string, number> }[]
+): InstallmentTariff | null {
+  const freq = enrollment.billingFrequency ?? group.billingFrequency
+  if (freq !== 'installments') return null
+  const tariff = tariffs.find((t) => t.id === enrollment.tariffId)
+  if (!tariff?.installmentPrices) return null
+  return { id: tariff.id, installmentPrices: tariff.installmentPrices }
+}

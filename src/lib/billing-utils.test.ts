@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys, resolveEnrollmentAmount } from '@/lib/billing-utils'
+import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys, resolveEnrollmentAmount, resolveInstallmentTariff } from '@/lib/billing-utils'
 
 describe('cycleLength', () => {
   it('mensual cubre 1 mes', () => {
@@ -137,5 +137,35 @@ describe('resolveEnrollmentAmount', () => {
 
   it('devuelve null si installments no tiene calendario de precios en absoluto', () => {
     expect(resolveEnrollmentAmount({ billingFrequency: 'installments' }, '2026-09')).toBeNull()
+  })
+})
+
+describe('resolveInstallmentTariff', () => {
+  const group = { billingFrequency: 'installments' as const }
+  const tariffs = [
+    { id: 't1', installmentPrices: { '2026-09': 90 } },
+    { id: 't2' }, // tarifa sin calendario de cuotas configurado
+  ]
+
+  it('resuelve la tarifa de la matricula cuando la frecuencia efectiva es installments', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't1', billingFrequency: 'installments' }, group, tariffs))
+      .toEqual({ id: 't1', installmentPrices: { '2026-09': 90 } })
+  })
+
+  it('usa la frecuencia del grupo como fallback si la matricula no tiene la suya', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't1' }, group, tariffs))
+      .toEqual({ id: 't1', installmentPrices: { '2026-09': 90 } })
+  })
+
+  it('devuelve null si la frecuencia efectiva no es installments', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't1', billingFrequency: 'monthly' }, group, tariffs)).toBeNull()
+  })
+
+  it('devuelve null si la matricula referencia una tarifa que no existe', () => {
+    expect(resolveInstallmentTariff({ tariffId: 'no-existe', billingFrequency: 'installments' }, group, tariffs)).toBeNull()
+  })
+
+  it('devuelve null si la tarifa existe pero no tiene calendario de cuotas', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't2', billingFrequency: 'installments' }, group, tariffs)).toBeNull()
   })
 })
