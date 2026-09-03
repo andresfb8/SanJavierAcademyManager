@@ -130,4 +130,12 @@ describe('resolveEnrollmentAmount', () => {
       '2026-09'
     )).toBe(0)
   })
+
+  it('tariffPrice de 0 (tarifa gratuita) tambien se factura, no se trata como falsy', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'monthly', tariffPrice: 0 }, '2026-09')).toBe(0)
+  })
+
+  it('devuelve null si installments no tiene calendario de precios en absoluto', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'installments' }, '2026-09')).toBeNull()
+  })
 })
