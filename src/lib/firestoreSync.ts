@@ -24,7 +24,7 @@ import { db } from './firebase'
 import { toast } from '@/hooks/use-toast'
 import type { Invoice, Payment, Enrollment } from '@/types'
 import { MONTHS } from '@/constants'
-import { isBillingMonth, remainingMonthsInGroup, cycleLength, billingFrequencyLabel } from './billing-utils'
+import { isBillingMonth, remainingMonthsInGroup, cycleLength, billingFrequencyLabel, resolveEnrollmentAmount } from './billing-utils'
 
 // Convierte Timestamps de Firestore a Date de JS (recursivo en arrays)
 export function fromFirestore(data: Record<string, unknown>): Record<string, unknown> {
@@ -377,6 +377,22 @@ export async function generateMonthlyReceiptsAtomic(
       })
     }
 
+    // Pre-cargar tarifas: la tarifa de la matricula manda siempre sobre
+    // el precio del grupo (ver resolveEnrollmentAmount en billing-utils.ts).
+    // No se filtra por isActive: una matricula antigua debe poder seguir
+    // resolviendo su tarifa aunque ya no este disponible para altas nuevas.
+    const tariffsSnap = await getDocs(
+      query(collection(db, 'tariffs'), where('clubId', '==', clubId))
+    )
+    const tariffsMap = new Map<string, { price: number; installmentPrices?: Record<string, number> }>()
+    for (const tariffDoc of tariffsSnap.docs) {
+      const t = tariffDoc.data()
+      tariffsMap.set(tariffDoc.id, {
+        price: t.price ?? 0,
+        installmentPrices: t.installmentPrices,
+      })
+    }
+
     const enrollmentsSnap = await getDocs(
       query(collection(db, 'enrollments'), where('clubId', '==', clubId), where('isActive', '==', true))
     )
@@ -388,10 +404,17 @@ export async function generateMonthlyReceiptsAtomic(
     for (const enrollDoc of enrollmentsSnap.docs) {
       const enrollment = enrollDoc.data()
 
-      // Obtener datos del grupo para precio y frecuencia
+      // Obtener datos del grupo para frecuencia de fallback y fin de ciclo
       const group = groupsMap.get(enrollment.groupId)
       if (!group) {
         console.warn(`[generateReceipts] Group ${enrollment.groupId} not found for enrollment ${enrollDoc.id}, skipping`)
+        continue
+      }
+
+      // La tarifa de la matricula manda siempre sobre la del grupo.
+      const tariff = tariffsMap.get(enrollment.tariffId)
+      if (!tariff) {
+        console.warn(`[generateReceipts] Tariff ${enrollment.tariffId} not found for enrollment ${enrollDoc.id}, skipping`)
         continue
       }
 
@@ -407,12 +430,18 @@ export async function generateMonthlyReceiptsAtomic(
         continue
       }
 
-      // For installments: additionally verify the specific month exists in the group's price map
-      if (freq === 'installments') {
-        const billingKey = `${year}-${String(month).padStart(2, '0')}`
-        if (!group.installmentPrices || !group.installmentPrices[billingKey]) {
-          continue
-        }
+      const billingKey = `${year}-${String(month).padStart(2, '0')}`
+      const amount = resolveEnrollmentAmount(
+        {
+          billingFrequency: freq,
+          customPrice: enrollment.customPrice,
+          tariffPrice: tariff.price,
+          tariffInstallmentPrices: tariff.installmentPrices,
+        },
+        billingKey
+      )
+      if (amount === null) {
+        continue
       }
 
       // Verificación server-side de duplicado
@@ -431,19 +460,6 @@ export async function generateMonthlyReceiptsAtomic(
         console.info(`[generateReceipts] Payment already exists for enrollment ${enrollDoc.id}`)
         continue // Ya existe
       }
-
-      // Calcular importe: customPrice tiene prioridad
-      // Para plazos: usar el precio específico del mes (YYYY-MM) sin multiplicar.
-      // Para mensual/trimestral/anual: el importe configurado directamente en
-      // el grupo/tarifa (no se multiplica por meses del ciclo).
-      let baseAmount: number
-      if (freq === 'installments' && group.installmentPrices) {
-        const billingKey = `${year}-${String(month).padStart(2, '0')}`
-        baseAmount = group.installmentPrices[billingKey] ?? group.defaultTariffPrice
-      } else {
-        baseAmount = group.defaultTariffPrice
-      }
-      const amount = enrollment.customPrice ?? baseAmount
 
       // Crear pago
       const paymentId = generateId()
