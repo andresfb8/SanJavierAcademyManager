@@ -843,6 +843,12 @@ export default function PlayerProfilePage() {
                       const group = groups.find((g) => g.id === enrollment.groupId)
                       const enrollmentTariff = tariffs.find((t) => t.id === enrollment.tariffId)
                       const price = enrollment.customPrice ?? enrollmentTariff?.price ?? group?.defaultTariffPrice ?? 0
+                      // Para cuotas sin precio personalizado, `price` es el total de la
+                      // temporada (Tariff.price), no un importe recurrente — se aclara para
+                      // no dar la impresion de que esa cifra se cobra cada mes.
+                      const isInstallmentsTotal =
+                        enrollment.customPrice === undefined &&
+                        (enrollment.billingFrequency ?? group?.billingFrequency) === 'installments'
 
                       return (
                         <div
@@ -864,6 +870,7 @@ export default function PlayerProfilePage() {
                             </div>
                             <p className="text-xs text-muted-foreground">
                               Tarifa: {enrollment.tariffName} &middot; {formatCurrency(price)}
+                              {isInstallmentsTotal && ' (según cuotas)'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Inscrito: {formatDate(enrollment.enrollmentDate)}
