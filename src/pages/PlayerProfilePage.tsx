@@ -841,7 +841,8 @@ export default function PlayerProfilePage() {
                   <div className="space-y-4">
                     {playerEnrollments.map((enrollment) => {
                       const group = groups.find((g) => g.id === enrollment.groupId)
-                      const price = enrollment.customPrice ?? group?.defaultTariffPrice ?? 0
+                      const enrollmentTariff = tariffs.find((t) => t.id === enrollment.tariffId)
+                      const price = enrollment.customPrice ?? enrollmentTariff?.price ?? group?.defaultTariffPrice ?? 0
 
                       return (
                         <div

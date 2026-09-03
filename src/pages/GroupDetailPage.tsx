@@ -539,7 +539,11 @@ export default function GroupDetailPage() {
                       <tbody>
                         {groupEnrollments.map((enrollment) => {
                           const player = players.find((p) => p.id === enrollment.playerId)
-                          const price = enrollment.customPrice ?? group.defaultTariffPrice
+                          const freq = enrollment.billingFrequency ?? group.billingFrequency
+                          const enrollmentTariff = tariffs.find((t) => t.id === enrollment.tariffId)
+                          // Solo se usa cuando NO hay customPrice y la frecuencia no es
+                          // cuotas (para cuotas el importe varia mes a mes, ver mas abajo).
+                          const price = enrollmentTariff?.price ?? group.defaultTariffPrice
                           return (
                             <tr
                               key={enrollment.id}
@@ -566,15 +570,23 @@ export default function GroupDetailPage() {
                               </td>
                               <td className="p-3 hidden lg:table-cell">
                                 <span className="text-sm text-muted-foreground">
-                                  {billingFrequencyLabel(enrollment.billingFrequency ?? group.billingFrequency)}
+                                  {billingFrequencyLabel(freq)}
                                 </span>
                               </td>
                               <td className="p-3 hidden sm:table-cell">
-                                <span className="text-sm font-medium">
-                                  {formatCurrency(price)}
-                                </span>
-                                {enrollment.customPrice !== undefined && (
-                                  <span className="ml-1.5 text-xs text-muted-foreground">(personalizado)</span>
+                                {enrollment.customPrice !== undefined ? (
+                                  <>
+                                    <span className="text-sm font-medium">
+                                      {formatCurrency(enrollment.customPrice)}
+                                    </span>
+                                    <span className="ml-1.5 text-xs text-muted-foreground">(personalizado)</span>
+                                  </>
+                                ) : freq === 'installments' ? (
+                                  <span className="text-sm text-muted-foreground">Según cuotas</span>
+                                ) : (
+                                  <span className="text-sm font-medium">
+                                    {formatCurrency(price)}
+                                  </span>
                                 )}
                               </td>
                               <td className="p-3 hidden lg:table-cell">
