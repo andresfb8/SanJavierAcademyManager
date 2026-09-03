@@ -83,6 +83,7 @@ export default function PlayerProfilePage() {
     players,
     enrollments,
     groups,
+    tariffs,
     updatePlayer,
     invitePlayer,
     payments: allBasePayments,
@@ -149,8 +150,13 @@ export default function PlayerProfilePage() {
     )
     for (const enrollment of activeEnrollments) {
       const group = groups.find((g) => g.id === enrollment.groupId)
-      if (!group || group.billingFrequency !== 'installments' || !group.installmentPrices) continue
-      Object.entries(group.installmentPrices)
+      if (!group) continue
+      const freq = enrollment.billingFrequency ?? group.billingFrequency
+      if (freq !== 'installments') continue
+      // La tarifa de la matricula manda siempre sobre la del grupo.
+      const tariff = tariffs.find((t) => t.id === enrollment.tariffId)
+      if (!tariff || !tariff.installmentPrices) continue
+      Object.entries(tariff.installmentPrices)
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([key, amount]) => {
           const lookupKey = `${enrollment.id}__${key}`
@@ -167,7 +173,7 @@ export default function PlayerProfilePage() {
         })
     }
     return result
-  }, [player, allBasePayments, activeEnrollments, groups])
+  }, [player, allBasePayments, activeEnrollments, groups, tariffs])
 
   // All enrollments for groups tab
   const playerEnrollments = useMemo(() => {

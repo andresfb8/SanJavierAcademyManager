@@ -1609,7 +1609,12 @@ export const useDataStore = create<DataState>()(
         const enrollment = state.enrollments.find((e) => e.id === enrollmentId)
         if (!enrollment) return 0
         const group = state.groups.find((g) => g.id === enrollment.groupId)
-        if (!group || group.billingFrequency !== 'installments' || !group.installmentPrices) return 0
+        if (!group) return 0
+        const freq = enrollment.billingFrequency ?? group.billingFrequency
+        if (freq !== 'installments') return 0
+        // La tarifa de la matricula manda siempre sobre la del grupo.
+        const tariff = state.tariffs.find((t) => t.id === enrollment.tariffId)
+        if (!tariff || !tariff.installmentPrices) return 0
 
         const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
         const { userName } = getCurrentUser()
@@ -1622,7 +1627,7 @@ export const useDataStore = create<DataState>()(
         )
 
         let created = 0
-        Object.entries(group.installmentPrices)
+        Object.entries(tariff.installmentPrices)
           .sort(([a], [b]) => a.localeCompare(b))
           .forEach(([key, amount]) => {
             if (existingKeys.has(key)) return
