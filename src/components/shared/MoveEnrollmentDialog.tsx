@@ -40,12 +40,11 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
   )
 
   const destinationGroup = groups.find(g => g.id === destinationGroupId)
-  const activeTariffs = tariffs.filter(t => t.isActive && t.billingFrequency !== 'installments')
+  const tariffSelectOptions = tariffs.filter(
+    t => t.isActive && (t.billingFrequency !== 'installments' || destinationGroup?.billingFrequency === 'installments')
+  )
   const selectedTariff = tariffs.find(t => t.id === selectedTariffId)
   const selectedTariffPrice = selectedTariff?.price ?? 0
-  const tariffSelectOptions = selectedTariff && selectedTariff.billingFrequency === 'installments'
-    ? [...activeTariffs, selectedTariff]
-    : activeTariffs
   // Precio de referencia del periodo completo: el precio de la tarifa ya es
   // el importe del ciclo (no se multiplica). Los descuentos operan sobre él.
   const periodBasePrice = selectedTariffPrice
@@ -93,14 +92,19 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
         if (!tariff) return
         const tariffPeriodPrice = tariff.price
         let finalCustomPrice: number | undefined
-        if (discountMode === 'percentage') {
-          const pct = parseFloat(discountPercentage)
-          if (!isNaN(pct) && pct > 0 && pct <= 100) {
-            finalCustomPrice = Math.round(tariffPeriodPrice * (1 - pct / 100) * 100) / 100
+        // Cuotas se facturan por el calendario del grupo (group.installmentPrices),
+        // nunca por un precio individual — tariff.price ahí es el total de la
+        // temporada, no un importe recurrente que tenga sentido guardar aquí.
+        if (tariff.billingFrequency !== 'installments') {
+          if (discountMode === 'percentage') {
+            const pct = parseFloat(discountPercentage)
+            if (!isNaN(pct) && pct > 0 && pct <= 100) {
+              finalCustomPrice = Math.round(tariffPeriodPrice * (1 - pct / 100) * 100) / 100
+            }
+          } else if (discountMode === 'fixed_price') {
+            const parsed = parseFloat(customPrice)
+            if (!isNaN(parsed) && parsed >= 0) finalCustomPrice = parsed
           }
-        } else if (discountMode === 'fixed_price') {
-          const parsed = parseFloat(customPrice)
-          if (!isNaN(parsed) && parsed >= 0) finalCustomPrice = parsed
         }
         await moveEnrollment(enrollmentId, destinationGroupId, {
           playerId: enrollment.playerId,
@@ -198,7 +202,12 @@ export function MoveEnrollmentDialog({ enrollmentId, currentGroupId, onClose }: 
                     />
                   </div>
 
-                  {selectedTariffId && (
+                  {selectedTariffId && selectedBillingFrequency === 'installments' ? (
+                    <div className="space-y-1">
+                      <Label>Precio</Label>
+                      <p className="text-xs text-muted-foreground">Según cuotas del grupo.</p>
+                    </div>
+                  ) : selectedTariffId && (
                     <div className="space-y-2">
                       <Label>Precio</Label>
                       <p className="text-xs text-muted-foreground">
