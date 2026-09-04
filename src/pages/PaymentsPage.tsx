@@ -1147,6 +1147,11 @@ export default function PaymentsPage() {
                     <Receipt className="h-4 w-4 mr-2" /> Facturar Pendientes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {/* stopPropagation evita que el click en el <select> nativo dispare el
+                      listener document.click de nuestro DropdownMenu (ver dropdown-menu.tsx)
+                      y cierre el menu antes de elegir una opcion. Si este componente se
+                      migra alguna vez a Radix real, revisar: Radix cierra por pointerdown
+                      en fase de captura / focus-out, que stopPropagation en click no ataja. */}
                   <div className="px-2 py-1.5 space-y-2" onClick={(e) => e.stopPropagation()}>
                     <Select
                       options={[
