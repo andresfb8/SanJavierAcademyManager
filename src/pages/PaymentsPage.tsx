@@ -188,7 +188,7 @@ export default function PaymentsPage() {
   const [showGenerateInvoiceDialog, setShowGenerateInvoiceDialog] = useState(false)
 
   // WhatsApp notification
-  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppPayload | null>(null)
+  const [whatsAppPayloads, setWhatsAppPayloads] = useState<WhatsAppPayload[]>([])
   const [whatsappCSVOpen, setWhatsappCSVOpen] = useState(false)
   const [sepaImportOpen, setSepaImportOpen] = useState(false)
 
@@ -572,7 +572,7 @@ export default function PaymentsPage() {
                   onClick={() => {
                     const phone = player?.phone ?? player?.guardian?.phone ?? ''
                     const msg = getWhatsAppReminderMessage(payment.playerId, payment.playerName)
-                    setWhatsAppPayload({ phone, message: msg, recipientName: payment.playerName })
+                    setWhatsAppPayloads([{ phone, message: msg, recipientName: payment.playerName }])
                   }}
                 >
                   <MessageCircle className="h-4 w-4" />
@@ -1364,7 +1364,7 @@ export default function PaymentsPage() {
                                 const player = players.find(p => p.id === row.playerId)
                                 const phone = player?.phone ?? player?.guardian?.phone ?? ''
                                 const msg = getWhatsAppReminderMessage(row.playerId, row.playerName)
-                                setWhatsAppPayload({ phone, message: msg, recipientName: row.playerName })
+                                setWhatsAppPayloads([{ phone, message: msg, recipientName: row.playerName }])
                               }}
                             >
                               <MessageCircle className="h-4 w-4 mr-2" />
@@ -1491,9 +1491,9 @@ export default function PaymentsPage() {
 
       {/* WhatsApp Notification Dialog */}
       <WhatsAppNotificationDialog
-        open={!!whatsAppPayload}
-        onOpenChange={(open) => { if (!open) setWhatsAppPayload(null) }}
-        payload={whatsAppPayload}
+        open={whatsAppPayloads.length > 0}
+        onOpenChange={(open) => { if (!open) setWhatsAppPayloads([]) }}
+        payloads={whatsAppPayloads}
       />
 
       {/* WhatsApp CSV Dialog */}

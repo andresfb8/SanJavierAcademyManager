@@ -1,7 +1,9 @@
 // ==========================================
 // WhatsApp Notification Dialog
 // ==========================================
-// Editable pre-send dialog that opens a wa.me deep link.
+// Editable pre-send dialog that opens a wa.me deep link. Accepts one or
+// several recipients — after each send it advances to the next one until
+// the queue is exhausted.
 
 import { useState, useEffect } from 'react'
 import {
@@ -28,7 +30,7 @@ export interface WhatsAppPayload {
 interface Props {
     open: boolean
     onOpenChange: (open: boolean) => void
-    payload: WhatsAppPayload | null
+    payloads: WhatsAppPayload[]
 }
 
 // Normalise phone: strips spaces/dashes, adds +34 if no leading +
@@ -40,22 +42,42 @@ function formatPhone(raw: string): string {
     return '+34' + cleaned
 }
 
-export function WhatsAppNotificationDialog({ open, onOpenChange, payload }: Props) {
+export function WhatsAppNotificationDialog({ open, onOpenChange, payloads }: Props) {
+    const [index, setIndex] = useState(0)
     const [message, setMessage] = useState('')
 
-    // Reset message every time the dialog opens with a new payload
+    const payload = payloads[index] ?? null
+
+    // Reset the queue position and message every time the dialog opens
+    useEffect(() => {
+        if (open) setIndex(0)
+    }, [open])
+
     useEffect(() => {
         if (payload) setMessage(payload.message)
     }, [payload])
 
     const phone = payload ? formatPhone(payload.phone) : ''
     const isPhoneValid = phone.length >= 10
+    const isLast = index >= payloads.length - 1
 
     const handleSend = () => {
         if (!isPhoneValid) return
         const url = `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`
         window.open(url, '_blank', 'noopener,noreferrer')
-        onOpenChange(false)
+        if (isLast) {
+            onOpenChange(false)
+        } else {
+            setIndex((i) => i + 1)
+        }
+    }
+
+    const handleSkip = () => {
+        if (isLast) {
+            onOpenChange(false)
+        } else {
+            setIndex((i) => i + 1)
+        }
     }
 
     return (
@@ -65,6 +87,11 @@ export function WhatsAppNotificationDialog({ open, onOpenChange, payload }: Prop
                     <DialogTitle className="flex items-center gap-2">
                         <MessageCircle className="h-5 w-5 text-green-500" />
                         Enviar aviso por WhatsApp
+                        {payloads.length > 1 && (
+                            <span className="text-sm font-normal text-muted-foreground ml-auto">
+                                {index + 1} de {payloads.length}
+                            </span>
+                        )}
                     </DialogTitle>
                     <DialogDescription>
                         Revisa y edita el mensaje antes de abrirlo en WhatsApp.
@@ -99,13 +126,18 @@ export function WhatsAppNotificationDialog({ open, onOpenChange, payload }: Prop
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Cancelar
                     </Button>
+                    {payloads.length > 1 && !isPhoneValid && (
+                        <Button variant="outline" onClick={handleSkip}>
+                            Saltar
+                        </Button>
+                    )}
                     <Button
                         onClick={handleSend}
                         disabled={!isPhoneValid || !message.trim()}
                         className="gap-2 bg-green-600 hover:bg-green-700 text-white"
                     >
                         <MessageCircle className="h-4 w-4" />
-                        Abrir en WhatsApp
+                        {isLast ? 'Abrir en WhatsApp' : 'Abrir y siguiente'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

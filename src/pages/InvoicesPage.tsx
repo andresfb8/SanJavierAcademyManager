@@ -61,7 +61,7 @@ export default function InvoicesPage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false)
 
   // WhatsApp notification
-  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppPayload | null>(null)
+  const [whatsAppPayloads, setWhatsAppPayloads] = useState<WhatsAppPayload[]>([])
 
   // Filtrar facturas
   const filteredInvoices = useMemo(() => {
@@ -372,7 +372,7 @@ export default function InvoicesPage() {
                                       const phone = player?.phone ?? player?.guardian?.phone ?? ''
                                       const clubName = club?.name ?? 'Club de Padel San Javier'
                                       const msg = `Hola ${invoice.playerName}, te informamos que la factura ${invoice.invoiceNumber} de ${clubName} por importe de ${formatCurrency(invoice.total)} está pendiente de pago. Puedes contactarnos para cualquier consulta. ¡Gracias!`
-                                      setWhatsAppPayload({ phone, message: msg, recipientName: invoice.playerName })
+                                      setWhatsAppPayloads([{ phone, message: msg, recipientName: invoice.playerName }])
                                     }}
                                   >
                                     <MessageCircle className="h-4 w-4 mr-2 text-green-600" />
@@ -432,9 +432,9 @@ export default function InvoicesPage() {
 
       {/* WhatsApp Notification Dialog */}
       <WhatsAppNotificationDialog
-        open={!!whatsAppPayload}
-        onOpenChange={(open) => { if (!open) setWhatsAppPayload(null) }}
-        payload={whatsAppPayload}
+        open={whatsAppPayloads.length > 0}
+        onOpenChange={(open) => { if (!open) setWhatsAppPayloads([]) }}
+        payloads={whatsAppPayloads}
       />
     </div>
   )
