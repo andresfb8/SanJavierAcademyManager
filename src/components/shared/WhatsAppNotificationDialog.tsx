@@ -46,12 +46,19 @@ export function WhatsAppNotificationDialog({ open, onOpenChange, payloads }: Pro
     const [index, setIndex] = useState(0)
     const [message, setMessage] = useState('')
 
-    const payload = payloads[index] ?? null
+    const safeIndex = Math.min(index, Math.max(payloads.length - 1, 0))
+    const payload = payloads[safeIndex] ?? null
 
     // Reset the queue position and message every time the dialog opens
     useEffect(() => {
         if (open) setIndex(0)
     }, [open])
+
+    // Defensive: if the payloads array shrinks while open (e.g. a queue
+    // whose caller mutates it in place), clamp rather than reading past the end
+    useEffect(() => {
+        if (index !== safeIndex) setIndex(safeIndex)
+    }, [index, safeIndex])
 
     useEffect(() => {
         if (payload) setMessage(payload.message)
@@ -59,7 +66,7 @@ export function WhatsAppNotificationDialog({ open, onOpenChange, payloads }: Pro
 
     const phone = payload ? formatPhone(payload.phone) : ''
     const isPhoneValid = phone.length >= 10
-    const isLast = index >= payloads.length - 1
+    const isLast = safeIndex >= payloads.length - 1
 
     const handleSend = () => {
         if (!isPhoneValid) return
@@ -89,7 +96,7 @@ export function WhatsAppNotificationDialog({ open, onOpenChange, payloads }: Pro
                         Enviar aviso por WhatsApp
                         {payloads.length > 1 && (
                             <span className="text-sm font-normal text-muted-foreground ml-auto">
-                                {index + 1} de {payloads.length}
+                                {safeIndex + 1} de {payloads.length}
                             </span>
                         )}
                     </DialogTitle>
