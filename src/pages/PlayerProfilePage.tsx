@@ -14,6 +14,7 @@ import { SeasonPaymentDialog } from '@/components/shared/SeasonPaymentDialog'
 import { useDataStore } from '@/stores/dataStore'
 import { ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, Activity, Users, AlertCircle, Edit as EditIcon, FileText, Star, Eye, Plus, Minus, RotateCcw, Send, CheckCircle2, CalendarRange } from 'lucide-react'
 import { cn, formatDate, formatCurrency, calculateAge, isMinor as checkIsMinor } from '@/lib/utils'
+import { resolveInstallmentTariff } from '@/lib/billing-utils'
 import { toast } from '@/hooks/use-toast'
 import { EvaluationDetailView } from '@/components/shared/EvaluationDetailView'
 import type { Evaluation } from '@/types'
@@ -83,6 +84,7 @@ export default function PlayerProfilePage() {
     players,
     enrollments,
     groups,
+    tariffs,
     updatePlayer,
     invitePlayer,
     payments: allBasePayments,
@@ -149,8 +151,10 @@ export default function PlayerProfilePage() {
     )
     for (const enrollment of activeEnrollments) {
       const group = groups.find((g) => g.id === enrollment.groupId)
-      if (!group || group.billingFrequency !== 'installments' || !group.installmentPrices) continue
-      Object.entries(group.installmentPrices)
+      if (!group) continue
+      const tariff = resolveInstallmentTariff(enrollment, group, tariffs)
+      if (!tariff) continue
+      Object.entries(tariff.installmentPrices)
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([key, amount]) => {
           const lookupKey = `${enrollment.id}__${key}`
@@ -167,7 +171,7 @@ export default function PlayerProfilePage() {
         })
     }
     return result
-  }, [player, allBasePayments, activeEnrollments, groups])
+  }, [player, allBasePayments, activeEnrollments, groups, tariffs])
 
   // All enrollments for groups tab
   const playerEnrollments = useMemo(() => {
@@ -837,7 +841,14 @@ export default function PlayerProfilePage() {
                   <div className="space-y-4">
                     {playerEnrollments.map((enrollment) => {
                       const group = groups.find((g) => g.id === enrollment.groupId)
-                      const price = enrollment.customPrice ?? group?.defaultTariffPrice ?? 0
+                      const enrollmentTariff = tariffs.find((t) => t.id === enrollment.tariffId)
+                      const price = enrollment.customPrice ?? enrollmentTariff?.price ?? group?.defaultTariffPrice ?? 0
+                      // Para cuotas sin precio personalizado, `price` es el total de la
+                      // temporada (Tariff.price), no un importe recurrente — se aclara para
+                      // no dar la impresion de que esa cifra se cobra cada mes.
+                      const isInstallmentsTotal =
+                        enrollment.customPrice === undefined &&
+                        (enrollment.billingFrequency ?? group?.billingFrequency) === 'installments'
 
                       return (
                         <div
@@ -859,6 +870,7 @@ export default function PlayerProfilePage() {
                             </div>
                             <p className="text-xs text-muted-foreground">
                               Tarifa: {enrollment.tariffName} &middot; {formatCurrency(price)}
+                              {isInstallmentsTotal && ' (según cuotas)'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Inscrito: {formatDate(enrollment.enrollmentDate)}

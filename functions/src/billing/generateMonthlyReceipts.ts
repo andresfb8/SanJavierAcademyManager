@@ -2,7 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import { isBillingMonth, cycleLength, remainingMonthsInGroup, billingFrequencyLabel } from "./billing-utils";
+import { isBillingMonth, cycleLength, remainingMonthsInGroup, billingFrequencyLabel, resolveEnrollmentAmount } from "./billing-utils";
 
 // ---------------------------------------------------------------------------
 // Spanish month names (1-indexed: index 0 unused)
@@ -52,6 +52,12 @@ interface Group {
   startDate?: Timestamp;
   endDate?: Timestamp;
   isActive: boolean;
+}
+
+interface Tariff {
+  id: string;
+  price: number;
+  installmentPrices?: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +148,16 @@ async function processClub(
     groupsMap.set(doc.id, { id: doc.id, ...doc.data() } as Group);
   }
 
+  // Pre-fetch all tariffs: la tarifa de la matricula manda siempre sobre
+  // el precio del grupo (ver resolveEnrollmentAmount en billing-utils.ts).
+  // No se filtra por isActive: una matricula antigua debe poder seguir
+  // resolviendo su tarifa aunque ya no este disponible para altas nuevas.
+  const tariffsSnap = await db.collection("tariffs").where("clubId", "==", clubId).get();
+  const tariffsMap = new Map<string, Tariff>();
+  for (const doc of tariffsSnap.docs) {
+    tariffsMap.set(doc.id, { id: doc.id, ...doc.data() } as Tariff);
+  }
+
   // Fetch all active enrollments
   const enrollmentsSnap = await db
     .collection("enrollments")
@@ -170,6 +186,17 @@ async function processClub(
     if (!group) {
       logger.warn(
         `Club ${clubId}: group ${enrollment.groupId} not found ` +
+        `for enrollment ${enrollment.id}, skipping.`,
+      );
+      skipped++;
+      continue;
+    }
+
+    // La tarifa de la matricula manda siempre sobre la del grupo.
+    const tariff = tariffsMap.get(enrollment.tariffId);
+    if (!tariff) {
+      logger.warn(
+        `Club ${clubId}: tariff ${enrollment.tariffId} not found ` +
         `for enrollment ${enrollment.id}, skipping.`,
       );
       skipped++;
@@ -211,16 +238,23 @@ async function processClub(
       continue;
     }
 
-    // For installments: verify the specific month is configured
-    if (freq === "installments") {
-      // Support both legacy installmentMonths (number[]) and installmentPrices (Record<YYYY-MM, number>)
-      const billingKey = `${billingYear}-${String(billingMonth).padStart(2, "0")}`;
-      const inPrices = group.installmentPrices?.[billingKey] !== undefined;
-      const inMonths = (group.installmentMonths ?? []).includes(billingMonth);
-      if (!inPrices && !inMonths) {
-        skipped++;
-        continue;
-      }
+    // Resolver el importe a partir de LA TARIFA DE LA MATRICULA (nunca la
+    // del grupo) — ver resolveEnrollmentAmount en billing-utils.ts. null
+    // significa que esta matricula no se puede facturar este mes (p.ej.
+    // cuotas sin precio configurado para este mes en su propia tarifa).
+    const billingKey = `${billingYear}-${String(billingMonth).padStart(2, "0")}`;
+    const amount = resolveEnrollmentAmount(
+      {
+        billingFrequency: freq,
+        customPrice: enrollment.customPrice,
+        tariffPrice: tariff.price,
+        tariffInstallmentPrices: tariff.installmentPrices,
+      },
+      billingKey,
+    );
+    if (amount === null) {
+      skipped++;
+      continue;
     }
 
     // -----------------------------------------------------------------------
@@ -242,19 +276,8 @@ async function processClub(
     }
 
     // -----------------------------------------------------------------------
-    // Calculate amount and concept
+    // Calculate concept
     // -----------------------------------------------------------------------
-    // El importe de un ciclo trimestral/anual es el que se ha configurado
-    // directamente en la tarifa/matrícula (no se multiplica por meses del
-    // ciclo); customPrice, si está definido, manda sobre el precio del grupo.
-    // Para plazos: usar el precio específico del mes (YYYY-MM) del grupo,
-    // igual que ya hace src/lib/firestoreSync.ts — antes esta función
-    // ignoraba installmentPrices y cobraba el precio total de la tarifa.
-    const billingKey = `${billingYear}-${String(billingMonth).padStart(2, "0")}`;
-    const baseAmount = freq === "installments" && group.installmentPrices
-      ? (group.installmentPrices[billingKey] ?? group.defaultTariffPrice)
-      : group.defaultTariffPrice;
-    const amount = enrollment.customPrice ?? baseAmount;
     let concept = `Cuota ${monthName} ${billingYear} - ${group.name}`;
 
     // Aviso de ciclo incompleto: si el ciclo (trimestral/anual) no cabe

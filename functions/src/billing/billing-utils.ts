@@ -66,3 +66,27 @@ export function remainingMonthsInGroup(
   const billingMonthsTotal = billingYear * 12 + billingMonth;
   return endMonthsTotal - billingMonthsTotal + 1;
 }
+
+export interface EnrollmentAmountInput {
+  billingFrequency: BillingFrequency;
+  customPrice?: number;
+  tariffPrice?: number;
+  tariffInstallmentPrices?: Record<string, number>;
+}
+
+/**
+ * Importe a facturar a una matricula para `billingKey` ("YYYY-MM").
+ * Espejo exacto de resolveEnrollmentAmount en src/lib/billing-utils.ts
+ * (esa version SI tiene tests) — mantener ambas sincronizadas si se
+ * cambia una.
+ */
+export function resolveEnrollmentAmount(
+  input: EnrollmentAmountInput,
+  billingKey: string,
+): number | null {
+  if (input.customPrice !== undefined) return input.customPrice;
+  if (input.billingFrequency === "installments") {
+    return input.tariffInstallmentPrices?.[billingKey] ?? null;
+  }
+  return input.tariffPrice ?? null;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys } from '@/lib/billing-utils'
+import { cycleLength, remainingMonthsInGroup, stripCycleWarning, buildInstallmentMonthKeys, resolveEnrollmentAmount, resolveInstallmentTariff } from '@/lib/billing-utils'
 
 describe('cycleLength', () => {
   it('mensual cubre 1 mes', () => {
@@ -91,5 +91,81 @@ describe('buildInstallmentMonthKeys', () => {
     expect(months).toHaveLength(60)
     expect(months[0]).toBe('2024-01')
     expect(months[59]).toBe('2028-12')
+  })
+})
+
+describe('resolveEnrollmentAmount', () => {
+  it('devuelve el precio de la tarifa para frecuencias no-installments', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'monthly', tariffPrice: 45 }, '2026-09')).toBe(45)
+  })
+
+  it('devuelve el precio del mes concreto para installments', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'installments', tariffInstallmentPrices: { '2026-09': 90 } },
+      '2026-09'
+    )).toBe(90)
+  })
+
+  it('devuelve null si installments no tiene precio para ese mes', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'installments', tariffInstallmentPrices: { '2026-11': 120 } },
+      '2026-09'
+    )).toBeNull()
+  })
+
+  it('devuelve null si una frecuencia no-installments no tiene tariffPrice', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'monthly' }, '2026-09')).toBeNull()
+  })
+
+  it('customPrice gana siempre, incluso sobre installments', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'installments', customPrice: 70, tariffInstallmentPrices: { '2026-09': 90 } },
+      '2026-09'
+    )).toBe(70)
+  })
+
+  it('customPrice de 0 tambien gana (no se trata como falsy)', () => {
+    expect(resolveEnrollmentAmount(
+      { billingFrequency: 'monthly', customPrice: 0, tariffPrice: 45 },
+      '2026-09'
+    )).toBe(0)
+  })
+
+  it('tariffPrice de 0 (tarifa gratuita) tambien se factura, no se trata como falsy', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'monthly', tariffPrice: 0 }, '2026-09')).toBe(0)
+  })
+
+  it('devuelve null si installments no tiene calendario de precios en absoluto', () => {
+    expect(resolveEnrollmentAmount({ billingFrequency: 'installments' }, '2026-09')).toBeNull()
+  })
+})
+
+describe('resolveInstallmentTariff', () => {
+  const group = { billingFrequency: 'installments' as const }
+  const tariffs = [
+    { id: 't1', installmentPrices: { '2026-09': 90 } },
+    { id: 't2' }, // tarifa sin calendario de cuotas configurado
+  ]
+
+  it('resuelve la tarifa de la matricula cuando la frecuencia efectiva es installments', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't1', billingFrequency: 'installments' }, group, tariffs))
+      .toEqual({ id: 't1', installmentPrices: { '2026-09': 90 } })
+  })
+
+  it('usa la frecuencia del grupo como fallback si la matricula no tiene la suya', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't1' }, group, tariffs))
+      .toEqual({ id: 't1', installmentPrices: { '2026-09': 90 } })
+  })
+
+  it('devuelve null si la frecuencia efectiva no es installments', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't1', billingFrequency: 'monthly' }, group, tariffs)).toBeNull()
+  })
+
+  it('devuelve null si la matricula referencia una tarifa que no existe', () => {
+    expect(resolveInstallmentTariff({ tariffId: 'no-existe', billingFrequency: 'installments' }, group, tariffs)).toBeNull()
+  })
+
+  it('devuelve null si la tarifa existe pero no tiene calendario de cuotas', () => {
+    expect(resolveInstallmentTariff({ tariffId: 't2', billingFrequency: 'installments' }, group, tariffs)).toBeNull()
   })
 })

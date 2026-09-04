@@ -31,6 +31,7 @@ export {
 // Firestore triggers
 // ---------------------------------------------------------------------------
 export { onPlayerStatusChange } from "./triggers/onPlayerStatusChange";
+export { onUserCreated } from "./triggers/onUserCreate";
 
 // ---------------------------------------------------------------------------
 // Push notifications

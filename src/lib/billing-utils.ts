@@ -97,3 +97,58 @@ export function buildInstallmentMonthKeys(
   }
   return months
 }
+
+export interface EnrollmentAmountInput {
+  billingFrequency: BillingFrequency
+  customPrice?: number
+  tariffPrice?: number
+  tariffInstallmentPrices?: Record<string, number>
+}
+
+/**
+ * Importe a facturar a una matricula para `billingKey` ("YYYY-MM"),
+ * resuelto siempre a partir de SU PROPIA tarifa (nunca la del grupo).
+ * `null` significa "no se puede facturar este mes" (tarifa de cuotas sin
+ * precio para ese mes, o tarifa sin precio base en el resto de
+ * frecuencias) — el caller debe saltar la matricula, no caer de vuelta a
+ * ningun precio de grupo (ese era exactamente el bug que esta funcion
+ * sustituye: usar group.defaultTariffPrice/installmentPrices en vez de
+ * la tarifa individual de cada matricula).
+ */
+export function resolveEnrollmentAmount(
+  input: EnrollmentAmountInput,
+  billingKey: string
+): number | null {
+  if (input.customPrice !== undefined) return input.customPrice
+  if (input.billingFrequency === 'installments') {
+    return input.tariffInstallmentPrices?.[billingKey] ?? null
+  }
+  return input.tariffPrice ?? null
+}
+
+export interface InstallmentTariff {
+  id: string
+  installmentPrices: Record<string, number>
+}
+
+/**
+ * Resuelve la tarifa de cuotas de una matricula, o `null` si esta
+ * matricula no se factura por cuotas (frecuencia efectiva, con el mismo
+ * fallback al grupo que ya usa el resto de la facturacion) o si su
+ * tarifa no tiene calendario de precios. Comparte la misma regla que
+ * resolveEnrollmentAmount: la tarifa de la matricula manda siempre sobre
+ * la del grupo — usado tanto por la generacion de cuotas sueltas de un
+ * alumno (dataStore.ts) como por el calculo de que cuotas le faltan por
+ * generar (PlayerProfilePage.tsx), para que ambos no puedan desincronizarse.
+ */
+export function resolveInstallmentTariff(
+  enrollment: { tariffId: string; billingFrequency?: BillingFrequency },
+  group: { billingFrequency: BillingFrequency },
+  tariffs: { id: string; installmentPrices?: Record<string, number> }[]
+): InstallmentTariff | null {
+  const freq = enrollment.billingFrequency ?? group.billingFrequency
+  if (freq !== 'installments') return null
+  const tariff = tariffs.find((t) => t.id === enrollment.tariffId)
+  if (!tariff?.installmentPrices) return null
+  return { id: tariff.id, installmentPrices: tariff.installmentPrices }
+}
