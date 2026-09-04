@@ -38,6 +38,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
+import { paymentsKpis } from '@/lib/finance-analytics'
 import { prepareSepaPayments, generateSepaXml } from '@/lib/sepa-utils'
 import type { SepaClubConfig } from '@/lib/sepa-utils'
 import { PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
@@ -243,44 +244,24 @@ export default function PaymentsPage() {
     )
   }, [allPayments, selectedMonth, selectedYear])
 
-  const previousMonthAllPayments = useMemo(() => {
-    const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1
-    const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear
-    return allPayments.filter(
-      (p) => p.billingMonth === prevMonth && p.billingYear === prevYear
+  const monthKeys = useMemo(() => new Set([`${selectedYear}-${selectedMonth}`]), [selectedYear, selectedMonth])
+
+  const kpis = useMemo(
+    () => paymentsKpis(currentMonthAllPayments, monthKeys, now),
+    [currentMonthAllPayments, monthKeys]
+  )
+
+  const devueltosDelMes = useMemo(() => {
+    return allBasePayments.filter(
+      (p) =>
+        p.category === 'otro' &&
+        p.concept === 'Recargo por devolución SEPA' &&
+        p.billingMonth === selectedMonth &&
+        p.billingYear === selectedYear
     )
-  }, [allPayments, selectedMonth, selectedYear])
+  }, [allBasePayments, selectedMonth, selectedYear])
 
-  const ingresosMes = useMemo(() => {
-    return currentMonthAllPayments
-      .filter((p) => p.status === 'pagado')
-      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
-  }, [currentMonthAllPayments])
-
-  const ingresosMesAnterior = useMemo(() => {
-    return previousMonthAllPayments
-      .filter((p) => p.status === 'pagado')
-      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
-  }, [previousMonthAllPayments])
-
-  const ingresosTrend = useMemo(() => {
-    if (ingresosMesAnterior === 0) return 0
-    return Math.round(((ingresosMes - ingresosMesAnterior) / ingresosMesAnterior) * 100)
-  }, [ingresosMes, ingresosMesAnterior])
-
-  const pendienteCobro = useMemo(() => {
-    return currentMonthAllPayments
-      .filter((p) => p.status === 'pendiente')
-      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
-  }, [currentMonthAllPayments])
-
-  const tasaCobro = useMemo(() => {
-    if (currentMonthAllPayments.length === 0) return 0
-    const pagados = currentMonthAllPayments.filter((p) => p.status === 'pagado').length
-    return Math.round((pagados / currentMonthAllPayments.length) * 100)
-  }, [currentMonthAllPayments])
-
-  const totalRecibos = currentMonthAllPayments.length
+  const devueltosAmount = devueltosDelMes.reduce((sum, p) => sum + Number(p.amount || 0), 0)
 
   // --- Annual summary data (usando TODOS los origenes) ---
   const annualSummary = useMemo<AnnualSummaryRow[]>(() => {
@@ -975,32 +956,28 @@ export default function PaymentsPage() {
         {viewMode === 'mensual' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              title="Ingresos del mes"
-              value={formatCurrency(ingresosMes)}
+              title="Cobrado"
+              value={formatCurrency(kpis.paidAmount)}
               icon={DollarSign}
-              trend={{
-                value: ingresosTrend,
-                label: 'vs mes anterior',
-              }}
               iconClassName="bg-green-100 text-green-700"
             />
             <StatCard
-              title="Pendiente de cobro"
-              value={formatCurrency(pendienteCobro)}
-              icon={AlertCircle}
-              iconClassName="bg-yellow-100 text-yellow-700"
-            />
-            <StatCard
-              title="Tasa de cobro"
-              value={`${tasaCobro}%`}
-              icon={TrendingUp}
+              title="Pendiente"
+              value={formatCurrency(kpis.pendingAmount)}
+              icon={FileText}
               iconClassName="bg-blue-100 text-blue-700"
             />
             <StatCard
-              title="Total recibos"
-              value={totalRecibos}
-              icon={FileText}
-              iconClassName="bg-purple-100 text-purple-700"
+              title="Vencido"
+              value={formatCurrency(kpis.overdueAmount)}
+              icon={AlertCircle}
+              iconClassName="bg-red-100 text-red-700"
+            />
+            <StatCard
+              title="Devueltos"
+              value={devueltosDelMes.length}
+              icon={RotateCcw}
+              iconClassName="bg-amber-100 text-amber-700"
             />
           </div>
         )}
