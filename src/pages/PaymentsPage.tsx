@@ -363,6 +363,42 @@ export default function PaymentsPage() {
     }
   }
 
+  const handleBulkMarkPaid = () => {
+    const targets = selectedPayments.filter((p) => p.status === 'pendiente')
+    if (targets.length === 0) return
+    if (!window.confirm(`¿Marcar como cobrados ${targets.length} recibo${targets.length === 1 ? '' : 's'} por transferencia?`)) return
+
+    targets.forEach((payment) => {
+      if (payment.source === 'evento') {
+        markEventPaymentPaid(payment.id, 'transferencia')
+      } else if (payment.source === 'clase_particular') {
+        markPrivateLessonPaymentPaid(payment.id, 'transferencia')
+      } else {
+        markPaymentPaid(payment.id, 'transferencia')
+      }
+    })
+    setSelectedPaymentIds(new Set())
+  }
+
+  const handleBulkRemind = () => {
+    const targets = selectedPayments.filter((p) => p.status === 'pendiente')
+    const payloads: WhatsAppPayload[] = targets
+      .map((payment) => {
+        const player = players.find((pl) => pl.id === payment.playerId)
+        const phone = player?.phone ?? player?.guardian?.phone ?? ''
+        if (!phone) return null
+        return {
+          phone,
+          message: getWhatsAppReminderMessage(payment.playerId, payment.playerName),
+          recipientName: payment.playerName,
+        }
+      })
+      .filter((p): p is WhatsAppPayload => p !== null)
+
+    if (payloads.length === 0) return
+    setWhatsAppPayloads(payloads)
+  }
+
   const handleTogglePayment = (paymentId: string) => {
     setSelectedPaymentIds((prev) => {
       const next = new Set(prev)
@@ -376,21 +412,28 @@ export default function PaymentsPage() {
   }
 
   const handleToggleAll = () => {
-    // Solo pagos pagados sin factura pueden ser seleccionados
-    const selectablePayments = filteredPayments.filter(
-      (p) => p.status === 'pagado' && !p.invoiceId
-    )
-
-    if (selectedPaymentIds.size === selectablePayments.length) {
+    // Cualquier fila visible es seleccionable
+    if (selectedPaymentIds.size === filteredPayments.length) {
       setSelectedPaymentIds(new Set())
     } else {
-      setSelectedPaymentIds(new Set(selectablePayments.map((p) => p.id)))
+      setSelectedPaymentIds(new Set(filteredPayments.map((p) => p.id)))
     }
   }
 
-  const selectableCount = filteredPayments.filter(
-    (p) => p.status === 'pagado' && !p.invoiceId
-  ).length
+  const selectableCount = filteredPayments.length
+
+  const selectedPayments = useMemo(
+    () => filteredPayments.filter((p) => selectedPaymentIds.has(p.id)),
+    [filteredPayments, selectedPaymentIds]
+  )
+
+  const canMarkPaid = selectedPayments.some((p) => p.status === 'pendiente')
+
+  const canRemind = selectedPayments.some(
+    (p) => p.status === 'pendiente' && !!(players.find((pl) => pl.id === p.playerId)?.phone ?? players.find((pl) => pl.id === p.playerId)?.guardian?.phone)
+  )
+
+  const canInvoice = selectedPayments.some((p) => p.status === 'pagado' && !p.invoiceId)
 
   // --- TanStack React Table columns ---
   const columns = useMemo<ColumnDef<NormalizedPayment>[]>(
@@ -406,9 +449,6 @@ export default function PaymentsPage() {
         ),
         cell: ({ row }) => {
           const payment = row.original
-          const isSelectable = payment.status === 'pagado' && !payment.invoiceId
-          if (!isSelectable) return null
-
           return (
             <Checkbox
               checked={selectedPaymentIds.has(payment.id)}
@@ -923,16 +963,32 @@ export default function PaymentsPage() {
                 <span className="hidden sm:inline">WhatsApp CSV</span>
               </Button>
               {selectedPaymentIds.size > 0 && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setShowGenerateInvoiceDialog(true)}
-                  className="gap-1"
-                >
-                  <Receipt className="h-4 w-4" />
-                  <span className="hidden sm:inline">Generar factura ({selectedPaymentIds.size})</span>
-                  <span className="sm:hidden">{selectedPaymentIds.size}</span>
-                </Button>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1">
+                  <span className="text-xs text-muted-foreground px-1">{selectedPaymentIds.size} seleccionados</span>
+                  {canMarkPaid && (
+                    <Button variant="outline" size="sm" onClick={handleBulkMarkPaid} className="gap-1">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Marcar como cobrado</span>
+                    </Button>
+                  )}
+                  {canRemind && (
+                    <Button variant="outline" size="sm" onClick={handleBulkRemind} className="gap-1 text-green-700 border-green-300 hover:bg-green-50">
+                      <MessageCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Enviar recordatorio</span>
+                    </Button>
+                  )}
+                  {canInvoice && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setShowGenerateInvoiceDialog(true)}
+                      className="gap-1"
+                    >
+                      <Receipt className="h-4 w-4" />
+                      <span className="hidden sm:inline">Emitir factura</span>
+                    </Button>
+                  )}
+                </div>
               )}
               <Button
                 size="sm"
