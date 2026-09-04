@@ -1,6 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { Header } from '@/components/layout/Header'
+import { useState, useMemo, useEffect } from 'react'
+import { Link, useOutletContext } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,6 +45,7 @@ import type { PaymentMethod } from '@/types'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
 import type { WhatsAppPayload } from '@/components/shared/WhatsAppNotificationDialog'
+import type { FinanzasOutletContext } from '@/components/layout/FinanzasLayout'
 import { WhatsAppCSVDialog } from '@/components/shared/WhatsAppCSVDialog'
 import { SepaImportDialog } from '@/components/financials/SepaImportDialog'
 import {
@@ -124,6 +124,8 @@ export default function PaymentsPage() {
     events
   } = useDataStore()
 
+  const { setPrimaryAction } = useOutletContext<FinanzasOutletContext>()
+
   const payments = useMemo(() => {
     const currentYear = new Date().getFullYear()
     return allBasePayments.filter(p => p.billingYear === currentYear || p.billingYear === currentYear - 1)
@@ -162,6 +164,11 @@ export default function PaymentsPage() {
 
   // Manual payment dialog
   const [manualDialogOpen, setManualDialogOpen] = useState(false)
+
+  useEffect(() => {
+    setPrimaryAction({ label: 'Registrar cobro', icon: Plus, onClick: () => setManualDialogOpen(true) })
+    return () => setPrimaryAction(null)
+  }, [setPrimaryAction])
 
   // TanStack Table sorting state
   const [sorting, setSorting] = useState<SortingState>([])
@@ -856,8 +863,6 @@ export default function PaymentsPage() {
     alert(`Conciliación completada:\n- ${paidIds.length} recibos cobrados\n- ${returned.length} devoluciones procesadas con recargo.`)
   }
 
-  const selectedMonthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label || ''
-
   // --- Chart data for annual view ---
   const chartData = useMemo(() => {
     return annualSummary.map((r) => ({
@@ -888,76 +893,62 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <Header
-        title="Pagos y Facturacion"
-        subtitle={
-          viewMode === 'mensual'
-            ? `${selectedMonthLabel} ${selectedYear} · ${totalRecibos} recibos`
-            : viewMode === 'anual'
-              ? `Resumen anual ${selectedYear}`
-              : `${pendingByPlayer.length} alumnos con deudas`
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportXLSX}>
-              <Download className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Exportar XLSX</span>
-            </Button>
-            {viewMode === 'mensual' && (
-              <>
-                <Button variant="outline" size="sm" onClick={handleExportSepaXML} title="Exportar XML para domiciliación SEPA">
-                  <Download className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">XML SEPA</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setSepaImportOpen(true)} title="Importar respuestas del banco para conciliar" className="text-blue-600 border-blue-200 hover:bg-blue-50">
-                  <UploadCloud className="h-4 w-4 md:mr-1" />
-                  <span className="hidden md:inline">Conciliar SEPA</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setWhatsappCSVOpen(true)} 
-                  title="Envío masivo WhatsApp CSV"
-                  className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">WhatsApp CSV</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setManualDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Nuevo pago</span>
-                </Button>
-                {selectedPaymentIds.size > 0 && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setShowGenerateInvoiceDialog(true)}
-                    className="gap-1"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    <span className="hidden sm:inline">Generar factura ({selectedPaymentIds.size})</span>
-                    <span className="sm:hidden">{selectedPaymentIds.size}</span>
-                  </Button>
-                )}
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={handleBulkGenerateInvoices} 
-                  title="Generar facturas de todos los cobros que aún no tienen factura"
-                  className="gap-1 border-primary/20 hover:border-primary/40 text-primary"
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleExportXLSX}>
+            <Download className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Exportar XLSX</span>
+          </Button>
+          {viewMode === 'mensual' && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleExportSepaXML} title="Exportar XML para domiciliación SEPA">
+                <Download className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">XML SEPA</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSepaImportOpen(true)} title="Importar respuestas del banco para conciliar" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                <UploadCloud className="h-4 w-4 md:mr-1" />
+                <span className="hidden md:inline">Conciliar SEPA</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWhatsappCSVOpen(true)}
+                title="Envío masivo WhatsApp CSV"
+                className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">WhatsApp CSV</span>
+              </Button>
+              {selectedPaymentIds.size > 0 && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowGenerateInvoiceDialog(true)}
+                  className="gap-1"
                 >
                   <Receipt className="h-4 w-4" />
-                  <span className="hidden sm:inline">Facturar Pendientes</span>
+                  <span className="hidden sm:inline">Generar factura ({selectedPaymentIds.size})</span>
+                  <span className="sm:hidden">{selectedPaymentIds.size}</span>
                 </Button>
-                <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
-                  <FileText className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Generar cuotas</span>
-                </Button>
-              </>
-            )}
-          </div>
-        }
-      />
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkGenerateInvoices}
+                title="Generar facturas de todos los cobros que aún no tienen factura"
+                className="gap-1 border-primary/20 hover:border-primary/40 text-primary"
+              >
+                <Receipt className="h-4 w-4" />
+                <span className="hidden sm:inline">Facturar Pendientes</span>
+              </Button>
+              <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
+                <FileText className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Generar cuotas</span>
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* KPI Cards - only in monthly view */}
