@@ -1119,7 +1119,7 @@ export default function PaymentsPage() {
                   className="w-full sm:w-48"
                 />
               </div>
-              <div className="flex flex-col sm:flex-row flex-wrap gap-3 text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center flex-wrap gap-3 pt-1 text-muted-foreground">
                 <Select
                   options={[
                     { value: '', label: 'Todas las categorias' },
@@ -1127,7 +1127,7 @@ export default function PaymentsPage() {
                   ]}
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full sm:w-44 text-sm"
+                  className="h-8 w-full text-xs sm:w-44"
                 />
                 <Select
                   options={[
@@ -1136,7 +1136,7 @@ export default function PaymentsPage() {
                   ]}
                   value={seasonFilter}
                   onChange={(e) => setSeasonFilter(e.target.value)}
-                  className="w-full sm:w-44 text-sm"
+                  className="h-8 w-full text-xs sm:w-44"
                 />
               </div>
             </div>
