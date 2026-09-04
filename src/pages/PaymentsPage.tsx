@@ -384,8 +384,7 @@ export default function PaymentsPage() {
     const targets = selectedPayments.filter((p) => p.status === 'pendiente')
     const payloads: WhatsAppPayload[] = targets
       .map((payment) => {
-        const player = players.find((pl) => pl.id === payment.playerId)
-        const phone = player?.phone ?? player?.guardian?.phone ?? ''
+        const phone = playerPhoneById.get(payment.playerId)
         if (!phone) return null
         return {
           phone,
@@ -396,6 +395,10 @@ export default function PaymentsPage() {
       .filter((p): p is WhatsAppPayload => p !== null)
 
     if (payloads.length === 0) return
+    const skipped = targets.length - payloads.length
+    if (skipped > 0) {
+      toast.info(`${skipped} recibo${skipped === 1 ? '' : 's'} sin teléfono, omitido${skipped === 1 ? '' : 's'}`)
+    }
     setWhatsAppPayloads(payloads)
   }
 
@@ -427,13 +430,20 @@ export default function PaymentsPage() {
     [filteredPayments, selectedPaymentIds]
   )
 
-  const canMarkPaid = selectedPayments.some((p) => p.status === 'pendiente')
+  const playerPhoneById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of players) {
+      const phone = p.phone ?? p.guardian?.phone ?? ''
+      if (phone) map.set(p.id, phone)
+    }
+    return map
+  }, [players])
 
-  const canRemind = selectedPayments.some(
-    (p) => p.status === 'pendiente' && !!(players.find((pl) => pl.id === p.playerId)?.phone ?? players.find((pl) => pl.id === p.playerId)?.guardian?.phone)
-  )
-
-  const canInvoice = selectedPayments.some((p) => p.status === 'pagado' && !p.invoiceId)
+  const { canMarkPaid, canRemind, canInvoice } = useMemo(() => ({
+    canMarkPaid: selectedPayments.some((p) => p.status === 'pendiente'),
+    canRemind: selectedPayments.some((p) => p.status === 'pendiente' && playerPhoneById.has(p.playerId)),
+    canInvoice: selectedPayments.some((p) => p.status === 'pagado' && !p.invoiceId),
+  }), [selectedPayments, playerPhoneById])
 
   // --- TanStack React Table columns ---
   const columns = useMemo<ColumnDef<NormalizedPayment>[]>(
