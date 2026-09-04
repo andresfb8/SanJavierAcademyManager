@@ -651,6 +651,7 @@ describe('attentionItems', () => {
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('1 recibo vencido')
     expect(items[0].subtitle).toContain('32 días')
+    expect(items[0].href).toBe('/finanzas/pagos?estado=vencido')
   })
 
   it('incluye un aviso de facturas emitidas sin cobrar', () => {

@@ -449,7 +449,7 @@ export function attentionItems(
       id: 'overdue',
       title: `${overdue.length} recibo${overdue.length === 1 ? '' : 's'} vencido${overdue.length === 1 ? '' : 's'}`,
       subtitle: `${formatCurrency(amount)} · el más antiguo lleva ${oldestDays} días`,
-      href: '/finanzas/pagos',
+      href: '/finanzas/pagos?estado=vencido',
     })
   }
 
