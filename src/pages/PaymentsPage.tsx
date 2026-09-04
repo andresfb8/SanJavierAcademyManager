@@ -12,6 +12,8 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { StatCard } from '@/components/shared/StatCard'
 import { GenerateInvoiceDialog } from '@/components/invoices/GenerateInvoiceDialog'
 import { AddManualPaymentDialog } from '@/components/payments/AddManualPaymentDialog'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { FilterChipSelect } from '@/components/shared/FilterChipSelect'
 import { useDataStore } from '@/stores/dataStore'
 import { toast } from '@/hooks/use-toast'
 import {
@@ -35,6 +37,7 @@ import {
   Pencil,
   MessageCircle,
   UploadCloud,
+  MoreHorizontal,
 } from 'lucide-react'
 import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
@@ -946,78 +949,14 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 px-6 pt-6">
-        <div className="flex items-center gap-2 flex-wrap">
+      {viewMode !== 'mensual' && (
+        <div className="flex flex-wrap items-center gap-3 px-6 pt-6">
           <Button variant="outline" size="sm" onClick={handleExportXLSX}>
             <Download className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">Exportar XLSX</span>
           </Button>
-          {viewMode === 'mensual' && (
-            <>
-              <Button variant="outline" size="sm" onClick={handleExportSepaXML} title="Exportar XML para domiciliación SEPA">
-                <Download className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">XML SEPA</span>
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setSepaImportOpen(true)} title="Importar respuestas del banco para conciliar" className="text-blue-600 border-blue-200 hover:bg-blue-50">
-                <UploadCloud className="h-4 w-4 md:mr-1" />
-                <span className="hidden md:inline">Conciliar SEPA</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWhatsappCSVOpen(true)}
-                title="Envío masivo WhatsApp CSV"
-                className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
-              >
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">WhatsApp CSV</span>
-              </Button>
-              {selectedPaymentIds.size > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2 py-1">
-                  <span className="text-xs text-muted-foreground px-1">{selectedPaymentIds.size} seleccionados</span>
-                  {canMarkPaid && (
-                    <Button variant="outline" size="sm" onClick={handleBulkMarkPaid} className="gap-1">
-                      <CheckCircle className="h-4 w-4" />
-                      <span className="hidden sm:inline">Marcar como cobrado</span>
-                    </Button>
-                  )}
-                  {canRemind && (
-                    <Button variant="outline" size="sm" onClick={handleBulkRemind} className="gap-1 text-green-700 border-green-300 hover:bg-green-50">
-                      <MessageCircle className="h-4 w-4" />
-                      <span className="hidden sm:inline">Enviar recordatorio</span>
-                    </Button>
-                  )}
-                  {canInvoice && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => setShowGenerateInvoiceDialog(true)}
-                      className="gap-1"
-                    >
-                      <Receipt className="h-4 w-4" />
-                      <span className="hidden sm:inline">Emitir factura</span>
-                    </Button>
-                  )}
-                </div>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkGenerateInvoices}
-                title="Generar facturas de todos los cobros que aún no tienen factura"
-                className="gap-1 border-primary/20 hover:border-primary/40 text-primary"
-              >
-                <Receipt className="h-4 w-4" />
-                <span className="hidden sm:inline">Facturar Pendientes</span>
-              </Button>
-              <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
-                <FileText className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">Generar cuotas</span>
-              </Button>
-            </>
-          )}
         </div>
-      </div>
+      )}
 
       <div className="p-6 space-y-6">
         {/* KPI Cards - only in monthly view */}
@@ -1129,82 +1068,107 @@ export default function PaymentsPage() {
               onChange={(e) => setSelectedYear(Number(e.target.value))}
               className="w-full sm:w-32"
             />
-
-            {/* Month selector only in monthly view */}
-            {viewMode === 'mensual' && (
-              <Select
-                options={MONTHS.map((m) => ({ value: String(m.value), label: m.label }))}
-                value={String(selectedMonth)}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="w-full sm:w-40"
-              />
-            )}
           </div>
 
-          {/* Monthly view filters */}
+          {/* Monthly view filters + actions (fiel al mock: una sola fila) */}
           {viewMode === 'mensual' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por jugador o concepto..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <Select
-                  options={[
-                    { value: '', label: 'Todos los estados' },
-                    { value: 'pendiente', label: 'Pendiente' },
-                    { value: 'vencido', label: 'Vencido' },
-                    { value: 'pagado', label: 'Pagado' },
-                    { value: 'cancelado', label: 'Cancelado' },
-                  ]}
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full sm:w-48"
-                />
-                <Select
-                  options={[
-                    { value: '', label: 'Todos los metodos' },
-                    ...PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label })),
-                  ]}
-                  value={methodFilter}
-                  onChange={(e) => setMethodFilter(e.target.value)}
-                  className="w-full sm:w-48"
-                />
-                <Select
-                  options={[
-                    { value: '', label: 'Todos los grupos' },
-                    ...groupOptions,
-                  ]}
-                  value={groupFilter}
-                  onChange={(e) => setGroupFilter(e.target.value)}
-                  className="w-full sm:w-48"
+            <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por jugador o concepto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
                 />
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center flex-wrap gap-3 pt-1 text-muted-foreground">
-                <Select
-                  options={[
-                    { value: '', label: 'Todas las categorias' },
-                    ...PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
-                  ]}
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="h-8 w-full text-xs sm:w-44"
-                />
-                <Select
-                  options={[
-                    { value: '', label: 'Todas las temporadas' },
-                    ...seasons.map((s) => ({ value: s.id, label: s.name })),
-                  ]}
-                  value={seasonFilter}
-                  onChange={(e) => setSeasonFilter(e.target.value)}
-                  className="h-8 w-full text-xs sm:w-44"
-                />
-              </div>
+              <FilterChipSelect
+                label="Estado"
+                options={[
+                  { value: '', label: 'Todos' },
+                  { value: 'pendiente', label: 'Pendiente' },
+                  { value: 'vencido', label: 'Vencido' },
+                  { value: 'pagado', label: 'Pagado' },
+                  { value: 'cancelado', label: 'Cancelado' },
+                ]}
+                value={statusFilter}
+                onChange={setStatusFilter}
+              />
+              <FilterChipSelect
+                label="Método"
+                options={[
+                  { value: '', label: 'Todos' },
+                  ...PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label })),
+                ]}
+                value={methodFilter}
+                onChange={setMethodFilter}
+              />
+              <FilterChipSelect
+                label="Mes"
+                options={MONTHS.map((m) => ({ value: String(m.value), label: m.label }))}
+                value={String(selectedMonth)}
+                onChange={(v) => setSelectedMonth(Number(v))}
+              />
+              <FilterChipSelect
+                label="Grupo"
+                options={[
+                  { value: '', label: 'Todos' },
+                  ...groupOptions,
+                ]}
+                value={groupFilter}
+                onChange={setGroupFilter}
+              />
+              <div className="flex-1" />
+              <Button size="sm" onClick={handleGenerateReceipts} title="Generar recibos de cuotas mensuales">
+                <FileText className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Generar recibos</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportXLSX}>
+                <Download className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Exportar</span>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Más acciones">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuItem onClick={() => setWhatsappCSVOpen(true)}>
+                    <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportSepaXML}>
+                    <Download className="h-4 w-4 mr-2" /> XML SEPA
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSepaImportOpen(true)}>
+                    <UploadCloud className="h-4 w-4 mr-2" /> Conciliar SEPA
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleBulkGenerateInvoices}>
+                    <Receipt className="h-4 w-4 mr-2" /> Facturar Pendientes
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <Select
+                      options={[
+                        { value: '', label: 'Todas las categorias' },
+                        ...PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
+                      ]}
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="w-full"
+                    />
+                    <Select
+                      options={[
+                        { value: '', label: 'Todas las temporadas' },
+                        ...seasons.map((s) => ({ value: s.id, label: s.name })),
+                      ]}
+                      value={seasonFilter}
+                      onChange={(e) => setSeasonFilter(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
