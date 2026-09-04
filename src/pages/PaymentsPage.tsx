@@ -976,6 +976,7 @@ export default function PaymentsPage() {
             <StatCard
               title="Devueltos"
               value={devueltosDelMes.length}
+              description={devueltosDelMes.length > 0 ? formatCurrency(devueltosAmount) : undefined}
               icon={RotateCcw}
               iconClassName="bg-amber-100 text-amber-700"
             />
