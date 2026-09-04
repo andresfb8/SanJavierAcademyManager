@@ -433,6 +433,8 @@ export default function PaymentsPage() {
     [filteredPayments, selectedPaymentIds]
   )
 
+  const selectedAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0)
+
   const playerPhoneById = useMemo(() => {
     const map = new Map<string, string>()
     for (const p of players) {
@@ -1195,6 +1197,38 @@ export default function PaymentsPage() {
             ) : (
               <Card>
                 <CardContent className="p-0">
+                  {selectedPaymentIds.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-3 border-b bg-accent/40 px-4 py-2.5">
+                      <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                      <span className="text-sm font-medium">
+                        {selectedPaymentIds.size} recibo{selectedPaymentIds.size === 1 ? '' : 's'} seleccionado{selectedPaymentIds.size === 1 ? '' : 's'} · {formatCurrency(selectedAmount)}
+                      </span>
+                      <div className="flex-1" />
+                      {canMarkPaid && (
+                        <Button variant="outline" size="sm" onClick={handleBulkMarkPaid} className="gap-1">
+                          <CheckCircle className="h-4 w-4" />
+                          <span className="hidden sm:inline">Marcar como cobrado</span>
+                        </Button>
+                      )}
+                      {canRemind && (
+                        <Button variant="outline" size="sm" onClick={handleBulkRemind} className="gap-1 text-green-700 border-green-300 hover:bg-green-50">
+                          <MessageCircle className="h-4 w-4" />
+                          <span className="hidden sm:inline">Enviar recordatorio</span>
+                        </Button>
+                      )}
+                      {canInvoice && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setShowGenerateInvoiceDialog(true)}
+                          className="gap-1"
+                        >
+                          <Receipt className="h-4 w-4" />
+                          <span className="hidden sm:inline">Emitir factura</span>
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   <Table>
                     <TableHeader>
                       {table.getHeaderGroups().map((headerGroup) => (
