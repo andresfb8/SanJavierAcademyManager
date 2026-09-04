@@ -162,6 +162,7 @@ export default function PaymentsPage() {
   const [editConcept, setEditConcept] = useState('')
 
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [methodFilter, setMethodFilter] = useState<string>('')
 
   // Manual payment dialog
   const [manualDialogOpen, setManualDialogOpen] = useState(false)
@@ -228,14 +229,15 @@ export default function PaymentsPage() {
             : p.status === statusFilter
       const matchesGroup = groupFilter === '' || p.groupId === groupFilter
       const matchesCategory = categoryFilter === '' || p.source === categoryFilter
+      const matchesMethod = methodFilter === '' || p.paymentMethod === methodFilter
       const matchesMonth = p.billingMonth === selectedMonth
       const matchesYear = p.billingYear === selectedYear
       const matchesSeason =
         seasonFilter === '' ||
         groups.find((g) => g.id === p.groupId)?.seasonId === seasonFilter
-      return matchesSearch && matchesStatus && matchesGroup && matchesCategory && matchesMonth && matchesYear && matchesSeason
+      return matchesSearch && matchesStatus && matchesGroup && matchesCategory && matchesMethod && matchesMonth && matchesYear && matchesSeason
     })
-  }, [allPayments, search, statusFilter, groupFilter, categoryFilter, selectedMonth, selectedYear, seasonFilter, groups])
+  }, [allPayments, search, statusFilter, groupFilter, categoryFilter, methodFilter, selectedMonth, selectedYear, seasonFilter, groups])
 
   // KPI calculations for current selected month (usando TODOS los origenes)
   const currentMonthAllPayments = useMemo(() => {
@@ -1075,55 +1077,68 @@ export default function PaymentsPage() {
 
           {/* Monthly view filters */}
           {viewMode === 'mensual' && (
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por jugador o concepto..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por jugador o concepto..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  options={[
+                    { value: '', label: 'Todos los estados' },
+                    { value: 'pendiente', label: 'Pendiente' },
+                    { value: 'vencido', label: 'Vencido' },
+                    { value: 'pagado', label: 'Pagado' },
+                    { value: 'cancelado', label: 'Cancelado' },
+                  ]}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full sm:w-48"
+                />
+                <Select
+                  options={[
+                    { value: '', label: 'Todos los metodos' },
+                    ...PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label })),
+                  ]}
+                  value={methodFilter}
+                  onChange={(e) => setMethodFilter(e.target.value)}
+                  className="w-full sm:w-48"
+                />
+                <Select
+                  options={[
+                    { value: '', label: 'Todos los grupos' },
+                    ...groupOptions,
+                  ]}
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
+                  className="w-full sm:w-48"
                 />
               </div>
-              <Select
-                options={[
-                  { value: '', label: 'Todos los estados' },
-                  { value: 'pendiente', label: 'Pendiente' },
-                  { value: 'vencido', label: 'Vencido' },
-                  { value: 'pagado', label: 'Pagado' },
-                  { value: 'cancelado', label: 'Cancelado' },
-                ]}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full sm:w-48"
-              />
-              <Select
-                options={[
-                  { value: '', label: 'Todos los grupos' },
-                  ...groupOptions,
-                ]}
-                value={groupFilter}
-                onChange={(e) => setGroupFilter(e.target.value)}
-                className="w-full sm:w-48"
-              />
-              <Select
-                options={[
-                  { value: '', label: 'Todas las temporadas' },
-                  ...seasons.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-                value={seasonFilter}
-                onChange={(e) => setSeasonFilter(e.target.value)}
-                className="w-full sm:w-48"
-              />
-              <Select
-                options={[
-                  { value: '', label: 'Todas las categorias' },
-                  ...PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
-                ]}
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full sm:w-48"
-              />
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 text-muted-foreground">
+                <Select
+                  options={[
+                    { value: '', label: 'Todas las categorias' },
+                    ...PAYMENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
+                  ]}
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full sm:w-44 text-sm"
+                />
+                <Select
+                  options={[
+                    { value: '', label: 'Todas las temporadas' },
+                    ...seasons.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                  value={seasonFilter}
+                  onChange={(e) => setSeasonFilter(e.target.value)}
+                  className="w-full sm:w-44 text-sm"
+                />
+              </div>
             </div>
           )}
         </div>
