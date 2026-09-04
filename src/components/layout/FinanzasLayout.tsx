@@ -37,6 +37,7 @@ export function FinanzasLayout() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
 
   const isResumen = location.pathname === '/finanzas/resumen'
+  const isPagos = location.pathname === '/finanzas/pagos'
 
   const activeSeason = club ? seasons.find((s) => s.id === club.activeSeasonId) : undefined
 
@@ -58,9 +59,11 @@ export function FinanzasLayout() {
     return monthEnd >= activeSeason.startDate && monthStart <= activeSeason.endDate
   }
 
+  const pagosCount = payments.filter((p) => billingMonthInActiveSeason(p.billingYear, p.billingMonth)).length
+
   const tabs: FinanzasTab[] = [
     { name: 'Resumen', href: '/finanzas/resumen' },
-    { name: 'Pagos', href: '/finanzas/pagos', count: payments.filter((p) => billingMonthInActiveSeason(p.billingYear, p.billingMonth)).length },
+    { name: 'Pagos', href: '/finanzas/pagos', count: pagosCount },
     { name: 'Facturas', href: '/finanzas/facturas', count: invoices.filter((i) => i.status !== 'cancelled' && inActiveSeason(i.invoiceDate)).length },
     { name: 'Ingresos y gastos', href: '/finanzas/ingresos-gastos' },
     { name: 'Análisis', href: '/finanzas/analisis' },
@@ -68,7 +71,9 @@ export function FinanzasLayout() {
 
   const subtitle = isResumen
     ? `Resumen de ${MONTHS.find((m) => m.value === selectedMonth)?.label.toLowerCase()} ${selectedYear}${activeSeason ? ` · temporada ${activeSeason.name}` : ''}`
-    : undefined
+    : isPagos
+      ? `Pagos · ${MONTHS.find((m) => m.value === now.getMonth() + 1)?.label.toLowerCase()} ${now.getFullYear()} · ${pagosCount} recibos de la temporada`
+      : undefined
 
   // No se limpia `primaryAction` aquí a propósito — mismo motivo que en
   // ClasesLayout/PersonasLayout: el cleanup de la página saliente ya lo
