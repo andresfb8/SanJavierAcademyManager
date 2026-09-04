@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,7 +40,7 @@ import { formatCurrency, formatDate, normalizeText } from '@/lib/utils'
 import { normalizeAllPayments } from '@/lib/payment-utils'
 import { prepareSepaPayments, generateSepaXml } from '@/lib/sepa-utils'
 import type { SepaClubConfig } from '@/lib/sepa-utils'
-import { PAYMENT_STATUSES, PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
+import { PAYMENT_METHODS, PAYMENT_CATEGORIES, MONTHS } from '@/constants'
 import type { PaymentMethod } from '@/types'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import { WhatsAppNotificationDialog } from '@/components/shared/WhatsAppNotificationDialog'
@@ -170,6 +170,14 @@ export default function PaymentsPage() {
     return () => setPrimaryAction(null)
   }, [setPrimaryAction])
 
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    const estado = searchParams.get('estado')
+    if (estado === 'vencido') setStatusFilter('vencido')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // TanStack Table sorting state
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -211,7 +219,12 @@ export default function PaymentsPage() {
         search === '' ||
         normalizeText(p.playerName).includes(q) ||
         normalizeText(p.concept).includes(q)
-      const matchesStatus = statusFilter === '' || p.status === statusFilter
+      const matchesStatus =
+        statusFilter === ''
+          ? true
+          : statusFilter === 'vencido'
+            ? p.status === 'pendiente' && !!p.dueDate && new Date(p.dueDate) < now
+            : p.status === statusFilter
       const matchesGroup = groupFilter === '' || p.groupId === groupFilter
       const matchesCategory = categoryFilter === '' || p.source === categoryFilter
       const matchesMonth = p.billingMonth === selectedMonth
@@ -470,7 +483,14 @@ export default function PaymentsPage() {
       {
         accessorKey: 'status',
         header: ({ column }) => <SortableHeader column={column}>Estado</SortableHeader>,
-        cell: ({ getValue }) => <StatusBadge status={getValue<string>()} />,
+        cell: ({ row }) => {
+          const payment = row.original
+          const displayStatus =
+            payment.status === 'pendiente' && payment.dueDate && new Date(payment.dueDate) < now
+              ? 'vencido'
+              : payment.status
+          return <StatusBadge status={displayStatus} />
+        },
       },
       {
         accessorKey: 'dueDate',
@@ -1090,7 +1110,10 @@ export default function PaymentsPage() {
               <Select
                 options={[
                   { value: '', label: 'Todos los estados' },
-                  ...PAYMENT_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+                  { value: 'pendiente', label: 'Pendiente' },
+                  { value: 'vencido', label: 'Vencido' },
+                  { value: 'pagado', label: 'Pagado' },
+                  { value: 'cancelado', label: 'Cancelado' },
                 ]}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
