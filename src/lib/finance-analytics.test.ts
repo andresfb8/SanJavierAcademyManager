@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint, collectionStats, monthlyTotals, collectionBreakdown, attentionItems, forecastNextMonth, activeMonthlyEnrollmentAmounts } from '@/lib/finance-analytics'
+import { pctChange, revenueByOrigin, revenueByAgeGroup, revenueByLevel, contributionMarginByCategory, costStructure, breakEvenPoint, collectionStats, monthlyTotals, collectionBreakdown, paymentsKpis, attentionItems, forecastNextMonth, activeMonthlyEnrollmentAmounts } from '@/lib/finance-analytics'
 import type { NormalizedPayment } from '@/lib/payment-utils'
 import type { AcademyEvent, EventPayment, PrivateLesson, PrivateLessonPayment, CoachSalaryConfig, Group, Player, ClubTransaction, Invoice, Enrollment } from '@/types'
 
@@ -571,6 +571,51 @@ describe('collectionBreakdown', () => {
     ]
     const result = collectionBreakdown(payments, new Set(['2026-8']), now)
     expect(result.total).toBe(0)
+  })
+})
+
+describe('paymentsKpis', () => {
+  const now = new Date(2026, 7, 28)
+
+  it('separa cobrado, pendiente (futuro) y vencido (pasado), de todas las fuentes', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'evento', playerId: 'p1', playerName: 'A', concept: 'Evento', amount: 100, status: 'pagado', billingMonth: 8, billingYear: 2026 },
+      { id: 'b', source: 'clase_particular', playerId: 'p2', playerName: 'B', concept: 'Clase', amount: 50, status: 'pendiente', billingMonth: 8, billingYear: 2026, dueDate: new Date(2026, 8, 5) },
+      { id: 'c', source: 'cuota', playerId: 'p3', playerName: 'C', concept: 'Cuota', amount: 30, status: 'pendiente', billingMonth: 8, billingYear: 2026, dueDate: new Date(2026, 7, 1) },
+    ]
+    const result = paymentsKpis(payments, new Set(['2026-8']), now)
+    expect(result.paidAmount).toBe(100)
+    expect(result.paidCount).toBe(1)
+    expect(result.pendingAmount).toBe(50)
+    expect(result.pendingCount).toBe(1)
+    expect(result.overdueAmount).toBe(30)
+    expect(result.overdueCount).toBe(1)
+  })
+
+  it('ignora pagos fuera de monthKeys', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'cuota', playerId: 'p1', playerName: 'A', concept: 'Cuota', amount: 999, status: 'pagado', billingMonth: 5, billingYear: 2026 },
+    ]
+    const result = paymentsKpis(payments, new Set(['2026-8']), now)
+    expect(result.paidAmount).toBe(0)
+    expect(result.paidCount).toBe(0)
+  })
+
+  it('un pendiente sin dueDate cuenta como pendiente, no vencido', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'cuota', playerId: 'p1', playerName: 'A', concept: 'Cuota', amount: 40, status: 'pendiente', billingMonth: 8, billingYear: 2026 },
+    ]
+    const result = paymentsKpis(payments, new Set(['2026-8']), now)
+    expect(result.pendingAmount).toBe(40)
+    expect(result.overdueAmount).toBe(0)
+  })
+
+  it('un cancelado no cuenta en ningun bucket', () => {
+    const payments: NormalizedPayment[] = [
+      { id: 'a', source: 'cuota', playerId: 'p1', playerName: 'A', concept: 'Cuota', amount: 40, status: 'cancelado', billingMonth: 8, billingYear: 2026 },
+    ]
+    const result = paymentsKpis(payments, new Set(['2026-8']), now)
+    expect(result.paidAmount + result.pendingAmount + result.overdueAmount).toBe(0)
   })
 })
 

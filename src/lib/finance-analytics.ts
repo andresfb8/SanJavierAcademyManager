@@ -382,6 +382,44 @@ export function collectionBreakdown(
   return { paidAmount, pendingAmount, overdueAmount, total: paidAmount + pendingAmount + overdueAmount }
 }
 
+export interface PaymentsKpis {
+  paidAmount: number
+  paidCount: number
+  pendingAmount: number
+  pendingCount: number
+  overdueAmount: number
+  overdueCount: number
+}
+
+/**
+ * KPIs de la pagina de Pagos: cobrado/pendiente/vencido dentro de
+ * `monthKeys`, sobre TODAS las fuentes de pago (a diferencia de
+ * `collectionBreakdown`, que se limita a cuota/manual para el Resumen).
+ */
+export function paymentsKpis(
+  payments: NormalizedPayment[],
+  monthKeys: Set<string>,
+  now: Date = new Date()
+): PaymentsKpis {
+  let paidAmount = 0, paidCount = 0, pendingAmount = 0, pendingCount = 0, overdueAmount = 0, overdueCount = 0
+  for (const p of payments) {
+    if (!monthKeys.has(monthKeyOf(p))) continue
+    if (p.status === 'pagado') {
+      paidAmount += p.amount
+      paidCount++
+    } else if (p.status === 'pendiente') {
+      if (p.dueDate && new Date(p.dueDate) < now) {
+        overdueAmount += p.amount
+        overdueCount++
+      } else {
+        pendingAmount += p.amount
+        pendingCount++
+      }
+    }
+  }
+  return { paidAmount, paidCount, pendingAmount, pendingCount, overdueAmount, overdueCount }
+}
+
 export interface AttentionItem {
   id: string
   title: string
